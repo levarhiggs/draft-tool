@@ -120,10 +120,7 @@ function renderShell() {
         <div class="stat-box">
           <div class="stat-label">Age</div>
           <div class="stat-value">${escHtml(p[COL.AGE] || '—')}</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-label">Grade</div>
-          <div class="stat-value">${escHtml(p[COL.GRADE] || '—')}</div>
+          <div class="stat-sublabel">Grade ${escHtml(p[COL.GRADE] || '—')}</div>
         </div>
         <div class="stat-box clickable" id="composite-rank-box" title="Click to see breakdown">
           <div class="stat-label">Composite Seed</div>

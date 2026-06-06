@@ -301,6 +301,12 @@ main {
   margin-top: 4px;
 }
 
+.stat-sublabel {
+  font-size: 0.78rem;
+  color: var(--clr-muted);
+  margin-top: 4px;
+}
+
 /* Photo tile in stats grid */
 .stat-box-photo {
   padding: 0;
