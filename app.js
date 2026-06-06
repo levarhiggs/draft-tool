@@ -37,7 +37,8 @@ const activeFilters = {
 };
 
 // Favorites: Set of player ID strings
-let favorites = new Set(JSON.parse(sessionStorage.getItem('favorites') || '[]'));
+let favorites   = new Set(JSON.parse(sessionStorage.getItem('favorites') || '[]'));
+let searchQuery = '';
 
 async function init() {
   try {
@@ -251,6 +252,12 @@ function applySort(players) {
 
 function applyFilters(players) {
   return players.filter(p => {
+    // Search filter
+    if (searchQuery) {
+      const name = (p[COL.NAME] || '').toLowerCase();
+      if (!name.includes(searchQuery)) return false;
+    }
+
     // Favorites filter
     if (activeFilters.favorites && !favorites.has(String(p[COL.ID]))) return false;
 
@@ -377,6 +384,12 @@ function setupControls() {
   document.getElementById('filter-favorites')?.addEventListener('click', e => {
     activeFilters.favorites = !activeFilters.favorites;
     e.currentTarget.classList.toggle('active', activeFilters.favorites);
+    renderGrid();
+  });
+
+  // Search input
+  document.getElementById('player-search')?.addEventListener('input', e => {
+    searchQuery = e.target.value.trim().toLowerCase();
     renderGrid();
   });
 
