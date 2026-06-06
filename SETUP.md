@@ -1,31 +1,16 @@
 # Draft Tool — Setup Checklist
 
-## 1. Google API Key (required for auto photo/video loading)
-
-The app scans your Drive folders automatically, but needs a free Google API key to do it.
-
-1. Go to https://console.cloud.google.com/
-2. Create a project (or use an existing one)
-3. Go to **APIs & Services → Library** → search "Google Drive API" → Enable it
-4. Go to **APIs & Services → Credentials → Create Credentials → API Key**
-5. Click **Restrict Key**:
-   - Under **API restrictions** → select "Google Drive API" only
-   - Under **Website restrictions** → add your GitHub Pages URL (e.g. `https://yourusername.github.io/*`)
-6. Copy the key
-7. Open `app.js` and replace `AIzaSyD-PLACEHOLDER` with your key
-
-**Cost:** Free. The Drive API free quota is 1 billion requests/day — this app uses ~2 per page load.
+## 1. Google API Key ✅
+- Key is set in `app.js`
+- Referrer restriction added: `https://levarhiggs.github.io/*`
 
 ---
 
-## 2. Firebase Setup
+## 2. Firebase Setup ✅
+- Config is set in `firebase-config.js`
+- Project: `csbc-2026-summer-draft`
 
-1. Go to https://console.firebase.google.com/
-2. Create a project → Add a web app → copy the config object
-3. Paste the config into `firebase-config.js` (replace all the REPLACE_WITH_ values)
-4. Go to **Firestore Database → Create database** (Start in test mode is fine)
-5. Go to **Rules** tab and paste:
-
+Firestore rules (paste in Firebase Console → Firestore → Rules → Publish):
 ```
 rules_version = '2';
 service cloud.firestore {
@@ -39,43 +24,32 @@ service cloud.firestore {
 
 ---
 
-## 3. Google Drive Folders
-
-- Photos folder ID: `1oJCTtCalNQTcQbMsZaOAa4VyAnJr35EV` (already in app.js)
-- Videos folder ID: `1xJq9RH6DTvP3xsAwABlBzBqWw2NtX63q` (already in app.js)
-- Name every photo file exactly as the player's ID: `101.jpg`, `102.jpg`, etc.
+## 3. Google Drive Folders ✅
+- Photos folder ID: `1oJCTtCalNQTcQbMsZaOAa4VyAnJr35EV`
+- Videos folder ID: `1xJq9RH6DTvP3xsAwABlBzBqWw2NtX63q`
+- Name every photo file as the player's ID: `101.jpg`, `102.jpg`, etc.
 - Name every video file the same way: `101.mp4`, `102.mp4`, etc.
-- Both folders must be shared: right-click folder → Share → Anyone with the link → Viewer
+- Both folders must be shared: right-click → Share → Anyone with the link → Viewer
 
 ---
 
-## 4. Google Sheets
-
-- Sheet CSV URL is already set in `app.js`
+## 4. Google Sheets ✅
+- CSV URL is set in `app.js`
 - Column headers must match exactly:
   - `ID`, `Name`, `Age`, `Grade`, `Size (1-5)`, `Handles (1-5)`
   - `Coach Rank`, `Photo Path/Link`, `Video Path/Link`, `Team Assignment`, `Notes`
-- The `Photo Path/Link` and `Video Path/Link` columns are optional overrides —
-  leave them blank if files are named by player ID in Drive
+- `Photo Path/Link` and `Video Path/Link` are optional — leave blank if files are named by player ID
 
 ---
 
 ## 5. Coach Config
-
-- Open `coaches-config.js`
-- Replace the placeholder coach names and PINs with your real coaching staff
-- Update the `TEAMS` array with your actual team names (e.g. "Blue", "Red", "Gold")
+- Edit `coaches-config.js` to update coach names, PINs, and team names
 
 ---
 
-## 6. GitHub Pages Deployment
-
-1. Create a free account at https://github.com
-2. Create a new repository named `draft-tool` (public)
-3. Upload all files from this folder to the repo
-4. Go to repo **Settings → Pages → Source → Deploy from branch → main → / (root)**
-5. Your site will be live at: `https://yourusername.github.io/draft-tool/`
-6. Share that URL with all coaches
+## 6. GitHub Pages ✅
+- Site is live at: https://levarhiggs.github.io/draft-tool/
+- To update the site: upload changed files via github.com or push via GitHub Desktop
 
 ---
 

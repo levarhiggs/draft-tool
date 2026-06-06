@@ -3,9 +3,10 @@ import { getCompositeRank } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 
 // ── CONFIGURATION ──────────────────────────────────────────────────────────────
-const SHEET_CSV_URL   = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQjE0aS5--XrlMU0YAnvS_dQVontr10xdYNPg5OxDe6rkoOzvGkQZ1vsRnKjfPSPP7SHr5g7YJRKbwp/pub?output=csv';
+const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQjE0aS5--XrlMU0YAnvS_dQVontr10xdYNPg5OxDe6rkoOzvGkQZ1vsRnKjfPSPP7SHr5g7YJRKbwp/pub?output=csv';
 const PHOTOS_FOLDER_ID = '1oJCTtCalNQTcQbMsZaOAa4VyAnJr35EV';
 const VIDEOS_FOLDER_ID = '1xJq9RH6DTvP3xsAwABlBzBqWw2NtX63q';
+const DRIVE_API_KEY    = 'AIzaSyAoIlK4ncTUeJjPeOYJLXuj2GoWnMge3X8';
 
 // Column header names — must match your sheet's first row exactly
 const COL = {
@@ -24,16 +25,13 @@ const COL = {
 // ──────────────────────────────────────────────────────────────────────────────
 
 // Drive file index: maps player ID → { photoId, videoId }
-// Populated once on load by scanning both folders via the Drive API.
-// Keys are strings (player IDs), values are Drive file IDs.
-const driveIndex = {};   // { "101": { photoId: "abc123", videoId: "xyz789" }, ... }
+const driveIndex = {};
 
 let allPlayers  = [];
 let currentSort = 'alpha';
 
 async function init() {
   try {
-    // Scan Drive folders and load sheet in parallel
     const [players] = await Promise.all([
       fetchPlayers(),
       buildDriveIndex(),
@@ -70,19 +68,8 @@ async function buildDriveIndex() {
   });
 }
 
-// Uses Drive's sharing page to list folder contents without an API key.
-// Works because the folders are publicly shared.
 async function listDriveFolder(folderId) {
-  // Drive folder index page returns an HTML page we can parse for file metadata.
-  // We use the gdocs export trick: fetch the folder as a JSON feed.
-  const url = `https://drive.google.com/drive/folders/${folderId}`;
-  // Drive doesn't expose a public JSON API without a key, so we use the
-  // undocumented but stable apps.google.com/drive/filelist endpoint instead.
-  const apiUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${folderId}' in parents`)}&fields=files(id,name)&key=AIzaSyD-PLACEHOLDER`;
-
-  // NOTE: Replace AIzaSyD-PLACEHOLDER with a real Google API key restricted to
-  // Drive API read-only. See SETUP.md for instructions.
-  // If no API key is set, fall back to manual links from the sheet.
+  const apiUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${folderId}' in parents`)}&fields=files(id,name)&key=${DRIVE_API_KEY}`;
   try {
     const res = await fetch(apiUrl);
     if (!res.ok) return [];
@@ -97,31 +84,21 @@ function stripExtension(filename) {
   return filename.replace(/\.[^/.]+$/, '').trim();
 }
 
-// Returns the best available photo URL for a player
 export function photoUrl(player) {
-  const id = player[COL.ID];
+  const id       = player[COL.ID];
   const override = player[COL.PHOTO];
-
-  // Manual override link in sheet takes priority
   if (override && override.trim()) return driveFileUrl(extractDriveId(override), 'img');
-
-  // Folder index
   const entry = driveIndex[String(id)];
   if (entry?.photoId) return driveFileUrl(entry.photoId, 'img');
-
   return null;
 }
 
-// Returns the best available video embed URL for a player
 export function videoUrl(player) {
-  const id = player[COL.ID];
+  const id       = player[COL.ID];
   const override = player[COL.VIDEO];
-
   if (override && override.trim()) return driveFileUrl(extractDriveId(override), 'video');
-
   const entry = driveIndex[String(id)];
   if (entry?.videoId) return driveFileUrl(entry.videoId, 'video');
-
   return null;
 }
 
