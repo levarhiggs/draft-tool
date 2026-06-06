@@ -22,6 +22,13 @@ export const COACHES = [
 
 ];
 
+// Coaches allowed to view and change Team Assignment
+// Add or remove names here — must match exactly as written in COACHES above
+export const TEAM_ADMINS = [
+  'Coach Mike',
+  'Coach Levar',
+];
+
 // Team names available for assignment
 export const TEAMS = [
   'Team Mike',

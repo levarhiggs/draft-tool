@@ -235,45 +235,13 @@ main {
 
 /* ── Player Profile Page ── */
 .player-profile {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 32px;
-  align-items: start;
-}
-
-@media (max-width: 768px) {
-  .player-profile { grid-template-columns: 1fr; }
-}
-
-.profile-media { display: flex; flex-direction: column; gap: 16px; }
-
-/* Video gets its own full-width row above the two-column layout */
-.profile-video-row {
-  grid-column: 1 / -1;
-  width: 100%;
-}
-
-.profile-photo {
-  width: 100%;
-  border-radius: var(--radius);
-  border: 1px solid var(--clr-border);
-  object-fit: cover;
-  display: block;
-  background: var(--clr-card);
-}
-
-.profile-photo-placeholder {
-  width: 100%;
-  aspect-ratio: 3/4;
-  background: var(--clr-card);
-  border-radius: var(--radius);
-  border: 1px solid var(--clr-border);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 5rem;
-  color: var(--clr-muted);
+  flex-direction: column;
+  gap: 24px;
+  max-width: 780px;
 }
+
+.profile-video-row { width: 100%; }
 
 .profile-video {
   width: 100%;
@@ -281,7 +249,8 @@ main {
   border: 1px solid var(--clr-border);
   background: #000;
   aspect-ratio: 16/9;
-  min-height: 280px;
+  min-height: 300px;
+  display: block;
 }
 
 .no-video {
@@ -289,6 +258,7 @@ main {
   align-items: center;
   justify-content: center;
   color: var(--clr-muted);
+  min-height: 200px;
 }
 
 .profile-details { display: flex; flex-direction: column; gap: 20px; }
@@ -412,6 +382,70 @@ main {
   margin-top: 8px;
   min-height: 1.2em;
 }
+
+/* ── Seed Buttons ── */
+.seed-section {
+  margin-bottom: 14px;
+}
+
+.seed-label {
+  font-size: 0.85rem;
+  color: var(--clr-muted);
+  margin-bottom: 8px;
+}
+
+.seed-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.seed-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  border: 2px solid var(--clr-border);
+  background: var(--clr-surface);
+  color: var(--clr-text);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.seed-btn:hover {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+}
+
+.seed-btn.selected {
+  background: var(--clr-accent);
+  border-color: var(--clr-accent);
+  color: #fff;
+}
+
+/* ── Notes hint & link ── */
+.notes-hint {
+  color: var(--clr-muted);
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--clr-accent);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 14px;
+  text-align: left;
+}
+
+.btn-link:hover { text-decoration: underline; }
 
 /* ── Notes Display (read-only, all coaches) ── */
 .notes-list { display: flex; flex-direction: column; gap: 10px; }
