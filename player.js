@@ -379,16 +379,22 @@ async function wirePlayerNav() {
   const cached = sessionStorage.getItem('playerSheet');
   if (!cached) return;
   const all = JSON.parse(cached);
-  const sorted = all
-    .map(p => parseInt(p[COL.ID]))
-    .filter(n => !isNaN(n))
-    .sort((a, b) => a - b);
 
-  const currentId = parseInt(playerId);
-  const idx = sorted.indexOf(currentId);
+  // Preserve sheet row order, sorting numerically only when both IDs are numbers
+  const ids = all
+    .map(p => String(p[COL.ID]).trim())
+    .filter(id => id)
+    .sort((a, b) => {
+      const na = parseFloat(a), nb = parseFloat(b);
+      if (!isNaN(na) && !isNaN(nb)) return na - nb;
+      return 0; // non-numeric IDs keep sheet order relative to each other
+    });
 
-  const prevId = idx > 0               ? sorted[idx - 1] : null;
-  const nextId = idx < sorted.length - 1 ? sorted[idx + 1] : null;
+  const currentId = String(playerId).trim();
+  const idx = ids.indexOf(currentId);
+
+  const prevId = idx > 0            ? ids[idx - 1] : null;
+  const nextId = idx < ids.length - 1 ? ids[idx + 1] : null;
 
   const prevBtn = document.getElementById('btn-prev-player');
   const nextBtn = document.getElementById('btn-next-player');
