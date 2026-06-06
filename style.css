@@ -538,6 +538,8 @@ main {
 
 .rank-table tr:last-child td { border-bottom: none; }
 
+.no-rankings-msg { color: var(--clr-muted); }
+
 .rank-footer {
   font-size: 0.82rem;
   color: var(--clr-muted);

@@ -283,7 +283,7 @@ function openRankingsModal(live) {
     ? entries.map(e =>
         `<tr><td>${escHtml(e.coach)}</td><td>${e.val.toFixed(1)}</td></tr>`
       ).join('')
-    : `<tr><td colspan="2" style="color:var(--clr-muted)">No rankings submitted yet.</td></tr>`;
+    : `<tr><td colspan="2" class="no-rankings-msg">No rankings submitted yet.</td></tr>`;
 
   const footerLines = [`Average of ${count} ranking${count !== 1 ? 's' : ''}`];
   if (count >= 2) {
