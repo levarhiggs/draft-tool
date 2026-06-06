@@ -1,6 +1,5 @@
 // app.js — loads player roster from Google Sheets CSV, renders thumbnail grid
 import { getCompositeRank } from './firebase.js';
-import { getCurrentCoach } from './coach-login.js';
 
 // ── CONFIGURATION ──────────────────────────────────────────────────────────────
 const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQjE0aS5--XrlMU0YAnvS_dQVontr10xdYNPg5OxDe6rkoOzvGkQZ1vsRnKjfPSPP7SHr5g7YJRKbwp/pub?output=csv';
