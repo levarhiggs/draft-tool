@@ -86,7 +86,7 @@ function renderProfile() {
 
   const videoHtml = video
     ? `<iframe class="profile-video" src="${video}" allowfullscreen allow="autoplay"></iframe>`
-    : `<div class="profile-video" style="display:flex;align-items:center;justify-content:center;color:var(--clr-muted);">No video available</div>`;
+    : `<div class="profile-video no-video">No video available</div>`;
 
   const compositeDisplay = live.composite !== null
     ? live.composite.toFixed(1)
@@ -99,9 +99,12 @@ function renderProfile() {
 
   const main = document.getElementById('player-main');
   main.innerHTML = `
+    <div class="profile-video-row">
+      ${videoHtml}
+    </div>
+
     <div class="profile-media">
       ${photoHtml}
-      ${videoHtml}
     </div>
 
     <div class="profile-details">

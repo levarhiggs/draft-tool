@@ -236,7 +236,7 @@ main {
 /* ── Player Profile Page ── */
 .player-profile {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 280px 1fr;
   gap: 32px;
   align-items: start;
 }
@@ -246,6 +246,12 @@ main {
 }
 
 .profile-media { display: flex; flex-direction: column; gap: 16px; }
+
+/* Video gets its own full-width row above the two-column layout */
+.profile-video-row {
+  grid-column: 1 / -1;
+  width: 100%;
+}
 
 .profile-photo {
   width: 100%;
@@ -275,6 +281,14 @@ main {
   border: 1px solid var(--clr-border);
   background: #000;
   aspect-ratio: 16/9;
+  min-height: 280px;
+}
+
+.no-video {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--clr-muted);
 }
 
 .profile-details { display: flex; flex-direction: column; gap: 20px; }
