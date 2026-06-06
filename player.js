@@ -302,7 +302,13 @@ function renderCoachPanel() {
 
       ${teamHtml}
 
-      <button class="btn-primary" id="btn-save-coach">Save</button>
+      <div class="save-nav-row">
+        <button class="btn-primary" id="btn-save-coach">Save</button>
+        <div class="player-nav-btns">
+          <button class="btn-secondary btn-sm-nav" id="btn-prev-player">← Prev</button>
+          <button class="btn-secondary btn-sm-nav" id="btn-next-player">Next →</button>
+        </div>
+      </div>
       <div class="save-status" id="save-status"></div>
     </div>`;
 
@@ -367,6 +373,50 @@ function renderCoachPanel() {
       status.textContent = err.message;
     }
   });
+
+  // Prev / Next player navigation by ID order
+  wirePlayerNav();
+}
+
+async function wirePlayerNav() {
+  const cached = sessionStorage.getItem('playerSheet');
+  if (!cached) return;
+  const all = JSON.parse(cached);
+  const sorted = all
+    .map(p => parseInt(p[COL.ID]))
+    .filter(n => !isNaN(n))
+    .sort((a, b) => a - b);
+
+  const currentId = parseInt(playerId);
+  const idx = sorted.indexOf(currentId);
+
+  const prevId = idx > 0               ? sorted[idx - 1] : null;
+  const nextId = idx < sorted.length - 1 ? sorted[idx + 1] : null;
+
+  const prevBtn = document.getElementById('btn-prev-player');
+  const nextBtn = document.getElementById('btn-next-player');
+
+  if (prevBtn) {
+    if (prevId !== null) {
+      prevBtn.addEventListener('click', () => {
+        window.location.href = `player.html?id=${prevId}`;
+      });
+    } else {
+      prevBtn.disabled = true;
+      prevBtn.style.opacity = '0.35';
+    }
+  }
+
+  if (nextBtn) {
+    if (nextId !== null) {
+      nextBtn.addEventListener('click', () => {
+        window.location.href = `player.html?id=${nextId}`;
+      });
+    } else {
+      nextBtn.disabled = true;
+      nextBtn.style.opacity = '0.35';
+    }
+  }
 }
 
 // ── Rankings Modal ────────────────────────────────────────────────────────────

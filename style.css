@@ -519,6 +519,23 @@ main {
   min-height: 1.2em;
 }
 
+.save-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.player-nav-btns {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-sm-nav {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
 /* ── Seed Buttons ── */
 .seed-section {
   margin-bottom: 14px;
