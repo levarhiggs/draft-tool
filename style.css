@@ -324,6 +324,18 @@ main {
   color: var(--clr-muted);
 }
 
+.player-card-flames {
+  display: inline-block;
+  margin-top: 6px;
+  margin-left: 4px;
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: 20px;
+  padding: 2px 6px;
+  font-size: 0.78rem;
+  vertical-align: middle;
+}
+
 .player-card-team {
   font-size: 0.75rem;
   color: var(--clr-success);

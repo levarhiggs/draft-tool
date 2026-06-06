@@ -318,7 +318,7 @@ function playerCardHTML(p, isLoggedIn) {
     if (composite !== null) {
       const dec = composite % 1;
       const flames = dec < 0.2 ? '🔥🔥🔥' : dec < 0.7 ? '🔥🔥' : '🔥';
-      scoreHtml = `<span class="player-card-score">${composite.toFixed(1)} ${flames}</span>`;
+      scoreHtml = `<span class="player-card-score">${composite.toFixed(1)}</span><span class="player-card-flames">${flames}</span>`;
     } else {
       scoreHtml = `<span class="player-card-score unranked">Unseeded</span>`;
     }
