@@ -313,11 +313,16 @@ function playerCardHTML(p, isLoggedIn) {
   const isFav     = favorites.has(String(id));
 
   // Seed only shown when logged in
-  const scoreHtml = isLoggedIn
-    ? (composite !== null
-        ? `<span class="player-card-score">${Math.floor(composite)}</span>`
-        : `<span class="player-card-score unranked">Unseeded</span>`)
-    : '';
+  let scoreHtml = '';
+  if (isLoggedIn) {
+    if (composite !== null) {
+      const dec = composite % 1;
+      const flames = dec < 0.2 ? '🔥🔥🔥' : dec < 0.7 ? '🔥🔥' : '🔥';
+      scoreHtml = `<span class="player-card-score">${composite.toFixed(1)} ${flames}</span>`;
+    } else {
+      scoreHtml = `<span class="player-card-score unranked">Unseeded</span>`;
+    }
+  }
 
   const teamHtml = team
     ? `<div class="player-card-team">${escHtml(team)}</div>` : '';

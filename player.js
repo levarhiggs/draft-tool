@@ -1,6 +1,6 @@
 // player.js — profile page: renders player data, coach panel, ranking modal
 import { photoUrl, videoUrl, escHtml, COL, SHEET_CSV_URL } from './app.js';
-import { subscribePlayer, getCompositeRank, saveRanking, saveNote, saveTeam, deleteNote } from './firebase.js';
+import { subscribePlayer, getCompositeRank, saveRanking, saveNote, saveTeam, deleteNote, decodeRanking } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_ADMINS } from './coaches-config.js';
 
@@ -125,6 +125,10 @@ function renderShell() {
         <div class="stat-box clickable" id="composite-rank-box" title="Click to see breakdown">
           <div class="stat-label">Composite Seed</div>
           <div class="stat-value" id="composite-seed-value">—</div>
+          <div id="your-ranking-section" class="hidden">
+            <div class="stat-label your-ranking-label">Your Ranking</div>
+            <div class="your-ranking-value" id="your-ranking-value"></div>
+          </div>
         </div>
         <div class="stat-box" id="team-stat-box"></div>
       </div>
@@ -149,6 +153,22 @@ function renderLiveStats() {
   // Composite seed value
   const seedEl = document.getElementById('composite-seed-value');
   if (seedEl) seedEl.textContent = live.composite !== null ? live.composite.toFixed(1) : '—';
+
+  // YOUR RANKING — show coach's own decoded seed + modifier label
+  const yourSection = document.getElementById('your-ranking-section');
+  const yourValue   = document.getElementById('your-ranking-value');
+  if (yourSection && yourValue && coach) {
+    const { seed, modifier } = decodeRanking(live.rankings[coach.name] ?? null, live.modifiers, coach.name);
+    if (seed !== null) {
+      const label = modifier || 'Reg';
+      yourValue.textContent = `${seed} · ${label}`;
+      yourSection.classList.remove('hidden');
+    } else {
+      yourSection.classList.add('hidden');
+    }
+  } else if (yourSection) {
+    yourSection.classList.add('hidden');
+  }
 
   // Team tile — only for admins
   const teamBox = document.getElementById('team-stat-box');
@@ -229,14 +249,23 @@ function renderCoachPanel() {
     return;
   }
 
-  const live        = liveData || { rankings: {}, notes: {}, team: '' };
-  const myRank      = live.rankings[coach.name] ?? null;
+  const live        = liveData || { rankings: {}, modifiers: {}, notes: {}, team: '' };
   const myNote      = live.notes[coach.name] ?? '';
   const teamVal     = live.team || '';
   const isTeamAdmin = TEAM_ADMINS.includes(coach.name);
 
+  const { seed: savedSeed, modifier: savedModifier } = decodeRanking(
+    live.rankings[coach.name] ?? null,
+    live.modifiers,
+    coach.name
+  );
+
   const seedButtons = [1,2,3,4,5,6,7,8].map(n => `
-    <button class="seed-btn${myRank === n ? ' selected' : ''}" data-seed="${n}">${n}</button>
+    <button class="seed-btn${savedSeed === n ? ' selected' : ''}" data-seed="${n}">${n}</button>
+  `).join('');
+
+  const modifierButtons = ['Strong', 'Mid', 'Low'].map(m => `
+    <button class="mod-btn${savedModifier === m ? ' selected' : ''}" data-mod="${m}">${m}</button>
   `).join('');
 
   const currentTeam = teamVal || 'Undrafted';
@@ -255,7 +284,11 @@ function renderCoachPanel() {
 
       <div class="seed-section">
         <div class="seed-label">Seed</div>
-        <div class="seed-buttons">${seedButtons}</div>
+        <div class="seed-buttons">
+          ${seedButtons}
+          <div class="mod-divider"></div>
+          ${modifierButtons}
+        </div>
       </div>
 
       <label>Your Notes <span class="notes-hint">(be respectful in your public commentary)</span>
@@ -269,13 +302,29 @@ function renderCoachPanel() {
       <div class="save-status" id="save-status"></div>
     </div>`;
 
-  // Track selected seed locally so form isn't reset on re-render
-  let selectedSeed = myRank;
+  // Track selected seed + modifier locally so form isn't reset on re-render
+  let selectedSeed     = savedSeed;
+  let selectedModifier = savedModifier;
+
   container.querySelectorAll('.seed-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       selectedSeed = parseInt(btn.dataset.seed);
       container.querySelectorAll('.seed-btn').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
+    });
+  });
+
+  container.querySelectorAll('.mod-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (selectedModifier === btn.dataset.mod) {
+        // Toggle off — deselect
+        selectedModifier = null;
+        btn.classList.remove('selected');
+      } else {
+        selectedModifier = btn.dataset.mod;
+        container.querySelectorAll('.mod-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      }
     });
   });
 
@@ -291,7 +340,7 @@ function renderCoachPanel() {
     const status  = document.getElementById('save-status');
 
     const saves = [];
-    if (selectedSeed !== null) saves.push(saveRanking(playerId, coach.name, selectedSeed));
+    if (selectedSeed !== null) saves.push(saveRanking(playerId, coach.name, selectedSeed, selectedModifier));
     if (noteVal !== '')        saves.push(saveNote(playerId, coach.name, noteVal));
     if (teamVal)               saves.push(saveTeam(playerId, teamVal));
 

@@ -551,6 +551,58 @@ main {
   color: #fff;
 }
 
+/* Visual gap between seed numbers and modifier buttons */
+.mod-divider {
+  width: 1px;
+  height: 42px;
+  background: var(--clr-border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* Modifier buttons (Strong / Mid / Low) */
+.mod-btn {
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 2px solid var(--clr-border);
+  background: var(--clr-surface);
+  color: var(--clr-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.mod-btn:hover {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+}
+
+.mod-btn.selected {
+  background: #2d4a2a;
+  border-color: var(--clr-success);
+  color: var(--clr-success);
+}
+
+/* YOUR RANKING subsection inside composite tile */
+.your-ranking-label {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--clr-border);
+}
+
+.your-ranking-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--clr-success);
+  margin-top: 3px;
+}
+
 /* ── Notes hint & link ── */
 .notes-hint {
   color: var(--clr-muted);

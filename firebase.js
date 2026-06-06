@@ -1,43 +1,41 @@
-// firebase.js — read/write rankings, notes, team assignments via Firestore
+// firebase.js — read/write rankings, notes, team assignments, favorites
 import { db } from './firebase-config.js';
 import {
   doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-// Firestore document path: players/{playerId}
-// Document shape:
+// Firestore document shape for players/{playerId}:
 // {
-//   rankings: { "CoachName": 7.5, "OtherCoach": 6.0 },
-//   notes:    { "CoachName": "Good handles, needs work on D", ... },
-//   team:     "Team Blue"
+//   rankings:  { "CoachName": 4.8 },   // numeric value used for composite avg
+//   modifiers: { "CoachName": "Low" },  // label stored separately, no effect on avg
+//   notes:     { "CoachName": "..." },
+//   team:      "Team Blue"
 // }
 
 function playerRef(playerId) {
   return doc(db, 'players', String(playerId));
 }
 
-// Returns { composite, count, rankings, notes, team }
+// Returns { composite, count, rankings, modifiers, notes, team }
 export async function getCompositeRank(playerId) {
   try {
     const snap = await getDoc(playerRef(playerId));
-    if (!snap.exists()) return { composite: null, count: 0, rankings: {}, notes: {}, team: '' };
-    const data = snap.data();
-    return buildComposite(data);
+    if (!snap.exists()) return emptyData();
+    return buildComposite(snap.data());
   } catch (err) {
     console.error('getCompositeRank error:', err);
-    return { composite: null, count: 0, rankings: {}, notes: {}, team: '' };
+    return emptyData();
   }
 }
 
-// Subscribe to live updates for a single player (used on profile page)
 export function subscribePlayer(playerId, callback) {
   return onSnapshot(playerRef(playerId), snap => {
-    if (!snap.exists()) {
-      callback({ composite: null, count: 0, rankings: {}, notes: {}, team: '' });
-    } else {
-      callback(buildComposite(snap.data()));
-    }
+    callback(snap.exists() ? buildComposite(snap.data()) : emptyData());
   });
+}
+
+function emptyData() {
+  return { composite: null, count: 0, rankings: {}, modifiers: {}, notes: {}, team: '' };
 }
 
 function buildComposite(data) {
@@ -48,52 +46,71 @@ function buildComposite(data) {
     : null;
   return {
     composite,
-    count:    values.length,
+    count:     values.length,
     rankings,
-    notes:    data.notes || {},
-    team:     data.team  || '',
+    modifiers: data.modifiers || {},
+    notes:     data.notes     || {},
+    team:      data.team      || '',
   };
 }
 
-// Save a single coach's ranking (1.0–8.0)
-export async function saveRanking(playerId, coachName, value) {
-  const parsed = parseFloat(value);
-  if (isNaN(parsed) || parsed < 1 || parsed > 8) {
-    throw new Error('Ranking must be a number between 1 and 8.');
-  }
-  const rounded = Math.round(parsed * 10) / 10; // one decimal
-  const ref = playerRef(playerId);
+// Modifier offsets — stored value = seed + offset
+export const MODIFIER_OFFSET = { Strong: 0.0, Mid: 0.5, Low: 0.8 };
+export const DEFAULT_OFFSET  = 0.2;  // no modifier selected → "Reg"
+export const DEFAULT_LABEL   = 'Reg';
+
+// Saves numeric ranking (seed + modifier offset) and the modifier label separately
+export async function saveRanking(playerId, coachName, seed, modifier) {
+  const offset = modifier ? MODIFIER_OFFSET[modifier] : DEFAULT_OFFSET;
+  const value  = Math.round((seed + offset) * 10) / 10;
+  const label  = modifier || DEFAULT_LABEL;
+
+  const ref  = playerRef(playerId);
   const snap = await getDoc(ref);
   if (snap.exists()) {
-    await updateDoc(ref, { [`rankings.${coachName}`]: rounded });
+    await updateDoc(ref, {
+      [`rankings.${coachName}`]:  value,
+      [`modifiers.${coachName}`]: label,
+    });
   } else {
-    await setDoc(ref, { rankings: { [coachName]: rounded }, notes: {}, team: '' });
+    await setDoc(ref, {
+      rankings:  { [coachName]: value },
+      modifiers: { [coachName]: label },
+      notes: {}, team: '',
+    });
   }
 }
 
-// Save a single coach's notes
+// Given a stored ranking value, reverse-engineer the base seed and modifier label
+export function decodeRanking(value, modifiers, coachName) {
+  if (value == null) return { seed: null, modifier: null };
+  const label = modifiers?.[coachName] || null;
+  const offset = label && label !== DEFAULT_LABEL
+    ? MODIFIER_OFFSET[label]
+    : (label === DEFAULT_LABEL ? DEFAULT_OFFSET : DEFAULT_OFFSET);
+  const seed = Math.round((value - offset) * 10) / 10;
+  return { seed: Math.round(seed), modifier: label };
+}
+
 export async function saveNote(playerId, coachName, text) {
-  const ref = playerRef(playerId);
+  const ref  = playerRef(playerId);
   const snap = await getDoc(ref);
   if (snap.exists()) {
     await updateDoc(ref, { [`notes.${coachName}`]: text });
   } else {
-    await setDoc(ref, { rankings: {}, notes: { [coachName]: text }, team: '' });
+    await setDoc(ref, { rankings: {}, modifiers: {}, notes: { [coachName]: text }, team: '' });
   }
 }
 
-// Delete a single coach's note
 export async function deleteNote(playerId, coachName) {
   await updateDoc(playerRef(playerId), { [`notes.${coachName}`]: deleteField() });
 }
 
-// Coach favorites — stored in coaches/{coachName} document
-function coachRef(coachName) {
-  return doc(db, 'coaches', coachName);
-}
+// Coach favorites stored in coaches/{coachName}
+function coachRef(coachName) { return doc(db, 'coaches', coachName); }
 
 export async function saveFavorites(coachName, favoriteIds) {
-  const ref = coachRef(coachName);
+  const ref  = coachRef(coachName);
   const snap = await getDoc(ref);
   if (snap.exists()) {
     await updateDoc(ref, { favorites: favoriteIds });
@@ -105,18 +122,16 @@ export async function saveFavorites(coachName, favoriteIds) {
 export async function getFavorites(coachName) {
   try {
     const snap = await getDoc(coachRef(coachName));
-    if (!snap.exists()) return [];
-    return snap.data().favorites || [];
+    return snap.exists() ? (snap.data().favorites || []) : [];
   } catch { return []; }
 }
 
-// Save team assignment (any coach can assign)
 export async function saveTeam(playerId, teamName) {
-  const ref = playerRef(playerId);
+  const ref  = playerRef(playerId);
   const snap = await getDoc(ref);
   if (snap.exists()) {
     await updateDoc(ref, { team: teamName });
   } else {
-    await setDoc(ref, { rankings: {}, notes: {}, team: teamName });
+    await setDoc(ref, { rankings: {}, modifiers: {}, notes: {}, team: teamName });
   }
 }
