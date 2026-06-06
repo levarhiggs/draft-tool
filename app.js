@@ -223,7 +223,10 @@ function applySort(players) {
     return arr.sort((a, b) => parseInt(a[COL.ID] || 0) - parseInt(b[COL.ID] || 0));
   }
   if (currentSort === 'birthday') {
-    return arr.sort((a, b) => (a[COL.AGE] || '').localeCompare(b[COL.AGE] || ''));
+    return arr.sort((a, b) => {
+      const parse = s => { const [m, d, y] = (s || '').split('/'); return new Date(y, m - 1, d); };
+      return parse(a[COL.AGE]) - parse(b[COL.AGE]);
+    });
   }
   if (currentSort === 'team') {
     return arr.sort((a, b) => {
