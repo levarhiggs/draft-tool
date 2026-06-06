@@ -150,18 +150,22 @@ function renderLiveStats() {
   const coach = getCurrentCoach();
   const isTeamAdmin = coach && TEAM_ADMINS.includes(coach.name);
 
-  // Composite seed value
+  // Composite seed tile — only visible to logged-in coaches
+  const rankBox = document.getElementById('composite-rank-box');
+  if (rankBox) rankBox.classList.toggle('hidden', !coach);
+
   const seedEl = document.getElementById('composite-seed-value');
   if (seedEl) seedEl.textContent = live.composite !== null ? live.composite.toFixed(1) : '—';
 
-  // YOUR RANKING — show coach's own decoded seed + modifier label
+  // YOUR RANKING — show coach's own decoded seed + modifier label (to one decimal)
   const yourSection = document.getElementById('your-ranking-section');
   const yourValue   = document.getElementById('your-ranking-value');
   if (yourSection && yourValue && coach) {
-    const { seed, modifier } = decodeRanking(live.rankings[coach.name] ?? null, live.modifiers, coach.name);
-    if (seed !== null) {
+    const rawVal = live.rankings[coach.name] ?? null;
+    const { seed, modifier } = decodeRanking(rawVal, live.modifiers, coach.name);
+    if (seed !== null && rawVal !== null) {
       const label = modifier || 'Reg';
-      yourValue.textContent = `${seed} · ${label}`;
+      yourValue.textContent = `${parseFloat(rawVal).toFixed(1)} · ${label}`;
       yourSection.classList.remove('hidden');
     } else {
       yourSection.classList.add('hidden');
@@ -397,7 +401,7 @@ function openRankingsModal(live) {
 
   tbody.innerHTML = entries.length
     ? entries.map(e =>
-        `<tr><td>${escHtml(e.coach)}</td><td>${e.val.toFixed(0)}</td></tr>`
+        `<tr><td>${escHtml(e.coach)}</td><td>${e.val.toFixed(1)}</td></tr>`
       ).join('')
     : `<tr><td colspan="2" class="no-rankings-msg">No seeds submitted yet.</td></tr>`;
 
@@ -405,7 +409,7 @@ function openRankingsModal(live) {
   if (count >= 2) {
     const min = Math.min(...entries.map(e => e.val));
     const max = Math.max(...entries.map(e => e.val));
-    footerLines.push(`Range: ${min.toFixed(0)} – ${max.toFixed(0)}`);
+    footerLines.push(`Range: ${min.toFixed(1)} – ${max.toFixed(1)}`);
   }
   footer.innerHTML = footerLines.map(l => `<div>${l}</div>`).join('');
 
