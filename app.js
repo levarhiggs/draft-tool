@@ -53,8 +53,9 @@ async function init() {
     renderGrid();
     setupControls();
 
-    // Enrich with Firebase data then re-render
+    // Enrich with Firebase data then re-render and rebuild team chips
     await enrichWithFirebase(allPlayers);
+    buildTeamChips();
     renderGrid();
   } catch (err) {
     const grid = document.getElementById('player-grid');

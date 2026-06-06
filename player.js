@@ -258,7 +258,7 @@ function renderCoachPanel() {
         <div class="seed-buttons">${seedButtons}</div>
       </div>
 
-      <label>Your Notes <span class="notes-hint">(be respectful)</span>
+      <label>Your Notes <span class="notes-hint">(be respectful in your public commentary)</span>
         <textarea id="input-note" placeholder="Observations, strengths, concerns…">${escHtml(myNote)}</textarea>
       </label>
       <button class="btn-link" id="btn-show-notes">View all coach notes ↓</button>
