@@ -10,16 +10,16 @@ const DRIVE_API_KEY    = 'AIzaSyAoIlK4ncTUeJjPeOYJLXuj2GoWnMge3X8';
 // Column header names — must match your sheet's first row exactly
 const COL = {
   ID:         'ID',
-  NAME:       'Name',
-  AGE:        'Age',
-  GRADE:      'Grade',
-  SIZE:       'Size (1-5)',
-  HANDLES:    'Handles (1-5)',
-  COACH_RANK: 'Coach Rank',
-  PHOTO:      'Photo Path/Link',   // optional manual override
-  VIDEO:      'Video Path/Link',   // optional manual override
-  TEAM:       'Team Assignment',
-  NOTES:      'Notes',
+  NAME:       'NAME',
+  AGE:        'AGE',
+  GRADE:      'GRADE',
+  SIZE:       'SIZE (1-5)',
+  HANDLES:    'HANDLES (1-5)',
+  COACH_RANK: 'RANK (1-8)',
+  PHOTO:      'PHOTO',
+  VIDEO:      'VIDEO',
+  TEAM:       'TEAM',
+  NOTES:      'NOTES',
 };
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -249,6 +249,6 @@ export function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-export { COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID, photoUrl, videoUrl };
+export { COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID };
 
 init();
