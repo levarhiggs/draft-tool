@@ -1,6 +1,6 @@
 // player.js — profile page: renders player data, coach panel, ranking modal
 import { photoUrl, videoUrl, escHtml, COL, SHEET_CSV_URL } from './app.js';
-import { subscribePlayer, getCompositeRank, saveRanking, saveNote, saveTeam } from './firebase.js';
+import { subscribePlayer, getCompositeRank, saveRanking, saveNote, saveTeam, deleteNote } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_ADMINS } from './coaches-config.js';
 
@@ -133,7 +133,6 @@ function renderShell() {
       </div>
 
       <div id="coach-panel-container"></div>
-      <div id="notes-section"></div>
     </div>
   `;
 
@@ -167,25 +166,55 @@ function renderLiveStats() {
     }
   }
 
-  // Notes section
-  const notesSection = document.getElementById('notes-section');
-  if (notesSection) notesSection.innerHTML = buildNotesHtml(live.notes);
 }
 
-function buildNotesHtml(notes) {
+function buildNotesHtml(notes, currentCoachName = null) {
   const entries = Object.entries(notes).filter(([, v]) => v && v.trim());
-  if (!entries.length) return '';
+  if (!entries.length) return '<div class="coach-panel-locked">No notes yet.</div>';
   return `
     <div>
       <div class="section-title">Coach Notes</div>
       <div class="notes-list">
-        ${entries.map(([coach, note]) => `
+        ${entries.map(([coachName, note]) => `
           <div class="note-item">
-            <div class="note-coach">${escHtml(coach)}</div>
+            <div class="note-coach-row">
+              <span class="note-coach">${escHtml(coachName)}</span>
+              ${coachName === currentCoachName
+                ? `<button class="btn-delete-note" data-coach="${escHtml(coachName)}">Delete</button>`
+                : ''}
+            </div>
             <div class="note-text">${escHtml(note)}</div>
           </div>`).join('')}
       </div>
     </div>`;
+}
+
+function renderInlineNotes(currentCoachName) {
+  const existing = document.getElementById('inline-notes');
+  if (existing) existing.remove();
+
+  const live = liveData || { notes: {} };
+  const div = document.createElement('div');
+  div.id = 'inline-notes';
+  div.innerHTML = buildNotesHtml(live.notes, currentCoachName);
+  document.getElementById('btn-show-notes').insertAdjacentElement('afterend', div);
+
+  div.querySelectorAll('.btn-delete-note').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '…';
+      try {
+        await deleteNote(playerId, currentCoachName);
+        // Clear the textarea too so it doesn't re-save on next Save click
+        const noteInput = document.getElementById('input-note');
+        if (noteInput) noteInput.value = '';
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Delete';
+        alert('Could not delete note: ' + err.message);
+      }
+    });
+  });
 }
 
 // ── Coach Panel ───────────────────────────────────────────────────────────────
@@ -213,12 +242,12 @@ function renderCoachPanel() {
     <button class="seed-btn${myRank === n ? ' selected' : ''}" data-seed="${n}">${n}</button>
   `).join('');
 
+  const currentTeam = teamVal || 'Undrafted';
   const teamHtml = isTeamAdmin ? `
     <label>Team Assignment
       <select id="input-team">
-        <option value="">— not assigned —</option>
         ${TEAMS.map(t =>
-          `<option value="${escHtml(t)}" ${teamVal === t ? 'selected' : ''}>${escHtml(t)}</option>`
+          `<option value="${escHtml(t)}" ${currentTeam === t ? 'selected' : ''}>${escHtml(t)}</option>`
         ).join('')}
       </select>
     </label>` : '';
@@ -256,11 +285,7 @@ function renderCoachPanel() {
   document.getElementById('btn-show-notes').addEventListener('click', () => {
     const existing = document.getElementById('inline-notes');
     if (existing) { existing.remove(); return; }
-    const live = liveData || { notes: {} };
-    const div = document.createElement('div');
-    div.id = 'inline-notes';
-    div.innerHTML = buildNotesHtml(live.notes) || '<div class="coach-panel-locked">No notes yet.</div>';
-    document.getElementById('btn-show-notes').insertAdjacentElement('afterend', div);
+    renderInlineNotes(coach.name);
   });
 
   document.getElementById('btn-save-coach').addEventListener('click', async () => {

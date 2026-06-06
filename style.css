@@ -478,12 +478,31 @@ main {
   padding: 10px 14px;
 }
 
+.note-coach-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
 .note-coach {
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--clr-accent);
-  margin-bottom: 4px;
 }
+
+.btn-delete-note {
+  background: none;
+  border: 1px solid var(--clr-border);
+  color: var(--clr-muted);
+  border-radius: 4px;
+  padding: 1px 8px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-delete-note:hover { border-color: var(--clr-danger); color: var(--clr-danger); }
+.btn-delete-note:disabled { opacity: 0.4; cursor: default; }
 
 .note-text {
   font-size: 0.88rem;

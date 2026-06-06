@@ -1,7 +1,7 @@
 // firebase.js — read/write rankings, notes, team assignments via Firestore
 import { db } from './firebase-config.js';
 import {
-  doc, getDoc, setDoc, updateDoc, onSnapshot, collection
+  doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Firestore document path: players/{playerId}
@@ -80,6 +80,11 @@ export async function saveNote(playerId, coachName, text) {
   } else {
     await setDoc(ref, { rankings: {}, notes: { [coachName]: text }, team: '' });
   }
+}
+
+// Delete a single coach's note
+export async function deleteNote(playerId, coachName) {
+  await updateDoc(playerRef(playerId), { [`notes.${coachName}`]: deleteField() });
 }
 
 // Save team assignment (any coach can assign)
