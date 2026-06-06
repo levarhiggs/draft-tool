@@ -223,8 +223,18 @@ function applySort(players) {
     return arr.sort((a, b) => parseInt(a[COL.ID] || 0) - parseInt(b[COL.ID] || 0));
   }
   if (currentSort === 'birthday') {
-    // AGE column stores birthday value — sort ascending (oldest first)
     return arr.sort((a, b) => (a[COL.AGE] || '').localeCompare(b[COL.AGE] || ''));
+  }
+  if (currentSort === 'team') {
+    return arr.sort((a, b) => {
+      const ta = a._teamFB || a[COL.TEAM] || 'Unassigned';
+      const tb = b._teamFB || b[COL.TEAM] || 'Unassigned';
+      if (ta !== tb) return ta.localeCompare(tb);
+      // Within a team, sort by seed ascending (unseeded last)
+      const sa = a._composite != null ? Math.floor(a._composite) : 99;
+      const sb = b._composite != null ? Math.floor(b._composite) : 99;
+      return sa - sb;
+    });
   }
   return arr;
 }
@@ -268,7 +278,23 @@ function renderGrid() {
     grid.innerHTML = '<div class="loading">No players match the current filters.</div>';
     return;
   }
-  grid.innerHTML = visible.map(p => playerCardHTML(p, !!coach)).join('');
+
+  if (currentSort === 'team') {
+    // Group by team — emit a full-width header row before each new team
+    let lastTeam = null;
+    const parts = [];
+    for (const p of visible) {
+      const team = p._teamFB || p[COL.TEAM] || 'Unassigned';
+      if (team !== lastTeam) {
+        parts.push(`<div class="team-group-header">${escHtml(team)}</div>`);
+        lastTeam = team;
+      }
+      parts.push(playerCardHTML(p, !!coach));
+    }
+    grid.innerHTML = parts.join('');
+  } else {
+    grid.innerHTML = visible.map(p => playerCardHTML(p, !!coach)).join('');
+  }
 
   // Wire heart buttons (outside the <a> tag, so clicks don't navigate)
   grid.querySelectorAll('.heart-btn').forEach(btn => {

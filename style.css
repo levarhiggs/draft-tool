@@ -236,6 +236,23 @@ main {
   gap: 18px;
 }
 
+/* Team group header spans the full grid width */
+.team-group-header {
+  grid-column: 1 / -1;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--clr-success);
+  padding: 10px 4px 2px;
+  border-bottom: 1px solid var(--clr-border);
+  margin-bottom: 4px;
+}
+
+.team-group-header:first-child {
+  padding-top: 0;
+}
+
 .player-card {
   background: var(--clr-card);
   border: 1px solid var(--clr-border);
