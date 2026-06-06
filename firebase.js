@@ -87,6 +87,29 @@ export async function deleteNote(playerId, coachName) {
   await updateDoc(playerRef(playerId), { [`notes.${coachName}`]: deleteField() });
 }
 
+// Coach favorites — stored in coaches/{coachName} document
+function coachRef(coachName) {
+  return doc(db, 'coaches', coachName);
+}
+
+export async function saveFavorites(coachName, favoriteIds) {
+  const ref = coachRef(coachName);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    await updateDoc(ref, { favorites: favoriteIds });
+  } else {
+    await setDoc(ref, { favorites: favoriteIds });
+  }
+}
+
+export async function getFavorites(coachName) {
+  try {
+    const snap = await getDoc(coachRef(coachName));
+    if (!snap.exists()) return [];
+    return snap.data().favorites || [];
+  } catch { return []; }
+}
+
 // Save team assignment (any coach can assign)
 export async function saveTeam(playerId, teamName) {
   const ref = playerRef(playerId);

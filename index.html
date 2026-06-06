@@ -19,11 +19,29 @@
         <button id="btn-login" class="btn-primary">Coach Login</button>
       </div>
     </div>
+    <!-- Sort bar -->
     <div class="sort-bar">
-      <span>Sort by:</span>
+      <span class="bar-label">Sort:</span>
       <button class="sort-btn active" data-sort="alpha">A – Z</button>
-      <button class="sort-btn" data-sort="score">Composite Score</button>
-      <button class="sort-btn" data-sort="grade">Grade</button>
+      <button class="sort-btn" data-sort="id">ID #</button>
+      <button class="sort-btn" data-sort="birthday">Birthday</button>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <div class="filter-row">
+        <span class="bar-label">Filter:</span>
+        <button class="filter-chip filter-fav" id="filter-favorites">♥ Favorites</button>
+        <div id="filter-grades" class="filter-group"></div>
+      </div>
+      <div class="filter-row">
+        <span class="bar-label">Seed:</span>
+        <div id="filter-seeds" class="filter-group"></div>
+      </div>
+      <div class="filter-row">
+        <span class="bar-label">Team:</span>
+        <div id="filter-teams" class="filter-group"></div>
+      </div>
     </div>
   </header>
 

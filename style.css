@@ -79,17 +79,70 @@ header h1 {
 
 .coach-badge span { color: var(--clr-text); font-weight: 600; }
 
-/* ── Sort Bar ── */
+/* ── Sort & Filter Bars ── */
+.bar-label {
+  font-size: 0.78rem;
+  color: var(--clr-muted);
+  white-space: nowrap;
+  min-width: 44px;
+}
+
 .sort-bar {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 10px 20px;
+  padding: 8px 20px;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 0.85rem;
   color: var(--clr-muted);
 }
+
+.filter-bar {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 4px 20px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.filter-empty {
+  font-size: 0.78rem;
+  color: var(--clr-muted);
+  font-style: italic;
+}
+
+/* Filter & sort chips */
+.filter-chip {
+  background: transparent;
+  border: 1px solid var(--clr-border);
+  color: var(--clr-muted);
+  border-radius: 20px;
+  padding: 3px 12px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.filter-chip:hover { border-color: var(--clr-accent); color: var(--clr-accent); }
+.filter-chip.active { background: var(--clr-accent); border-color: var(--clr-accent); color: #fff; }
+
+.filter-fav { color: var(--clr-muted); }
+.filter-fav.active { background: #c0392b; border-color: #c0392b; color: #fff; }
 
 .sort-btn {
   background: transparent;
@@ -144,6 +197,33 @@ header h1 {
 .btn-sm:hover { border-color: var(--clr-danger); color: var(--clr-danger); }
 
 /* ── Player Grid ── */
+/* card wrap positions the heart over the card */
+.player-card-wrap {
+  position: relative;
+}
+
+.heart-btn {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  background: rgba(0,0,0,0.45);
+  border: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  color: rgba(255,255,255,0.5);
+  transition: all 0.15s;
+  z-index: 2;
+  line-height: 1;
+}
+.heart-btn:hover { color: #e05c5c; background: rgba(0,0,0,0.65); }
+.heart-btn.active { color: #e05c5c; }
+
 main {
   max-width: 1200px;
   margin: 0 auto;
