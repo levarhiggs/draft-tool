@@ -1,6 +1,6 @@
 // player.js — profile page: renders player data, coach panel, ranking modal
 import { photoUrl, videoUrl, escHtml, COL, SHEET_CSV_URL } from './app.js';
-import { subscribePlayer, getCompositeRank, saveRanking, saveNote, saveTeam, deleteNote, decodeRanking } from './firebase.js';
+import { subscribePlayer, getCompositeRank, saveRanking, saveNote, saveTeam, deleteNote, decodeRanking, saveFavorites, getFavorites } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_ADMINS } from './coaches-config.js';
 
@@ -8,6 +8,7 @@ let playerId   = null;
 let playerData = null;
 let liveData   = null;
 let unsubscribe = null;
+let pageFavorites = new Set(JSON.parse(sessionStorage.getItem('favorites') || '[]'));
 
 async function init() {
   const params = new URLSearchParams(window.location.search);
@@ -24,6 +25,16 @@ async function init() {
   }
 
   document.title = `${playerData[COL.NAME]} — Draft Tool`;
+
+  // Sync favorites from Firebase if logged in
+  const coach = getCurrentCoach();
+  if (coach) {
+    try {
+      const saved = await getFavorites(coach.name);
+      pageFavorites = new Set(saved);
+      sessionStorage.setItem('favorites', JSON.stringify([...pageFavorites]));
+    } catch { /* fall back to session */ }
+  }
 
   // Render shell immediately — no Firebase wait
   liveData = { composite: null, count: 0, rankings: {}, notes: {}, team: '' };
@@ -99,11 +110,16 @@ function renderShell() {
     ? `<iframe class="profile-video" src="${video}" allowfullscreen allow="autoplay"></iframe>`
     : `<div class="profile-video no-video">No video available</div>`;
 
+  const isFav = pageFavorites.has(String(p[COL.ID]));
   const photoTileHtml = photo
-    ? `<div class="stat-box stat-box-photo">
+    ? `<div class="stat-box stat-box-photo stat-box-photo-wrap">
          <img src="${photo}" alt="${escHtml(p[COL.NAME])}" class="stat-photo-img" />
+         <button class="profile-heart-btn${isFav ? ' active' : ''}" id="profile-heart" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">♥</button>
        </div>`
-    : `<div class="stat-box stat-box-photo stat-photo-placeholder">🏀</div>`;
+    : `<div class="stat-box stat-box-photo stat-photo-placeholder stat-box-photo-wrap">
+         🏀
+         <button class="profile-heart-btn${isFav ? ' active' : ''}" id="profile-heart" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">♥</button>
+       </div>`;
 
   const main = document.getElementById('player-main');
   main.innerHTML = `
@@ -145,8 +161,29 @@ function renderShell() {
   document.getElementById('composite-rank-box')
     .addEventListener('click', () => openRankingsModal(liveData));
 
+  document.getElementById('profile-heart')
+    .addEventListener('click', toggleProfileFavorite);
+
   wireRankingsModal();
   wirePlayerNav();
+}
+
+async function toggleProfileFavorite() {
+  const id  = String(playerData[COL.ID]);
+  const btn = document.getElementById('profile-heart');
+  if (pageFavorites.has(id)) {
+    pageFavorites.delete(id);
+  } else {
+    pageFavorites.add(id);
+  }
+  const isFav = pageFavorites.has(id);
+  btn.classList.toggle('active', isFav);
+  btn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
+  sessionStorage.setItem('favorites', JSON.stringify([...pageFavorites]));
+  const coach = getCurrentCoach();
+  if (coach) {
+    try { await saveFavorites(coach.name, [...pageFavorites]); } catch { /* silent */ }
+  }
 }
 
 // ── Render: live sections only (no form reset) ────────────────────────────────
@@ -254,7 +291,7 @@ function renderCoachPanel() {
   if (!coach) {
     container.innerHTML = `
       <div class="coach-panel-locked">
-        Log in as a coach to submit your seed, notes, and team assignment.
+        Log in as a coach to submit rankings, player notes and team assignments.
       </div>`;
     return;
   }

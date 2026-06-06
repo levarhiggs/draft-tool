@@ -450,6 +450,32 @@ main {
   overflow: hidden;
 }
 
+.stat-box-photo-wrap {
+  position: relative;
+}
+
+.profile-heart-btn {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: rgba(255,255,255,0.5);
+  transition: all 0.15s;
+  z-index: 2;
+  line-height: 1;
+}
+.profile-heart-btn:hover { color: #e05c5c; background: rgba(0,0,0,0.7); }
+.profile-heart-btn.active { color: #e05c5c; }
+
 .stat-photo-img {
   width: 100%;
   height: 100%;
