@@ -301,6 +301,27 @@ main {
   margin-top: 4px;
 }
 
+/* Photo tile in stats grid */
+.stat-box-photo {
+  padding: 0;
+  overflow: hidden;
+}
+
+.stat-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.stat-photo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: var(--clr-muted);
+}
+
 /* Composite rank box is clickable */
 .stat-box.clickable {
   cursor: pointer;

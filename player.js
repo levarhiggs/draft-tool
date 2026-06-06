@@ -1,5 +1,5 @@
 // player.js — profile page: renders player data, coach panel, ranking modal
-import { videoUrl, escHtml, COL, SHEET_CSV_URL } from './app.js';
+import { photoUrl, videoUrl, escHtml, COL, SHEET_CSV_URL } from './app.js';
 import { subscribePlayer, getCompositeRank, saveRanking, saveNote, saveTeam } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_ADMINS } from './coaches-config.js';
@@ -25,20 +25,22 @@ async function init() {
 
   document.title = `${playerData[COL.NAME]} — Draft Tool`;
 
-  // Render immediately — no waiting for Firebase
+  // Render shell immediately — no Firebase wait
   liveData = { composite: null, count: 0, rankings: {}, notes: {}, team: '' };
-  renderProfile();
+  renderShell();
+  renderLiveStats();
+  renderCoachPanel();
 
-  // Fetch Firebase data in background, re-render when ready
+  // Fetch Firebase data in background, update only live sections
   getCompositeRank(playerId).then(data => {
     liveData = data;
-    renderProfile();
+    renderLiveStats();
   });
 
-  // Live subscription keeps data fresh while coach is on the page
+  // Live subscription updates stats + notes instantly on any save
   unsubscribe = subscribePlayer(playerId, data => {
     liveData = data;
-    renderProfile();
+    renderLiveStats();
   });
 
   document.addEventListener('coachChanged', () => renderCoachPanel());
@@ -86,27 +88,26 @@ function splitCSVLine(line) {
   return result;
 }
 
-// ── Render ────────────────────────────────────────────────────────────────────
+// ── Render: static shell (video + layout, rendered once) ─────────────────────
 
-function renderProfile() {
-  const p    = playerData;
-  const live = liveData || { composite: null, count: 0, rankings: {}, notes: {}, team: '' };
-
+function renderShell() {
+  const p = playerData;
   const video = videoUrl(p);
+  const photo = photoUrl(p);
+
   const videoHtml = video
     ? `<iframe class="profile-video" src="${video}" allowfullscreen allow="autoplay"></iframe>`
     : `<div class="profile-video no-video">No video available</div>`;
 
-  const compositeDisplay = live.composite !== null ? live.composite.toFixed(1) : '—';
-  const coach = getCurrentCoach();
-  const isTeamAdmin = coach && TEAM_ADMINS.includes(coach.name);
-  const team = live.team || p[COL.TEAM] || '—';
+  const photoTileHtml = photo
+    ? `<div class="stat-box stat-box-photo">
+         <img src="${photo}" alt="${escHtml(p[COL.NAME])}" class="stat-photo-img" />
+       </div>`
+    : `<div class="stat-box stat-box-photo stat-photo-placeholder">🏀</div>`;
 
   const main = document.getElementById('player-main');
   main.innerHTML = `
-    <div class="profile-video-row">
-      ${videoHtml}
-    </div>
+    <div class="profile-video-row">${videoHtml}</div>
 
     <div class="profile-details">
       <div>
@@ -115,6 +116,7 @@ function renderProfile() {
       </div>
 
       <div class="stats-grid">
+        ${photoTileHtml}
         <div class="stat-box">
           <div class="stat-label">Age</div>
           <div class="stat-value">${escHtml(p[COL.AGE] || '—')}</div>
@@ -125,26 +127,49 @@ function renderProfile() {
         </div>
         <div class="stat-box clickable" id="composite-rank-box" title="Click to see breakdown">
           <div class="stat-label">Composite Seed</div>
-          <div class="stat-value">${compositeDisplay}</div>
+          <div class="stat-value" id="composite-seed-value">—</div>
         </div>
-        ${isTeamAdmin ? `
-        <div class="stat-box">
-          <div class="stat-label">Team</div>
-          <div class="stat-value team-display">${escHtml(team)}</div>
-        </div>` : ''}
+        <div class="stat-box" id="team-stat-box"></div>
       </div>
 
       <div id="coach-panel-container"></div>
-
-      ${buildNotesHtml(live.notes)}
+      <div id="notes-section"></div>
     </div>
   `;
 
   document.getElementById('composite-rank-box')
-    .addEventListener('click', () => openRankingsModal(live));
+    .addEventListener('click', () => openRankingsModal(liveData));
 
-  renderCoachPanel();
   wireRankingsModal();
+}
+
+// ── Render: live sections only (no form reset) ────────────────────────────────
+
+function renderLiveStats() {
+  const live = liveData || { composite: null, rankings: {}, notes: {}, team: '' };
+  const coach = getCurrentCoach();
+  const isTeamAdmin = coach && TEAM_ADMINS.includes(coach.name);
+
+  // Composite seed value
+  const seedEl = document.getElementById('composite-seed-value');
+  if (seedEl) seedEl.textContent = live.composite !== null ? live.composite.toFixed(1) : '—';
+
+  // Team tile — only for admins
+  const teamBox = document.getElementById('team-stat-box');
+  if (teamBox) {
+    if (isTeamAdmin) {
+      teamBox.innerHTML = `
+        <div class="stat-label">Team</div>
+        <div class="stat-value team-display">${escHtml(live.team || playerData[COL.TEAM] || '—')}</div>`;
+      teamBox.classList.remove('hidden');
+    } else {
+      teamBox.classList.add('hidden');
+    }
+  }
+
+  // Notes section
+  const notesSection = document.getElementById('notes-section');
+  if (notesSection) notesSection.innerHTML = buildNotesHtml(live.notes);
 }
 
 function buildNotesHtml(notes) {
@@ -162,6 +187,8 @@ function buildNotesHtml(notes) {
       </div>
     </div>`;
 }
+
+// ── Coach Panel ───────────────────────────────────────────────────────────────
 
 function renderCoachPanel() {
   const container = document.getElementById('coach-panel-container');
@@ -182,10 +209,8 @@ function renderCoachPanel() {
   const teamVal     = live.team || '';
   const isTeamAdmin = TEAM_ADMINS.includes(coach.name);
 
-  // Seed buttons 1–8
   const seedButtons = [1,2,3,4,5,6,7,8].map(n => `
-    <button class="seed-btn${myRank === n ? ' selected' : ''}"
-            data-seed="${n}">${n}</button>
+    <button class="seed-btn${myRank === n ? ' selected' : ''}" data-seed="${n}">${n}</button>
   `).join('');
 
   const teamHtml = isTeamAdmin ? `
@@ -218,7 +243,7 @@ function renderCoachPanel() {
       <div class="save-status" id="save-status"></div>
     </div>`;
 
-  // Seed button clicks
+  // Track selected seed locally so form isn't reset on re-render
   let selectedSeed = myRank;
   container.querySelectorAll('.seed-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -228,22 +253,20 @@ function renderCoachPanel() {
     });
   });
 
-  // View all notes toggle
   document.getElementById('btn-show-notes').addEventListener('click', () => {
     const existing = document.getElementById('inline-notes');
     if (existing) { existing.remove(); return; }
     const live = liveData || { notes: {} };
-    const notesHtml = buildNotesHtml(live.notes);
     const div = document.createElement('div');
     div.id = 'inline-notes';
-    div.innerHTML = notesHtml || '<div class="coach-panel-locked">No notes yet.</div>';
+    div.innerHTML = buildNotesHtml(live.notes) || '<div class="coach-panel-locked">No notes yet.</div>';
     document.getElementById('btn-show-notes').insertAdjacentElement('afterend', div);
   });
 
   document.getElementById('btn-save-coach').addEventListener('click', async () => {
-    const noteVal  = document.getElementById('input-note').value.trim();
-    const teamVal  = isTeamAdmin ? document.getElementById('input-team')?.value : null;
-    const status   = document.getElementById('save-status');
+    const noteVal = document.getElementById('input-note').value.trim();
+    const teamVal = isTeamAdmin ? document.getElementById('input-team')?.value : null;
+    const status  = document.getElementById('save-status');
 
     const saves = [];
     if (selectedSeed !== null) saves.push(saveRanking(playerId, coach.name, selectedSeed));
@@ -303,7 +326,7 @@ function openRankingsModal(live) {
 
   tbody.innerHTML = entries.length
     ? entries.map(e =>
-        `<tr><td>${escHtml(e.coach)}</td><td>${e.val.toFixed(1)}</td></tr>`
+        `<tr><td>${escHtml(e.coach)}</td><td>${e.val.toFixed(0)}</td></tr>`
       ).join('')
     : `<tr><td colspan="2" class="no-rankings-msg">No seeds submitted yet.</td></tr>`;
 
