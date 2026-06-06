@@ -194,7 +194,7 @@ function playerCardHTML(p) {
   const id        = p[COL.ID]    || '';
   const photo     = photoUrl(p);
   const team      = p._teamFB || p[COL.TEAM] || '';
-  const composite = p._composite;
+  const composite = p._composite ?? null;
 
   const scoreHtml = composite !== null
     ? `<span class="player-card-score">${composite.toFixed(1)}</span>`
