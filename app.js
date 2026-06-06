@@ -36,12 +36,14 @@ async function init() {
       buildDriveIndex(),
     ]);
     allPlayers = players;
-    await enrichWithFirebase(allPlayers);
+    // Render immediately with no rankings, then silently fill them in
     renderGrid(allPlayers);
     setupSortButtons();
+    await enrichWithFirebase(allPlayers);
+    renderGrid(allPlayers); // re-render with scores
   } catch (err) {
-    document.getElementById('player-grid').innerHTML =
-      `<div class="loading">Error loading players: ${err.message}</div>`;
+    const grid = document.getElementById('player-grid');
+    if (grid) grid.innerHTML = `<div class="loading">Error loading players: ${err.message}</div>`;
     console.error(err);
   }
 }
@@ -49,6 +51,12 @@ async function init() {
 // ── Drive folder scanning ─────────────────────────────────────────────────────
 
 async function buildDriveIndex() {
+  const cached = sessionStorage.getItem('driveIndex');
+  if (cached) {
+    Object.assign(driveIndex, JSON.parse(cached));
+    return;
+  }
+
   const [photos, videos] = await Promise.all([
     listDriveFolder(PHOTOS_FOLDER_ID),
     listDriveFolder(VIDEOS_FOLDER_ID),
@@ -65,6 +73,8 @@ async function buildDriveIndex() {
     if (!driveIndex[playerId]) driveIndex[playerId] = {};
     driveIndex[playerId].videoId = id;
   });
+
+  sessionStorage.setItem('driveIndex', JSON.stringify(driveIndex));
 }
 
 async function listDriveFolder(folderId) {
@@ -117,10 +127,15 @@ function extractDriveId(url) {
 // ── Sheet fetch & parse ───────────────────────────────────────────────────────
 
 async function fetchPlayers() {
+  const cached = sessionStorage.getItem('playerSheet');
+  if (cached) return JSON.parse(cached);
+
   const res = await fetch(SHEET_CSV_URL);
   if (!res.ok) throw new Error(`Sheet fetch failed: ${res.status}`);
   const text = await res.text();
-  return parseCSV(text);
+  const players = parseCSV(text);
+  sessionStorage.setItem('playerSheet', JSON.stringify(players));
+  return players;
 }
 
 function parseCSV(text) {
