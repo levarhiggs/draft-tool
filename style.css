@@ -519,21 +519,18 @@ main {
   min-height: 1.2em;
 }
 
-.save-nav-row {
+.player-nav-standalone {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 10px;
-}
-
-.player-nav-btns {
-  display: flex;
-  gap: 8px;
+  justify-content: space-between;
+  margin-top: 8px;
 }
 
 .btn-sm-nav {
   padding: 8px 14px;
   font-size: 0.85rem;
+  flex: 1;
+  text-align: center;
 }
 
 /* ── Seed Buttons ── */

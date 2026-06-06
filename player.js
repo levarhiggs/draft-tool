@@ -134,6 +134,11 @@ function renderShell() {
       </div>
 
       <div id="coach-panel-container"></div>
+
+      <div class="save-nav-row player-nav-standalone">
+        <button class="btn-secondary btn-sm-nav" id="btn-prev-player">← Prev Player</button>
+        <button class="btn-secondary btn-sm-nav" id="btn-next-player">Next Player →</button>
+      </div>
     </div>
   `;
 
@@ -141,6 +146,7 @@ function renderShell() {
     .addEventListener('click', () => openRankingsModal(liveData));
 
   wireRankingsModal();
+  wirePlayerNav();
 }
 
 // ── Render: live sections only (no form reset) ────────────────────────────────
@@ -302,13 +308,7 @@ function renderCoachPanel() {
 
       ${teamHtml}
 
-      <div class="save-nav-row">
-        <button class="btn-primary" id="btn-save-coach">Save</button>
-        <div class="player-nav-btns">
-          <button class="btn-secondary btn-sm-nav" id="btn-prev-player">← Prev</button>
-          <button class="btn-secondary btn-sm-nav" id="btn-next-player">Next →</button>
-        </div>
-      </div>
+      <button class="btn-primary" id="btn-save-coach">Save</button>
       <div class="save-status" id="save-status"></div>
     </div>`;
 
@@ -373,9 +373,6 @@ function renderCoachPanel() {
       status.textContent = err.message;
     }
   });
-
-  // Prev / Next player navigation by ID order
-  wirePlayerNav();
 }
 
 async function wirePlayerNav() {
