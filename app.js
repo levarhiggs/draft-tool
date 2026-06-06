@@ -26,7 +26,7 @@ const COL = {
 const driveIndex = {};
 
 let allPlayers  = [];
-let currentSort = 'alpha';
+let currentSort = 'id';
 
 // Active filters — each is a Set of selected values; empty Set = no filter
 const activeFilters = {
