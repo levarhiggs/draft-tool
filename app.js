@@ -228,6 +228,13 @@ function applySort(players) {
       return parse(a[COL.AGE]) - parse(b[COL.AGE]);
     });
   }
+  if (currentSort === 'rank') {
+    return arr.sort((a, b) => {
+      const ra = a._composite != null ? a._composite : 99;
+      const rb = b._composite != null ? b._composite : 99;
+      return ra - rb;
+    });
+  }
   if (currentSort === 'team') {
     return arr.sort((a, b) => {
       const ta = a._teamFB || a[COL.TEAM] || 'Unassigned';
