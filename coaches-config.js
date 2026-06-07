@@ -4,26 +4,23 @@
 // Share each coach's PIN with them privately.
 
 export const COACHES = [
-  { name: 'Coach Mike',  pin: '123'},
-  { name: 'Coach Levar',  pin: '123'},
-  { name: 'Coach Alfred',   pin: '123'},
-  { name: 'Coach Alex',     pin: '123'},
-  { name: 'Coach Tatiana',  pin: '123'},
-  { name: 'Coach Benjamin',  pin: '123'},
-  { name: 'Coach 7',    pin: '123'},
-  { name: 'Coach 8',    pin: '123'},
-  { name: 'Coach 9',     pin: '123'},
-  { name: 'Coach 10',    pin: '123'},
-  { name: 'Coach 11',   pin: '123'},
-  { name: 'Coach 12',     pin: '123'},
-  { name: 'Coach 13',    pin: '123'},
-  { name: 'Coach 14',    pin: '123'},
-  { name: 'Coach 15',       pin: '123'},
-
+  { name: 'Coach Alex',            pin: '123'  },
+  { name: 'Coach Alfred',          pin: '456'  },
+  { name: 'Coach Andre',           pin: '789'  },
+  { name: 'Coach Ben',             pin: '123'  },
+  { name: 'Coach Chris',           pin: '456'  },
+  { name: 'Coach Daven-Josiah',    pin: '789'  },
+  { name: 'Coach Humberto-Felipe', pin: '123'  },
+  { name: 'Coach Jeff',            pin: '456'  },
+  { name: 'Coach Kevin',           pin: '789'  },
+  { name: 'Coach Levar',           pin: '123'  },
+  { name: 'Coach Mike',            pin: '456'  },
+  { name: 'Coach Sedat',           pin: '789'  },
+  { name: 'Coach Tati',            pin: '1234' },
 ];
 
-// Coaches allowed to view and change Team Assignment
-// Add or remove names here — must match exactly as written in COACHES above
+// Coaches allowed to view and change Team Assignment and mark No Shows
+// Must match exactly as written in COACHES above
 export const TEAM_ADMINS = [
   'Coach Mike',
   'Coach Levar',
