@@ -1,6 +1,6 @@
 // player.js — profile page: renders player data, coach panel, ranking modal
 import { photoUrl, videoUrl, escHtml, COL, SHEET_CSV_URL } from './app.js';
-import { subscribePlayer, getCompositeRank, saveRanking, saveNote, saveTeam, deleteNote, decodeRanking, saveFavorites, getFavorites } from './firebase.js';
+import { subscribePlayer, getCompositeRank, saveRanking, saveNote, saveTeam, saveNoShow, deleteNote, decodeRanking, saveFavorites, getFavorites } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_ADMINS } from './coaches-config.js';
 
@@ -102,7 +102,9 @@ function splitCSVLine(line) {
 // ── Render: static shell (video + layout, rendered once) ─────────────────────
 
 function renderShell() {
-  const p = playerData;
+  const p           = playerData;
+  const coach       = getCurrentCoach();
+  const isTeamAdmin = coach && TEAM_ADMINS.includes(coach.name);
   const video = videoUrl(p);
   const photo = photoUrl(p);
 
@@ -158,10 +160,11 @@ function renderShell() {
 
       <div class="stats-grid">
         ${photoTileHtml}
-        <div class="stat-box">
+        <div class="stat-box stat-box-photo-wrap">
           <div class="stat-label">Age</div>
           <div class="stat-value">${escHtml(p[COL.AGE] || '—')}</div>
           <div class="stat-sublabel">Grade ${escHtml(p[COL.GRADE] || '—')}</div>
+          ${isTeamAdmin ? `<button class="noshow-btn" id="noshow-btn" title="Mark as No Show">✕</button>` : ''}
         </div>
         <div class="stat-box clickable" id="composite-rank-box" title="Click to see breakdown">
           <div class="stat-label">Composite Seed</div>
@@ -189,8 +192,20 @@ function renderShell() {
   document.getElementById('profile-heart')
     .addEventListener('click', toggleProfileFavorite);
 
+  document.getElementById('noshow-btn')
+    ?.addEventListener('click', toggleNoShow);
+
   wireRankingsModal();
   wirePlayerNav();
+}
+
+async function toggleNoShow() {
+  const btn      = document.getElementById('noshow-btn');
+  const isNoShow = !(liveData?.noShow || false);
+  btn.classList.toggle('active', isNoShow);
+  btn.title = isNoShow ? 'Remove No Show' : 'Mark as No Show';
+  if (liveData) liveData.noShow = isNoShow;
+  try { await saveNoShow(playerId, isNoShow); } catch { /* silent */ }
 }
 
 async function toggleProfileFavorite() {
@@ -240,6 +255,14 @@ function renderLiveStats() {
     }
   } else if (yourSection) {
     yourSection.classList.add('hidden');
+  }
+
+  // No-show button state — sync from liveData
+  const noshowBtn = document.getElementById('noshow-btn');
+  if (noshowBtn) {
+    const isNoShow = live.noShow || false;
+    noshowBtn.classList.toggle('active', isNoShow);
+    noshowBtn.title = isNoShow ? 'Remove No Show' : 'Mark as No Show';
   }
 
   // Team tile — only for admins

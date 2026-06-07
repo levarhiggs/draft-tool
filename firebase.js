@@ -35,7 +35,7 @@ export function subscribePlayer(playerId, callback) {
 }
 
 function emptyData() {
-  return { composite: null, count: 0, rankings: {}, modifiers: {}, notes: {}, team: '' };
+  return { composite: null, count: 0, rankings: {}, modifiers: {}, notes: {}, team: '', noShow: false };
 }
 
 function buildComposite(data) {
@@ -51,6 +51,7 @@ function buildComposite(data) {
     modifiers: data.modifiers || {},
     notes:     data.notes     || {},
     team:      data.team      || '',
+    noShow:    data.noShow    || false,
   };
 }
 
@@ -124,6 +125,16 @@ export async function getFavorites(coachName) {
     const snap = await getDoc(coachRef(coachName));
     return snap.exists() ? (snap.data().favorites || []) : [];
   } catch { return []; }
+}
+
+export async function saveNoShow(playerId, value) {
+  const ref  = playerRef(playerId);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    await updateDoc(ref, { noShow: value });
+  } else {
+    await setDoc(ref, { rankings: {}, modifiers: {}, notes: {}, team: '', noShow: value });
+  }
 }
 
 export async function saveTeam(playerId, teamName) {

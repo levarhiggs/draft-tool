@@ -35,6 +35,7 @@ const activeFilters = {
   seeds:     new Set(),   // floor integers 1–8
   teams:     new Set(),   // team name strings
   favorites: false,       // boolean toggle
+  noShows:   false,       // boolean toggle
 };
 
 // Favorites: Set of player ID strings
@@ -210,7 +211,8 @@ async function enrichWithFirebase(players) {
     p._composite = data.composite;
     p._rankCount = data.count;
     p._rankings  = data.rankings;
-    p._teamFB    = data.team || '';
+    p._teamFB    = data.team   || '';
+    p._noShow    = data.noShow || false;
   }));
 }
 
@@ -261,6 +263,9 @@ function applyFilters(players) {
 
     // Favorites filter
     if (activeFilters.favorites && !favorites.has(String(p[COL.ID]))) return false;
+
+    // No-show filter
+    if (activeFilters.noShows && !p._noShow) return false;
 
     // Grade filter
     if (activeFilters.grades.size > 0) {
@@ -394,8 +399,30 @@ function setupControls() {
     renderGrid();
   });
 
-  // Re-build team chips after Firebase enrichment (called again after enrich)
-  document.addEventListener('coachChanged', () => renderGrid());
+  // No-shows toggle (coach only)
+  document.getElementById('filter-noshows')?.addEventListener('click', e => {
+    activeFilters.noShows = !activeFilters.noShows;
+    e.currentTarget.classList.toggle('active', activeFilters.noShows);
+    renderGrid();
+  });
+
+  // Show/hide no-shows button based on login state
+  updateNoShowButtonVisibility();
+  document.addEventListener('coachChanged', () => {
+    updateNoShowButtonVisibility();
+    renderGrid();
+  });
+}
+
+function updateNoShowButtonVisibility() {
+  const btn = document.getElementById('filter-noshows');
+  if (!btn) return;
+  const coach = getCurrentCoach();
+  btn.classList.toggle('hidden', !coach);
+  if (!coach) {
+    activeFilters.noShows = false;
+    btn.classList.remove('active');
+  }
 }
 
 function buildFilterChips() {
