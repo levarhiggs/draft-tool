@@ -127,9 +127,9 @@ function renderShell() {
   // If no Drive video, try embedding the first YouTube link
   let embedHtml = videoHtml;
   if (!video && ytLinks.length > 0) {
-    const ytId = extractYouTubeId(ytLinks[0]);
-    if (ytId) {
-      embedHtml = `<iframe class="profile-video" src="https://www.youtube.com/embed/${ytId}"
+    const ytSrc = youTubeEmbedUrl(ytLinks[0]);
+    if (ytSrc) {
+      embedHtml = `<iframe class="profile-video" src="${ytSrc}"
         allowfullscreen allow="autoplay"></iframe>`;
     }
   }
@@ -540,6 +540,29 @@ function extractYouTubeId(url) {
     /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/
   );
   return m ? m[1] : null;
+}
+
+function youTubeEmbedUrl(url) {
+  const id = extractYouTubeId(url);
+  if (!id) return null;
+  // Extract timestamp — supports ?t=90, ?t=1m30s, #t=90, &t=90
+  const tMatch = url.match(/[?&#]t=([0-9hms]+)/);
+  let start = 0;
+  if (tMatch) {
+    const raw = tMatch[1];
+    // Parse combined formats like 1h30m45s or plain seconds
+    const h = raw.match(/(\d+)h/);
+    const m = raw.match(/(\d+)m/);
+    const s = raw.match(/(\d+)s/);
+    if (h || m || s) {
+      start = (h ? parseInt(h[1]) * 3600 : 0)
+            + (m ? parseInt(m[1]) * 60   : 0)
+            + (s ? parseInt(s[1])        : 0);
+    } else {
+      start = parseInt(raw) || 0;
+    }
+  }
+  return `https://www.youtube.com/embed/${id}${start ? `?start=${start}` : ''}`;
 }
 
 function showError(msg) {
