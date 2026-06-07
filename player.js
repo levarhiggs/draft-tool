@@ -122,21 +122,32 @@ function renderShell() {
        </div>`;
 
   const linksRaw = (p[COL.LINKS] || '').trim();
-  const linksHtml = linksRaw
+  const ytLinks  = linksRaw ? linksRaw.split(';').map(u => u.trim()).filter(Boolean) : [];
+
+  // If no Drive video, try embedding the first YouTube link
+  let embedHtml = videoHtml;
+  if (!video && ytLinks.length > 0) {
+    const ytId = extractYouTubeId(ytLinks[0]);
+    if (ytId) {
+      embedHtml = `<iframe class="profile-video" src="https://www.youtube.com/embed/${ytId}"
+        allowfullscreen allow="autoplay"></iframe>`;
+    }
+  }
+
+  // Remaining YouTube links shown as buttons (skip first if it's being embedded)
+  const buttonLinks = (!video && ytLinks.length > 0) ? ytLinks.slice(1) : ytLinks;
+  const linksHtml = buttonLinks.length
     ? `<div class="profile-links">
-        ${linksRaw.split(';').map((url, i) => {
-          url = url.trim();
-          if (!url) return '';
-          return `<a class="profile-link-btn" href="${escHtml(url)}" target="_blank" rel="noopener">
+        ${buttonLinks.map((url, i) => `
+          <a class="profile-link-btn" href="${escHtml(url)}" target="_blank" rel="noopener">
             ▶ Video Clip ${i + 1}
-          </a>`;
-        }).join('')}
+          </a>`).join('')}
        </div>`
     : '';
 
   const main = document.getElementById('player-main');
   main.innerHTML = `
-    <div class="profile-video-row">${videoHtml}</div>
+    <div class="profile-video-row">${embedHtml}</div>
     ${linksHtml}
 
     <div class="profile-details">
@@ -522,6 +533,13 @@ function openRankingsModal(live) {
 
 function closeRankingsModal() {
   document.getElementById('modal-rankings')?.classList.add('hidden');
+}
+
+function extractYouTubeId(url) {
+  const m = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/
+  );
+  return m ? m[1] : null;
 }
 
 function showError(msg) {
