@@ -14,7 +14,7 @@ export const COACHES = [
   { name: 'Coach Jeff',            pin: '456'  },
   { name: 'Coach Kevin',           pin: '789'  },
   { name: 'Coach Levar',           pin: '123'  },
-  { name: 'Coach Mike',            pin: '456'  },
+  { name: 'Coach Mike',            pin: '1111' },
   { name: 'Coach Sedat',           pin: '789'  },
   { name: 'Coach Tati',            pin: '1234' },
 ];
