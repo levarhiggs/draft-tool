@@ -398,6 +398,28 @@ main {
   min-height: 200px;
 }
 
+.profile-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.profile-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #c0392b;
+  color: #fff;
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.profile-link-btn:hover { background: #a93226; text-decoration: none; }
+
 .profile-details { display: flex; flex-direction: column; gap: 20px; }
 
 .profile-name {

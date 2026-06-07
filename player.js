@@ -121,9 +121,23 @@ function renderShell() {
          <button class="profile-heart-btn${isFav ? ' active' : ''}" id="profile-heart" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">♥</button>
        </div>`;
 
+  const linksRaw = (p[COL.LINKS] || '').trim();
+  const linksHtml = linksRaw
+    ? `<div class="profile-links">
+        ${linksRaw.split(';').map((url, i) => {
+          url = url.trim();
+          if (!url) return '';
+          return `<a class="profile-link-btn" href="${escHtml(url)}" target="_blank" rel="noopener">
+            ▶ Video Clip ${i + 1}
+          </a>`;
+        }).join('')}
+       </div>`
+    : '';
+
   const main = document.getElementById('player-main');
   main.innerHTML = `
     <div class="profile-video-row">${videoHtml}</div>
+    ${linksHtml}
 
     <div class="profile-details">
       <div>
