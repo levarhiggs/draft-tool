@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CSBC 2026 SJV — Draft Results</title>
+<link rel="icon" href="favicon.png" type="image/png"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0c12;--surface:#13161f;--card:#1a1d2b;
+  --border:#252840;--text:#e8eaf0;--muted:#6b7194;--radius:12px;
+}
+body{
+  font-family:'Segoe UI',system-ui,sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100vh;padding:32px 20px 60px;
+}
+h1{
+  text-align:center;font-size:1.5rem;font-weight:800;
+  letter-spacing:.06em;text-transform:uppercase;color:#fff;margin-bottom:6px;
+}
+.subtitle{
+  text-align:center;font-size:.8rem;color:var(--muted);
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:40px;
+}
+.back-link{
+  display:block;text-align:center;margin-bottom:24px;
+  font-size:.85rem;color:var(--muted);text-decoration:none;
+}
+.back-link:hover{color:var(--text)}
+.teams-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
+  gap:24px;max-width:1400px;margin:0 auto;
+}
+.team-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--radius);overflow:hidden;
+}
+.team-header{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 18px;border-bottom:1px solid var(--border);
+}
+.team-number{
+  width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.85rem;font-weight:800;flex-shrink:0;
+}
+.team-name{font-size:1rem;font-weight:700;line-height:1.2}
+.team-pick-count{margin-left:auto;font-size:.72rem;color:var(--muted);white-space:nowrap}
+.player-list{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
+.player-tile{
+  display:flex;flex-direction:column;align-items:center;
+  padding:10px 6px;border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border);position:relative;
+}
+.player-tile:nth-child(4n){border-right:none}
+.pick-badge{
+  position:absolute;top:5px;left:5px;
+  font-size:.58rem;font-weight:800;color:var(--muted);line-height:1;
+}
+.player-photo{
+  width:76px;height:76px;border-radius:50%;
+  object-fit:cover;object-position:center top;
+  background:var(--border);display:block;margin-bottom:6px;
+  cursor:pointer;transition:transform .15s,box-shadow .15s;
+}
+.player-photo:hover{transform:scale(1.08);box-shadow:0 0 0 2px #fff4}
+.player-photo-placeholder{
+  width:76px;height:76px;border-radius:50%;
+  background:var(--border);display:flex;align-items:center;
+  justify-content:center;font-size:1.6rem;margin-bottom:6px;flex-shrink:0;
+}
+.player-id{font-size:.6rem;color:var(--muted);font-weight:700;letter-spacing:.04em;line-height:1;margin-bottom:2px}
+.player-name{font-size:.68rem;font-weight:600;text-align:center;line-height:1.25;color:var(--text);word-break:break-word}
+/* lightbox */
+#lightbox{
+  display:none;position:fixed;inset:0;z-index:1000;
+  background:rgba(0,0,0,0.88);
+  align-items:center;justify-content:center;cursor:pointer;
+}
+#lightbox.open{display:flex}
+#lightbox img{
+  max-width:88vw;max-height:88vh;
+  border-radius:12px;object-fit:contain;
+  box-shadow:0 8px 48px rgba(0,0,0,0.7);
+}
+#lightbox-name{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,0.7);color:#fff;
+  padding:8px 20px;border-radius:20px;
+  font-size:.9rem;font-weight:600;pointer-events:none;white-space:nowrap;
+}
+.loading-msg{
+  text-align:center;color:var(--muted);padding:60px 20px;font-size:.95rem;
+}
+</style>
+</head>
+<body>
+
+<h1>CSBC 2026 SJV Summer League</h1>
+<p class="subtitle">Draft Results &nbsp;·&nbsp; 12 Teams &nbsp;·&nbsp; 96 Players</p>
+<a class="back-link" href="index.html">← Back to Player Directory</a>
+
+<div id="teams-grid" class="teams-grid">
+  <div class="loading-msg" style="grid-column:1/-1">Loading photos…</div>
+</div>
+
+<div id="lightbox">
+  <img id="lightbox-img" src="" alt=""/>
+  <div id="lightbox-name"></div>
+</div>
+
+<script>
+const PHOTOS_FOLDER_ID = '1oJCTtCalNQTcQbMsZaOAa4VyAnJr35EV';
+const DRIVE_API_KEY    = 'AIzaSyAoIlK4ncTUeJjPeOYJLXuj2GoWnMge3X8';
+
+const TEAMS = [
+  {
+    coach:"Coach Humberto", num:1, color:"#e74c8b",
+    players:[
+      {id:"83",name:"Zachary Simmons",pick:1},
+      {id:"46",name:"Kayden Gordon",pick:2},
+      {id:"5",name:"Wyatt Van Eck",pick:3},
+      {id:"52",name:"Matthew Baker",pick:4},
+      {id:"53",name:"Mason Baker",pick:5},
+      {id:"24",name:"Humberto Espinal",pick:6},
+      {id:"15",name:"Brayden Dbuisson",pick:7},
+      {id:"82",name:"Keno Turner",pick:8},
+    ]
+  },
+  {
+    coach:"Coach Alex", num:2, color:"#f39c12",
+    players:[
+      {id:"60",name:"Alex Alexander",pick:1},
+      {id:"48",name:"Weston Jacobs",pick:2},
+      {id:"87",name:"Maximilian Figueroa",pick:3},
+      {id:"86",name:"Delano Figueroa",pick:4},
+      {id:"35",name:"Mckinley Acceus",pick:5},
+      {id:"12",name:"Santino Quintana",pick:6},
+      {id:"78",name:"Kevin Hernandez",pick:7},
+      {id:"26",name:"Jackson Burick",pick:8},
+    ]
+  },
+  {
+    coach:"Coach Jeff", num:3, color:"#2ecc71",
+    players:[
+      {id:"10",name:"Gavin Leonard",pick:1},
+      {id:"56",name:"Cameron Bailey",pick:2},
+      {id:"37",name:"Maximus Cross",pick:3},
+      {id:"38",name:"Dominic Reid",pick:4},
+      {id:"39",name:"Carter Phillips",pick:5},
+      {id:"9",name:"Blake Budd",pick:6},
+      {id:"93",name:"Carter Weiss",pick:7},
+      {id:"94",name:"Mack Weiss",pick:8},
+    ]
+  },
+  {
+    coach:"Coach Daven-Josiah", num:4, color:"#9b59b6",
+    players:[
+      {id:"62",name:"Gideyon Charles",pick:1},
+      {id:"61",name:"Berthel Archibald",pick:2},
+      {id:"16",name:"Ryder Fiske",pick:3},
+      {id:"99A",name:"Hosea Philemon",pick:4},
+      {id:"88",name:"Logan Maya",pick:5},
+      {id:"14",name:"Joseph Zohar",pick:6},
+      {id:"57",name:"Tristan Eustache",pick:7},
+      {id:"49",name:"Gavin Perez",pick:8},
+    ]
+  },
+  {
+    coach:"Coach Ben", num:5, color:"#1abc9c",
+    players:[
+      {id:"6",name:"Jacob Rawls",pick:1},
+      {id:"13",name:"Camden Bryant",pick:2},
+      {id:"21",name:"Leo Lowther",pick:3},
+      {id:"63",name:"Helix Thekkan",pick:4},
+      {id:"33",name:"Jordan Collier",pick:5},
+      {id:"65",name:"Samuel Torres",pick:6},
+      {id:"18",name:"Nikash Singh",pick:7},
+      {id:"2",name:"Gabriel Canales",pick:8},
+    ]
+  },
+  {
+    coach:"Coach Tati", num:6, color:"#e91e8c",
+    players:[
+      {id:"11",name:"Rashod Clark",pick:1},
+      {id:"44",name:"Landon Dubreuze",pick:2},
+      {id:"85",name:"Jemal Brown",pick:3},
+      {id:"92",name:"Kaleb Pina",pick:4},
+      {id:"23",name:"Jaeden Rose",pick:5},
+      {id:"22",name:"Dwayne Anglin",pick:6},
+      {id:"70",name:"Mekhi Charlestin",pick:7},
+      {id:"71",name:"Landerson Lebrun",pick:8},
+    ]
+  },
+  {
+    coach:"Coach Sedat", num:7, color:"#3498db",
+    players:[
+      {id:"68",name:"Arman Dilek",pick:1},
+      {id:"74",name:"Gabriel Johnson",pick:2},
+      {id:"75",name:"Jaxon Perry",pick:3},
+      {id:"17",name:"Elijah Biggs",pick:4},
+      {id:"79",name:"Justin Greene",pick:5},
+      {id:"40",name:"Caleb Industrious",pick:6},
+      {id:"55",name:"Andrew Mascary",pick:7},
+      {id:"76",name:"Christian Williams",pick:8},
+    ]
+  },
+  {
+    coach:"Coach Andre", num:8, color:"#e67e22",
+    players:[
+      {id:"1",name:"Sebastian Fernandez",pick:1},
+      {id:"28",name:"Christian Green",pick:2},
+      {id:"29",name:"Logan Bingham",pick:3},
+      {id:"30",name:"Teddy Bingham",pick:4},
+      {id:"41",name:"Axel Almada",pick:5},
+      {id:"43",name:"Berch Dale",pick:6},
+      {id:"81",name:"Cruz Gravier",pick:7},
+      {id:"50",name:"Shreyas Kenny",pick:8},
+    ]
+  },
+  {
+    coach:"Coach Alfred-Levar", num:9, color:"#f1c40f",
+    players:[
+      {id:"95",name:"Levar Higgs",pick:1},
+      {id:"96",name:"Zakai Celcis",pick:2},
+      {id:"32",name:"Josiah Germain",pick:3},
+      {id:"45",name:"Nicholas Buonpastore",pick:4},
+      {id:"42",name:"Jacob Perez",pick:5},
+      {id:"59",name:"Karmello Vasquez",pick:6},
+      {id:"69",name:"Jayden Gomez",pick:7},
+      {id:"67",name:"Andrew Miller",pick:8},
+    ]
+  },
+  {
+    coach:"Coach Kevin", num:10, color:"#00bcd4",
+    players:[
+      {id:"36",name:"Sade Katib",pick:1},
+      {id:"34",name:"Joshua Su",pick:2},
+      {id:"80",name:"Ryan Dashoush",pick:3},
+      {id:"19",name:"David Martin",pick:4},
+      {id:"27",name:"Blake Burden",pick:5},
+      {id:"4",name:"Asher Parker",pick:6},
+      {id:"3",name:"Louie Pachon",pick:7},
+      {id:"54",name:"Angel Forero",pick:8},
+    ]
+  },
+  {
+    coach:"Coach Mike", num:11, color:"#ff5252",
+    players:[
+      {id:"90",name:"Bryce Cabrera",pick:1},
+      {id:"7",name:"Chance Densmore",pick:2},
+      {id:"91",name:"Dylan Cabrera",pick:3},
+      {id:"73",name:"Ayden Gutierrez",pick:4},
+      {id:"25",name:"Sebastian Gutierrez",pick:5},
+      {id:"64",name:"Alec Amisial",pick:6},
+      {id:"89",name:"Timmy Priester",pick:7},
+      {id:"72",name:"Carter Bleus",pick:8},
+    ]
+  },
+  {
+    coach:"Coach Chris", num:12, color:"#8bc34a",
+    players:[
+      {id:"66",name:"Jaiden Chavez",pick:1},
+      {id:"47",name:"Jackson Brossard",pick:2},
+      {id:"20",name:"Jordan Chavez",pick:3},
+      {id:"84",name:"Nicolas Katz",pick:4},
+      {id:"51",name:"Nikko Akers",pick:5},
+      {id:"97",name:"Lucciano Siarrocchi",pick:6},
+      {id:"8",name:"Phoenix Woodall",pick:7},
+      {id:"58",name:"Joshua Plaisir",pick:8},
+    ]
+  },
+];
+
+// Map player ID -> Drive file IDs (populated after API call)
+const photoIndex = {};  // id -> { thumbUrl, fullUrl }
+
+async function buildPhotoIndex() {
+  const cached = sessionStorage.getItem('drivePhotos');
+  if (cached) {
+    Object.assign(photoIndex, JSON.parse(cached));
+    return;
+  }
+  const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${PHOTOS_FOLDER_ID}' in parents`)}&fields=files(id,name)&key=${DRIVE_API_KEY}`;
+  const res = await fetch(url);
+  if (!res.ok) return;
+  const data = await res.json();
+  (data.files || []).forEach(({ id, name }) => {
+    const pid = name.replace(/\.[^/.]+$/, '').trim();
+    photoIndex[pid] = {
+      thumbUrl: `https://drive.google.com/thumbnail?id=${id}&sz=w400`,
+      fullUrl:  `https://drive.google.com/thumbnail?id=${id}&sz=w1200`,
+    };
+  });
+  sessionStorage.setItem('drivePhotos', JSON.stringify(photoIndex));
+}
+
+function renderTeam(t) {
+  const tiles = t.players.map(p => {
+    const entry = photoIndex[p.id];
+    const photoHtml = entry
+      ? `<img class="player-photo"
+              src="${entry.thumbUrl}"
+              alt="${p.name}"
+              onclick="openLightbox('${entry.fullUrl}','${p.name.replace(/'/g, "\\'")}',event)"
+              onerror="this.outerHTML='<div class=\\'player-photo-placeholder\\'>🏀</div>'" />`
+      : `<div class="player-photo-placeholder">🏀</div>`;
+    return `
+      <div class="player-tile">
+        <span class="pick-badge">#${p.pick}</span>
+        ${photoHtml}
+        <div class="player-id">${p.id}</div>
+        <div class="player-name">${p.name}</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="team-card">
+      <div class="team-header">
+        <div class="team-number" style="background:${t.color}20;color:${t.color};border:1.5px solid ${t.color}40">${t.num}</div>
+        <div class="team-name">${t.coach}</div>
+        <div class="team-pick-count">${t.players.length} players</div>
+      </div>
+      <div class="player-list">${tiles}</div>
+    </div>`;
+}
+
+async function init() {
+  await buildPhotoIndex();
+  document.getElementById('teams-grid').innerHTML = TEAMS.map(renderTeam).join('');
+}
+
+function openLightbox(src, name, e) {
+  e.stopPropagation();
+  document.getElementById('lightbox-img').src = src;
+  document.getElementById('lightbox-name').textContent = name;
+  document.getElementById('lightbox').classList.add('open');
+}
+document.getElementById('lightbox').addEventListener('click', () => {
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-img').src = '';
+});
+
+init();
+</script>
+</body>
+</html>
