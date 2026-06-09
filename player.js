@@ -248,7 +248,7 @@ function renderLiveStats() {
     const { seed, modifier } = decodeRanking(rawVal, live.modifiers, coach.name);
     if (seed !== null && rawVal !== null) {
       const label = modifier || 'Reg';
-      yourValue.textContent = `${parseFloat(rawVal).toFixed(1)} · ${label}`;
+      yourValue.textContent = `${label} · ${parseFloat(rawVal).toFixed(1)}`;
       yourSection.classList.remove('hidden');
     } else {
       yourSection.classList.add('hidden');
