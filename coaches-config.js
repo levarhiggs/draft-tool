@@ -8,21 +8,21 @@ export const COACHES = [
   { name: 'Coach Alfred-Levar',  pin: '456'  },
   { name: 'Coach Andre',         pin: '789'  },
   { name: 'Coach Ben',           pin: '123'  },
-  { name: 'Coach Cabrera',       pin: '2345' },
   { name: 'Coach Chris',         pin: '456'  },
   { name: 'Coach Daven-Josiah',  pin: '789'  },
   { name: 'Coach Humberto',      pin: '123'  },
   { name: 'Coach Jeff',          pin: '456'  },
   { name: 'Coach Kevin',         pin: '789'  },
-  { name: 'Coach Mike',          pin: '1111' },
+  { name: 'Coach Mike C.',       pin: '2345' },
   { name: 'Coach Sedat',         pin: '789'  },
   { name: 'Coach Tati',          pin: '1234' },
+  { name: 'Director Mike M.',    pin: '1111' },
 ];
 
 // Coaches allowed to view and change Team Assignment and mark No Shows
 // Must match exactly as written in COACHES above
 export const TEAM_ADMINS = [
-  'Coach Mike',
+  'Director Mike M.',
   'Coach Alfred-Levar',
 ];
 
@@ -38,7 +38,7 @@ export const TEAMS = [
   'Team Andre',
   'Team Alfred-Levar',
   'Team Kevin',
-  'Team Mike',
+  'Team Mike C.',
   'Team Chris',
   'Undrafted',
 ];
