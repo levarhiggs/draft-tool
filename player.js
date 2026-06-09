@@ -268,10 +268,17 @@ function renderLiveStats() {
   // Team tile — only for admins
   const teamBox = document.getElementById('team-stat-box');
   if (teamBox) {
-    if (isTeamAdmin) {
+    const teamName = live.team || playerData[COL.TEAM] || '';
+    if (teamName) {
+      const teamLink = `index.html?team=${encodeURIComponent(teamName)}&sort=rank`;
       teamBox.innerHTML = `
         <div class="stat-label">Team</div>
-        <div class="stat-value team-display">${escHtml(live.team || playerData[COL.TEAM] || '—')}</div>`;
+        <a class="stat-value team-display" href="${teamLink}" style="color:var(--clr-success);text-decoration:none">${escHtml(teamName)}</a>`;
+      teamBox.classList.remove('hidden');
+    } else if (isTeamAdmin) {
+      teamBox.innerHTML = `
+        <div class="stat-label">Team</div>
+        <div class="stat-value team-display">—</div>`;
       teamBox.classList.remove('hidden');
     } else {
       teamBox.classList.add('hidden');
@@ -430,14 +437,15 @@ function renderCoachPanel() {
   });
 
   document.getElementById('btn-save-coach').addEventListener('click', async () => {
-    const noteVal = document.getElementById('input-note').value.trim();
-    const teamVal = isTeamAdmin ? document.getElementById('input-team')?.value : null;
-    const status  = document.getElementById('save-status');
+    const noteVal        = document.getElementById('input-note').value.trim();
+    const selectedTeam   = isTeamAdmin ? document.getElementById('input-team')?.value : null;
+    const existingTeam   = liveData?.team || '';
+    const status         = document.getElementById('save-status');
 
     const saves = [];
     if (selectedSeed !== null) saves.push(saveRanking(playerId, coach.name, selectedSeed, selectedModifier));
     if (noteVal !== '')        saves.push(saveNote(playerId, coach.name, noteVal));
-    if (teamVal)               saves.push(saveTeam(playerId, teamVal));
+    if (selectedTeam !== null && selectedTeam !== existingTeam) saves.push(saveTeam(playerId, selectedTeam));
 
     if (saves.length === 0) {
       status.style.color = 'var(--clr-danger)';

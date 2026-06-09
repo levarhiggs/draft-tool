@@ -44,6 +44,13 @@ let searchQuery = '';
 
 async function init() {
   try {
+    // Read URL params set by team tile links on player profile pages
+    const params = new URLSearchParams(window.location.search);
+    const urlTeam = params.get('team');
+    const urlSort = params.get('sort');
+    if (urlTeam) activeFilters.teams.add(urlTeam);
+    if (urlSort) currentSort = urlSort;
+
     const [players] = await Promise.all([
       fetchPlayers(),
       buildDriveIndex(),
@@ -373,8 +380,9 @@ function playerCardHTML(p, isLoggedIn) {
 // ── Controls setup ────────────────────────────────────────────────────────────
 
 function setupControls() {
-  // Sort buttons
+  // Sort buttons — sync active state with currentSort (may be pre-set from URL)
   document.querySelectorAll('.sort-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.sort === currentSort);
     btn.addEventListener('click', () => {
       document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
