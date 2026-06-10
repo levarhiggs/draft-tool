@@ -28,38 +28,45 @@
           <button id="btn-logout" class="btn-sm">Log Out</button>
         </div>
         <button id="btn-login" class="btn-primary">Coach Login</button>
+        <button id="btn-drawer-toggle" class="btn-drawer-toggle" aria-label="Toggle filters">
+          <span id="drawer-toggle-icon">▾ Filters</span>
+        </button>
       </div>
-    </div>
-    <!-- Sort bar -->
-    <div class="sort-bar">
-      <span class="bar-label">Sort:</span>
-      <button class="sort-btn" data-sort="alpha">A – Z</button>
-      <button class="sort-btn active" data-sort="id">ID #</button>
-      <button class="sort-btn" data-sort="birthday">Age</button>
-      <button class="sort-btn" data-sort="team">Team</button>
-      <button class="sort-btn" data-sort="rank">Rank</button>
     </div>
 
-    <!-- Search bar -->
-    <div class="search-bar">
-      <input id="player-search" type="search" placeholder="Search players…" autocomplete="off" />
-    </div>
+    <!-- Collapsible drawer: sort + search + filters -->
+    <div id="header-drawer" class="header-drawer">
+      <!-- Sort bar -->
+      <div class="sort-bar">
+        <span class="bar-label">Sort:</span>
+        <button class="sort-btn" data-sort="alpha">A – Z</button>
+        <button class="sort-btn active" data-sort="id">ID #</button>
+        <button class="sort-btn" data-sort="birthday">Age</button>
+        <button class="sort-btn" data-sort="team">Team</button>
+        <button class="sort-btn" data-sort="rank">Rank</button>
+      </div>
 
-    <!-- Filter bar -->
-    <div class="filter-bar">
-      <div class="filter-row">
-        <span class="bar-label">Filter:</span>
-        <button class="filter-chip filter-fav" id="filter-favorites">♥ Favorites</button>
-        <button class="filter-chip filter-noshow hidden" id="filter-noshows">✕ No Shows</button>
-        <div id="filter-grades" class="filter-group"></div>
+      <!-- Search bar -->
+      <div class="search-bar">
+        <input id="player-search" type="search" placeholder="Search players…" autocomplete="off" />
       </div>
-      <div class="filter-row">
-        <span class="bar-label">Seed:</span>
-        <div id="filter-seeds" class="filter-group"></div>
-      </div>
-      <div class="filter-row">
-        <span class="bar-label">Team:</span>
-        <div id="filter-teams" class="filter-group"></div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar">
+        <div class="filter-row">
+          <span class="bar-label">Filter:</span>
+          <button class="filter-chip filter-fav" id="filter-favorites">♥ Favorites</button>
+          <button class="filter-chip filter-noshow hidden" id="filter-noshows">✕ No Shows</button>
+          <div id="filter-grades" class="filter-group"></div>
+        </div>
+        <div class="filter-row">
+          <span class="bar-label">Seed:</span>
+          <div id="filter-seeds" class="filter-group"></div>
+        </div>
+        <div class="filter-row">
+          <span class="bar-label">Team:</span>
+          <div id="filter-teams" class="filter-group"></div>
+        </div>
       </div>
     </div>
   </header>

@@ -503,3 +503,26 @@ export function escHtml(str) {
 export { COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID };
 
 init();
+
+// ── Mobile drawer ─────────────────────────────────────────────────────────────
+(function wireDrawer() {
+  const toggle = document.getElementById('btn-drawer-toggle');
+  const drawer = document.getElementById('header-drawer');
+  if (!toggle || !drawer) return;
+
+  function setOpen(open) {
+    drawer.classList.toggle('open', open);
+    toggle.classList.toggle('active', open);
+    document.getElementById('drawer-toggle-icon').textContent = open ? '▴ Filters' : '▾ Filters';
+  }
+
+  toggle.addEventListener('click', () => setOpen(!drawer.classList.contains('open')));
+
+  // Auto-collapse on scroll down, restore on scroll up
+  let lastY = window.scrollY;
+  window.addEventListener('scroll', () => {
+    const y = window.scrollY;
+    if (y > lastY + 10 && drawer.classList.contains('open')) setOpen(false);
+    lastY = y;
+  }, { passive: true });
+})();

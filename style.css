@@ -79,6 +79,42 @@ header h1 {
 
 .coach-badge span { color: var(--clr-text); font-weight: 600; }
 
+/* ── Mobile drawer toggle ── */
+.btn-drawer-toggle {
+  display: none;
+  background: transparent;
+  border: 1px solid var(--clr-border);
+  color: var(--clr-muted);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.btn-drawer-toggle:hover { border-color: var(--clr-accent); color: var(--clr-accent); }
+.btn-drawer-toggle.active { background: var(--clr-accent); border-color: var(--clr-accent); color: #fff; }
+
+.header-drawer {
+  overflow: hidden;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+}
+
+@media (max-width: 640px) {
+  .btn-drawer-toggle { display: inline-flex; align-items: center; gap: 4px; }
+
+  .header-drawer {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .header-drawer.open {
+    max-height: 600px;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
 /* ── Sort & Filter Bars ── */
 .bar-label {
   font-size: 0.78rem;
