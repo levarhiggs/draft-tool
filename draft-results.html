@@ -17,18 +17,13 @@ body{
   min-height:100vh;padding:32px 20px 60px;
 }
 h1{
-  text-align:center;font-size:1.5rem;font-weight:800;
+  font-size:1.5rem;font-weight:800;
   letter-spacing:.06em;text-transform:uppercase;color:#fff;margin-bottom:6px;
 }
 .subtitle{
-  text-align:center;font-size:.8rem;color:var(--muted);
-  letter-spacing:.08em;text-transform:uppercase;margin-bottom:40px;
+  font-size:.8rem;color:var(--muted);
+  letter-spacing:.08em;text-transform:uppercase;margin-bottom:0;
 }
-.back-link{
-  display:block;text-align:center;margin-bottom:24px;
-  font-size:.85rem;color:var(--muted);text-decoration:none;
-}
-.back-link:hover{color:var(--text)}
 .teams-grid{
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
@@ -95,13 +90,90 @@ h1{
 .loading-msg{
   text-align:center;color:var(--muted);padding:60px 20px;font-size:.95rem;
 }
+
+/* ── Header + hamburger menu (matches index.html / rotations.html) ── */
+.top-header{
+  max-width:1400px;margin:0 auto 28px;padding:0 4px;
+  display:flex;align-items:center;gap:14px;
+}
+.btn-menu-toggle{
+  flex-shrink:0;width:36px;height:36px;background:transparent;
+  border:1px solid var(--border);border-radius:8px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;transition:border-color .15s;
+}
+.btn-menu-toggle:hover{border-color:#4f8ef7}
+.btn-menu-toggle span{
+  display:block;width:18px;height:2px;background:var(--text);
+  border-radius:2px;transition:transform .2s,opacity .2s;
+}
+.btn-menu-toggle[aria-expanded="true"] span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+.btn-menu-toggle[aria-expanded="true"] span:nth-child(2){opacity:0}
+.btn-menu-toggle[aria-expanded="true"] span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
+
+.top-header-titles{min-width:0;flex:1 1 auto}
+.top-header-titles h1{
+  font-size:1.4rem;margin-bottom:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+@media (max-width:640px){
+  .top-header-titles h1{font-size:1rem}
+}
+
+.side-menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300}
+.side-menu-overlay.hidden{display:none}
+.side-menu{
+  position:fixed;top:0;left:0;height:100%;width:260px;max-width:80vw;
+  background:var(--surface);border-right:1px solid var(--border);
+  box-shadow:0 4px 24px rgba(0,0,0,.4);z-index:301;
+  display:flex;flex-direction:column;transform:translateX(-100%);
+  transition:transform .2s ease;
+}
+.side-menu.open{transform:translateX(0)}
+.side-menu-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 18px;border-bottom:1px solid var(--border);
+  font-weight:700;color:var(--text);
+}
+.btn-menu-close{
+  background:transparent;border:none;color:var(--muted);
+  font-size:1.1rem;cursor:pointer;padding:4px 8px;
+}
+.btn-menu-close:hover{color:var(--text)}
+.side-menu-link{
+  display:flex;align-items:center;gap:10px;padding:14px 18px;
+  color:var(--text);text-decoration:none;font-size:.95rem;
+  border-bottom:1px solid var(--border);
+}
+.side-menu-link:hover{background:var(--card)}
+.side-menu-link.active{color:#4f8ef7;font-weight:600}
 </style>
 </head>
 <body>
 
-<h1>CSBC 2026 SJV Summer League</h1>
-<p class="subtitle">Draft Results &nbsp;·&nbsp; 12 Teams &nbsp;·&nbsp; 96 Players</p>
-<a class="back-link" href="index.html">← Back to Player Directory</a>
+<header class="top-header">
+  <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="top-header-titles">
+    <h1>CSBC 2026 SJV Summer League</h1>
+    <p class="subtitle">Draft Results &nbsp;·&nbsp; 12 Teams &nbsp;·&nbsp; 96 Players</p>
+  </div>
+</header>
+
+<!-- Side menu -->
+<div id="side-menu-overlay" class="side-menu-overlay hidden"></div>
+<nav id="side-menu" class="side-menu" aria-label="Main menu">
+  <div class="side-menu-header">
+    <span>Menu</span>
+    <button id="btn-menu-close" class="btn-menu-close" aria-label="Close menu">✕</button>
+  </div>
+  <a href="index.html" class="side-menu-link">🏀 Player Directory</a>
+  <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
+  <a href="draft-results.html" class="side-menu-link active">🏆 Draft Results</a>
+  <a href="schedule.html" class="side-menu-link">📅 Schedules</a>
+</nav>
 
 <div id="teams-grid" class="teams-grid">
   <div class="loading-msg" style="grid-column:1/-1">Loading photos…</div>
@@ -346,5 +418,6 @@ document.getElementById('lightbox').addEventListener('click', () => {
 
 init();
 </script>
+<script type="module" src="side-menu.js"></script>
 </body>
 </html>

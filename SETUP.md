@@ -18,9 +18,17 @@ service cloud.firestore {
     match /players/{id} {
       allow read, write: if true;
     }
+    match /coaches/{coachName} {
+      allow read, write: if true;
+    }
+    match /scheduleGames/{gameNum} {
+      allow read, write: if true;
+    }
   }
 }
 ```
+- `coaches/{coachName}` stores each coach's favorites (used by the Player Directory).
+- `scheduleGames/{gameNum}` stores coach-entered game scores (used by the Schedules page). If this collection isn't in the *live* rules yet, score saves will fail with a generic "Save failed" error in the app (Firestore permission-denied under the hood) — check the browser console for the real error if this happens again.
 
 ---
 

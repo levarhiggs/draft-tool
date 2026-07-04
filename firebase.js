@@ -1,7 +1,7 @@
 // firebase.js — read/write rankings, notes, team assignments, favorites
 import { db } from './firebase-config.js';
 import {
-  doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField
+  doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField, serverTimestamp, arrayUnion
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Firestore document shape for players/{playerId}:
@@ -145,4 +145,60 @@ export async function saveTeam(playerId, teamName) {
   } else {
     await setDoc(ref, { rankings: {}, modifiers: {}, notes: {}, team: teamName });
   }
+}
+
+// ── Schedule score overrides ────────────────────────────────────────────────
+// Firestore document shape for scheduleGames/{gameNum}:
+// {
+//   vScore: number | null,
+//   hScore: number | null,
+//   winner: 'V' | 'H' | null,
+//   updatedAt: timestamp,
+//   updatedBy: string (coach name),
+// }
+
+function scheduleGameRef(gameNum) {
+  return doc(db, 'scheduleGames', String(gameNum));
+}
+
+export async function getScheduleGame(gameNum) {
+  try {
+    const snap = await getDoc(scheduleGameRef(gameNum));
+    return snap.exists() ? snap.data() : null;
+  } catch (err) {
+    console.error('getScheduleGame error:', err);
+    return null;
+  }
+}
+
+export async function saveScheduleGame(gameNum, vScore, hScore, coachName) {
+  let winner = null;
+  if (vScore != null && hScore != null) {
+    if (vScore > hScore) winner = 'V';
+    else if (hScore > vScore) winner = 'H';
+    // equal scores -> winner stays null (tie)
+  }
+  const ref = scheduleGameRef(gameNum);
+  await setDoc(ref, {
+    vScore,
+    hScore,
+    winner,
+    updatedAt: serverTimestamp(),
+    updatedBy: coachName,
+  }, { merge: true }); // merge, not overwrite — a comment may already exist on this doc
+  return { vScore, hScore, winner };
+}
+
+// Comments accumulate — each save APPENDS a new { text, coachName, at }
+// entry via arrayUnion rather than overwriting the field, so multiple
+// coaches' comments over time all persist. serverTimestamp() can't be
+// nested inside an array element passed to arrayUnion (a Firestore
+// limitation), so each entry's `at` is a plain client-side Date instead.
+export async function saveGameComment(gameNum, text, coachName) {
+  const ref = scheduleGameRef(gameNum);
+  const entry = { text: String(text).slice(0, 100), coachName, at: new Date() };
+  await setDoc(ref, {
+    comments: arrayUnion(entry),
+  }, { merge: true });
+  return entry;
 }
