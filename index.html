@@ -20,9 +20,13 @@
 
   <header>
     <div class="header-inner">
-      <h1>CSBC SJV Player Directory - Summer 2026</h1>
+      <div class="header-left">
+        <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <h1>CSBC SJV Player Directory - Summer 2026</h1>
+      </div>
       <div class="header-controls">
-        <a href="draft-results.html" class="btn-primary" style="text-decoration:none;font-size:.85rem;padding:7px 14px">🏆 Draft Results</a>
         <div id="coach-badge" class="coach-badge hidden">
           <span id="coach-badge-name"></span>
           <button id="btn-logout" class="btn-sm">Log Out</button>
@@ -71,6 +75,19 @@
     </div>
   </header>
 
+  <!-- Side menu -->
+  <div id="side-menu-overlay" class="side-menu-overlay hidden"></div>
+  <nav id="side-menu" class="side-menu" aria-label="Main menu">
+    <div class="side-menu-header">
+      <span>Menu</span>
+      <button id="btn-menu-close" class="btn-menu-close" aria-label="Close menu">✕</button>
+    </div>
+    <a href="index.html" class="side-menu-link active">🏀 Player Directory</a>
+    <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
+    <a href="draft-results.html" class="side-menu-link">🏆 Draft Results</a>
+    <a href="schedule.html" class="side-menu-link">📅 Schedules</a>
+  </nav>
+
   <main>
     <div id="player-grid" class="player-grid">
       <div class="loading">Loading players…</div>
@@ -99,6 +116,7 @@
 
   <script type="module" src="app.js"></script>
   <script type="module" src="coach-login.js"></script>
+  <script type="module" src="side-menu.js"></script>
   <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/draft-tool/sw.js');
   </script>

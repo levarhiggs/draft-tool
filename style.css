@@ -12,6 +12,7 @@
   --clr-muted:     #8890a8;
   --clr-danger:    #e05c5c;
   --clr-success:   #4ecf87;
+  --clr-warning:   #e0a75c;
   --radius:        10px;
   --shadow:        0 4px 24px rgba(0,0,0,0.4);
 }
@@ -49,7 +50,114 @@ header h1 {
   font-size: 1.4rem;
   font-weight: 700;
   color: var(--clr-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+@media (max-width: 640px) {
+  header h1 {
+    font-size: 1rem;
+  }
+}
+
+/* ── Hamburger menu toggle ── */
+.btn-menu-toggle {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: border-color 0.15s;
+}
+.btn-menu-toggle:hover { border-color: var(--clr-accent); }
+.btn-menu-toggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--clr-text);
+  border-radius: 2px;
+  transition: transform 0.2s, opacity 0.2s;
+}
+.btn-menu-toggle[aria-expanded="true"] span:nth-child(1) { transform: translateY(6px) rotate(45deg); }
+.btn-menu-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+.btn-menu-toggle[aria-expanded="true"] span:nth-child(3) { transform: translateY(-6px) rotate(-45deg); }
+
+/* ── Side menu ── */
+.side-menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 300;
+}
+.side-menu-overlay.hidden { display: none; }
+
+.side-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 260px;
+  max-width: 80vw;
+  background: var(--clr-surface);
+  border-right: 1px solid var(--clr-border);
+  box-shadow: var(--shadow);
+  z-index: 301;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.22s ease;
+}
+.side-menu.open { transform: translateX(0); }
+
+.side-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--clr-border);
+  font-weight: 700;
+  color: var(--clr-text);
+}
+
+.btn-menu-close {
+  background: transparent;
+  border: none;
+  color: var(--clr-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+}
+.btn-menu-close:hover { color: var(--clr-text); }
+
+.side-menu-link {
+  display: block;
+  padding: 14px 18px;
+  color: var(--clr-text);
+  text-decoration: none;
+  font-size: 0.95rem;
+  border-bottom: 1px solid var(--clr-border);
+  transition: background 0.15s;
+}
+.side-menu-link:hover { background: var(--clr-card); text-decoration: none; }
+.side-menu-link.active { color: var(--clr-accent); font-weight: 700; }
 
 .back-link {
   font-size: 0.95rem;
@@ -870,7 +978,8 @@ main {
 }
 
 .modal-box select,
-.modal-box input {
+.modal-box input,
+.modal-box textarea {
   background: var(--clr-card);
   border: 1px solid var(--clr-border);
   color: var(--clr-text);
@@ -879,12 +988,29 @@ main {
   font-size: 0.9rem;
   width: 100%;
   font-family: inherit;
+  resize: vertical;
 }
 
 .modal-box select:focus,
-.modal-box input:focus {
+.modal-box input:focus,
+.modal-box textarea:focus {
   outline: none;
   border-color: var(--clr-accent);
+}
+
+.modal-box input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sched-permission-note {
+  font-size: 0.8rem;
+  color: var(--clr-warning);
+  background: rgba(224, 167, 92, 0.12);
+  border: 1px solid rgba(224, 167, 92, 0.3);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 4px;
 }
 
 .modal-actions {
@@ -958,4 +1084,742 @@ main {
   letter-spacing: 0.07em;
   color: var(--clr-muted);
   margin-bottom: 10px;
+}
+
+/* ── Rotations page ── */
+.rotations-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rot-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.rot-team-select-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--clr-muted);
+}
+
+.rot-team-select-label select {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  min-width: 200px;
+}
+
+.rot-avatar-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar-toggle-btn {
+  background: transparent;
+  border: 1px solid var(--clr-border);
+  color: var(--clr-muted);
+  border-radius: 20px;
+  padding: 4px 14px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.15s;
+}
+.avatar-toggle-btn:hover { border-color: var(--clr-accent); color: var(--clr-accent); }
+.avatar-toggle-btn.active { background: var(--clr-accent); border-color: var(--clr-accent); color: #fff; }
+
+.rot-status-banner {
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border: 1px solid var(--clr-border);
+}
+.rot-status-valid {
+  background: rgba(78, 207, 135, 0.12);
+  border-color: var(--clr-success);
+  color: var(--clr-success);
+}
+.rot-status-error {
+  background: rgba(224, 92, 92, 0.12);
+  border-color: var(--clr-danger);
+  color: var(--clr-danger);
+}
+
+.rot-grid-wrap {
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  overflow-x: auto;
+  position: relative;
+}
+
+.rot-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 560px;
+}
+
+/* Column order: grip handle, avatar, name, status dot, initials reference, Q1-Q4.
+   No sticky columns — the whole row scrolls together as one unit; the
+   initials-reference column stays close to Q1 so tile order is still
+   readable once you've scrolled past the name. */
+.rot-row {
+  display: grid;
+  grid-template-columns: 26px 60px 1fr 22px 40px repeat(4, 64px);
+  align-items: center;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  background: var(--clr-surface);
+  border: 1px solid transparent;
+  transition: border-color 0.15s, opacity 0.15s;
+}
+
+.rot-cell-initials-ref {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  position: relative;
+}
+.rot-cell-ref-name-mode {
+  justify-content: flex-start;
+}
+.rot-initials-ref-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.rot-firstname-ref {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--clr-muted);
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.rot-header-row {
+  background: transparent;
+  padding: 0 4px 4px;
+}
+
+.rot-row-dragging { opacity: 0.6; border-color: var(--clr-accent); }
+
+.rot-row-absent { opacity: 0.5; }
+
+.rot-cell-grip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: grab;
+  touch-action: none; /* prevent the browser from scrolling instead of firing pointer move events during a drag */
+  padding: 8px 4px;
+}
+.rot-cell-grip span {
+  display: block;
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--clr-muted);
+}
+.rot-cell-grip:active { cursor: grabbing; }
+
+.rot-cell-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rot-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.rot-dot-valid  { background: var(--clr-success); }
+.rot-dot-error  { background: var(--clr-danger); }
+.rot-dot-absent { background: var(--clr-muted); }
+
+.rot-cell-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rot-row-avatar {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.rot-row-avatar-img {
+  width: 51px;
+  height: 51px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+  background: var(--clr-border);
+}
+
+.rot-row-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  color: var(--clr-muted);
+}
+
+.rot-avatar-absent .rot-row-avatar-img {
+  filter: grayscale(1) brightness(0.6);
+}
+
+.rot-cell-name {
+  background: none;
+  border: none;
+  color: var(--clr-text);
+  font-weight: 700;
+  font-size: 0.92rem;
+  text-align: left;
+  cursor: pointer;
+  padding: 4px 2px;
+  white-space: nowrap;
+}
+.rot-cell-name:hover { color: var(--clr-accent); }
+
+.rot-cell-quarter-header {
+  background: transparent;
+  border: none;
+  color: var(--clr-muted);
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  padding: 2px 0;
+  line-height: 1.2;
+}
+.rot-quarter-error {
+  color: var(--clr-danger);
+  font-weight: 800;
+}
+.rot-quarter-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.rot-cell-quarter {
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--clr-border);
+  background: var(--clr-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.rot-cell-quarter:hover { border-color: var(--clr-accent); }
+.rot-cell-on {
+  background: rgba(79, 142, 247, 0.15);
+  border-color: var(--clr-accent);
+}
+
+.rot-cell-disabled {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--clr-border),
+    var(--clr-border) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  opacity: 0.4;
+  cursor: default;
+  border-color: var(--clr-border);
+}
+
+.rot-cell-avatar-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.rot-cell-avatar-initials {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.rot-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+/* ── Popovers ── */
+.rot-popover {
+  position: absolute;
+  z-index: 400;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 10px 14px;
+  max-width: 260px;
+  font-size: 0.85rem;
+}
+
+.rot-popover-title {
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.rot-popover-valid  { color: var(--clr-success); }
+.rot-popover-error  { color: var(--clr-danger); }
+.rot-popover-absent { color: var(--clr-muted); }
+
+.rot-popover-body {
+  color: var(--clr-text);
+}
+
+/* ── Schedules: game-info popover (single click/tap on a game slot) ── */
+.sched-popover {
+  position: absolute;
+  z-index: 400;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 10px 14px;
+  max-width: 280px;
+  font-size: 0.85rem;
+}
+.sched-popover-title {
+  font-weight: 800;
+  margin-bottom: 6px;
+  color: var(--clr-text);
+}
+.sched-popover-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--clr-muted);
+  padding: 2px 0;
+}
+.sched-popover-row span:last-child {
+  color: var(--clr-text);
+  text-align: right;
+}
+.sched-popover-hint {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--clr-border);
+  color: var(--clr-muted);
+  font-size: 0.76rem;
+  font-style: italic;
+}
+
+.sched-popover-comments {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--clr-border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+.sched-popover-comment {
+  font-size: 0.8rem;
+  color: var(--clr-text);
+  line-height: 1.35;
+}
+.sched-popover-comment b {
+  color: var(--clr-muted);
+  font-weight: 700;
+}
+
+/* ── Suggestions modal ── */
+.modal-box-lg {
+  max-width: 640px;
+  max-height: 82vh;
+  overflow-y: auto;
+}
+
+.rot-suggestions-hint {
+  font-size: 0.85rem;
+  color: var(--clr-muted);
+}
+
+.suggestions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.suggestion-card {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.suggestions-more-link {
+  background: none;
+  border: none;
+  color: var(--clr-accent);
+  font-size: 0.85rem;
+  font-family: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 10px 4px;
+  align-self: center;
+}
+.suggestions-more-link:hover { color: var(--clr-accent-dk); }
+.suggestions-more-link:disabled {
+  color: var(--clr-muted);
+  text-decoration: none;
+  cursor: default;
+}
+
+.suggestion-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.rot-mini-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rot-mini-row {
+  display: grid;
+  grid-template-columns: 90px repeat(4, 20px) 32px;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--clr-muted);
+}
+
+.rot-mini-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rot-mini-cell {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: var(--clr-border);
+  display: inline-block;
+}
+.rot-mini-on { background: var(--clr-accent); }
+
+.rot-mini-total {
+  text-align: right;
+  color: var(--clr-text);
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .rot-row {
+    grid-template-columns: 22px 44px 1fr 18px 36px repeat(4, 48px);
+  }
+  .rot-row-avatar-img { width: 40px; height: 40px; }
+  .rot-cell-quarter { height: 38px; }
+  .rot-cell-avatar-img, .rot-cell-avatar-initials { width: 28px; height: 28px; }
+}
+
+/* ── Schedules page ── */
+.sched-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sched-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.sched-toolbar select {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  min-width: 200px;
+}
+
+.sched-cell-muted { color: var(--clr-muted); }
+.sched-last-updated { font-size: 0.8em; font-style: italic; }
+
+/* Table view */
+.sched-table-wrap {
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  overflow-x: auto;
+}
+
+.sched-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+  font-size: 0.88rem;
+}
+
+.sched-table th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--clr-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--clr-border);
+}
+
+.sched-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--clr-border);
+  color: var(--clr-text);
+}
+
+.sched-table tbody tr {
+  cursor: default;
+  transition: background 0.12s;
+}
+.sched-table tbody tr:hover { background: var(--clr-surface); }
+
+.sched-color-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.sched-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+  border: 1px solid var(--clr-border);
+  flex-shrink: 0;
+}
+
+.sched-swatch-sm {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+/* Calendar view */
+/* Calendar cells are fixed-width, sized to fit their content (time +
+   2 color swatches + up to ~5 score characters) rather than stretching
+   fluidly with the window. Mon-Fri share one width; Sat/Sun share a
+   narrower width (no games are ever played on weekends, but the columns
+   stay visible for date-context continuity). The grid scrolls horizontally
+   on very narrow viewports rather than shrinking cells below their
+   content's minimum size. */
+.sched-calendar-wrap {
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  /* No overflow-x here — setting it would force an implicit overflow-y
+     scroll container on this element too, which breaks position:sticky for
+     the nav/weekday rows below (their sticky "top" would resolve against
+     this box instead of the real page). Horizontal scroll is scoped to
+     .sched-cal-scroll instead, which wraps only the grid. */
+}
+
+.sched-cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  position: sticky;
+  top: var(--page-header-h, 0px);
+  z-index: 90;
+  background: var(--clr-card);
+  padding-top: 4px;
+}
+
+.sched-cal-month-label {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--clr-text);
+}
+
+:root {
+  --sched-cal-weekday-w: 112px;
+  --sched-cal-weekend-w: 56px;
+}
+
+.sched-cal-weekdays,
+.sched-cal-grid {
+  display: grid;
+  grid-template-columns:
+    var(--sched-cal-weekend-w)
+    repeat(5, var(--sched-cal-weekday-w))
+    var(--sched-cal-weekend-w);
+  gap: 4px;
+  width: fit-content;
+  margin: 0 auto;
+}
+
+.sched-cal-weekdays {
+  margin-bottom: 4px;
+  position: sticky;
+  top: calc(var(--page-header-h, 0px) + var(--cal-nav-h, 44px));
+  z-index: 89;
+  background: var(--clr-card);
+  padding-bottom: 4px;
+  /* On viewports narrower than the calendar's natural width, this clips
+     and its scroll position is mirrored from .sched-cal-scroll via JS
+     (wireCalendarScrollSync) — it has no scrollbar of its own on purpose. */
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Wraps only the date grid — this is the element that actually scrolls
+   horizontally on narrow viewports. Kept separate from .sched-calendar-wrap
+   (see above) so sticky positioning on the nav/weekday rows isn't broken. */
+.sched-cal-scroll {
+  overflow-x: auto;
+}
+.sched-cal-weekdays div {
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--clr-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 4px 0;
+}
+
+/* Sized to fit up to 6 game entries (the season's real max-per-day) without
+   scrolling: 6 x ~20px entry rows + 5 x 3px gaps + day-number row + padding. */
+.sched-cal-cell {
+  height: 190px;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+}
+
+/* When filtered to a single team, at most 2 games can ever land on the same
+   date (a team plays at most once per game slot) — shrink cells to fit
+   exactly that, so the calendar reads less sparse than the 6-slot height
+   needed for the unfiltered "All Teams" view. */
+.sched-cal-cell-compact {
+  height: 84px;
+}
+
+.sched-cal-cell-empty {
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.sched-cal-daynum {
+  font-size: 0.72rem;
+  color: var(--clr-muted);
+  font-weight: 600;
+  text-align: center;
+}
+
+.sched-cal-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+}
+
+.sched-cal-entry {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: 5px;
+  padding: 2px 4px;
+  font-size: 0.66rem;
+  color: var(--clr-muted);
+  cursor: default;
+  transition: border-color 0.12s;
+  white-space: nowrap;
+}
+.sched-cal-entry:hover { border-color: var(--clr-accent); }
+.sched-cal-entry-played { color: var(--clr-text); }
+
+.sched-cal-time {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.sched-cal-score {
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--clr-text);
+  white-space: nowrap;
+  max-width: 5ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sched-score-matchup {
+  color: var(--clr-muted);
+  font-size: 0.9rem;
+  margin-top: -6px;
 }
