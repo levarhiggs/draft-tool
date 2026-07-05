@@ -1,10 +1,12 @@
-const CACHE = 'csbc-draft-v5';
+const CACHE = 'csbc-draft-v6';
 const SHELL = [
   '/draft-tool/',
   '/draft-tool/index.html',
+  '/draft-tool/directory.html',
   '/draft-tool/player.html',
   '/draft-tool/rotations.html',
-  '/draft-tool/schedule.html',
+  '/draft-tool/gameboard.html',
+  '/draft-tool/draft-results.html',
   '/draft-tool/app.js',
   '/draft-tool/player.js',
   '/draft-tool/rotations.js',
@@ -12,6 +14,7 @@ const SHELL = [
   '/draft-tool/players-data.js',
   '/draft-tool/schedule.js',
   '/draft-tool/schedule-data.js',
+  '/draft-tool/gameboard.js',
   '/draft-tool/side-menu.js',
   '/draft-tool/coach-login.js',
   '/draft-tool/coaches-config.js',

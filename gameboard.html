@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gameboard — CSBC 2026 SJV Summer Directory</title>
+  <meta property="og:title" content="Gameboard — CSBC 2026 SJV Summer Directory" />
+  <meta property="og:description" content="Live in-game lineup board for CSBC SJV Summer 2026 teams." />
+  <meta name="description" content="Live in-game lineup board for CSBC SJV Summer 2026 teams." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="favicon.png" type="image/png" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0f1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CSBC Draft" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <div class="header-left">
+        <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <h1>Gameboard</h1>
+      </div>
+      <div class="header-controls">
+        <div id="coach-badge" class="coach-badge hidden">
+          <span id="coach-badge-name"></span>
+          <button id="btn-logout" class="btn-sm">Log Out</button>
+        </div>
+        <button id="btn-login" class="btn-primary">Coach Login</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Side menu -->
+  <div id="side-menu-overlay" class="side-menu-overlay hidden"></div>
+  <nav id="side-menu" class="side-menu" aria-label="Main menu">
+    <div class="side-menu-header">
+      <span>Menu</span>
+      <button id="btn-menu-close" class="btn-menu-close" aria-label="Close menu">✕</button>
+    </div>
+    <a href="index.html" class="side-menu-link">📅 Schedules</a>
+    <a href="gameboard.html" class="side-menu-link active">🎯 Gameboard</a>
+    <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
+    <a href="directory.html" class="side-menu-link">🏀 Player Directory</a>
+    <a href="draft-results.html" class="side-menu-link">🏆 Draft Results</a>
+  </nav>
+
+  <main>
+    <div class="gb-page">
+
+      <!-- Toolbar: view toggle on the LEFT (mirrors Schedules' toggle, which sits on the right) -->
+      <div class="gb-toolbar">
+        <div class="gb-view-toggle" role="group" aria-label="Gameboard view">
+          <button class="avatar-toggle-btn" data-view="game">Game</button>
+          <button class="avatar-toggle-btn" data-view="board">Board</button>
+        </div>
+      </div>
+
+      <!-- Game view: live in-game lineup tracker for a specific scheduled game -->
+      <div id="gb-view-game" class="gb-view hidden">
+
+        <div class="gb-game-toolbar">
+          <label class="rot-team-select-label">
+            Team
+            <select id="gb-game-team-select">
+              <option value="">— choose a team —</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="gb-game-empty-state" class="loading">Select a team to track a game.</div>
+
+        <div id="gb-game-content" class="gb-game-content hidden">
+
+          <!-- Game # bar: this team's own game sequence (1st game, 2nd game,
+               ...), not the schedule sheet's absolute Game # column. -->
+          <div id="gb-gamenum-bar" class="gb-gamenum-bar"></div>
+
+          <!-- Matchup row: own team icon + mini-grid, VS., opponent mini-grid + icon -->
+          <div id="gb-matchup-row" class="gb-matchup-row"></div>
+
+          <!-- Quarter tabs: single-select, filters both IN/OUT container sets -->
+          <div id="gb-quarter-tabs" class="gb-quarter-tabs"></div>
+
+          <!-- IN/OUT containers, own team (left) + opponent (right) -->
+          <div class="gb-inout-columns">
+            <div class="gb-inout-column">
+              <div id="gb-own-in" class="gb-inout-container gb-inout-in"></div>
+              <div id="gb-own-out" class="gb-inout-container gb-inout-out"></div>
+            </div>
+            <div class="gb-inout-column">
+              <div id="gb-opp-in" class="gb-inout-container gb-inout-in"></div>
+              <div id="gb-opp-out" class="gb-inout-container gb-inout-out"></div>
+            </div>
+          </div>
+
+          <button id="btn-save-game-config" class="btn-primary gb-save-btn hidden" type="button">💾 Save to Gameboard</button>
+
+        </div>
+      </div>
+
+      <!-- Board view: all 12 teams, one tile each. Rank 1 (once ranking is
+           live) renders alone in its own full-width band, ranks 2-3 share
+           a second band below it, and the 3-per-row grid holds ranks 4-12. -->
+      <div id="gb-view-board" class="gb-view hidden">
+        <div id="gb-board-top" class="gb-board-top"></div>
+        <div id="gb-board-second" class="gb-board-second"></div>
+        <div id="gb-board-grid" class="gb-board-grid"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Team stats popover (click/tap a Board tile) -->
+  <div id="gb-team-popover" class="sched-popover hidden"></div>
+
+  <!-- Coach Login Modal -->
+  <div id="modal-login" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>Coach Login</h2>
+      <label>Select your name
+        <select id="login-name">
+          <option value="">— choose —</option>
+        </select>
+      </label>
+      <label>PIN
+        <input id="login-pin" type="password" maxlength="6" placeholder="Enter your PIN" />
+      </label>
+      <p id="login-error" class="error-msg hidden">Incorrect PIN. Try again.</p>
+      <div class="modal-actions">
+        <button id="btn-login-cancel" class="btn-secondary">Cancel</button>
+        <button id="btn-login-submit" class="btn-primary">Log In</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="gameboard.js"></script>
+  <script type="module" src="coach-login.js"></script>
+  <script type="module" src="side-menu.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/draft-tool/sw.js');
+  </script>
+</body>
+</html>

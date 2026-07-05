@@ -270,7 +270,7 @@ function renderLiveStats() {
   if (teamBox) {
     const teamName = live.team || playerData[COL.TEAM] || '';
     if (teamName) {
-      const teamLink = `index.html?team=${encodeURIComponent(teamName)}&sort=rank`;
+      const teamLink = `directory.html?team=${encodeURIComponent(teamName)}&sort=rank`;
       teamBox.innerHTML = `
         <div class="stat-label">Team</div>
         <a class="stat-value team-display" href="${teamLink}" style="color:var(--clr-success);text-decoration:none">${escHtml(teamName)}</a>`;

@@ -214,12 +214,17 @@ export async function saveGameComment(gameNum, text, coachName) {
 //   isValid: bool,
 //   title: string,                           // auto-generated, user-editable afterward
 //   createdAt: timestamp,
+//   gameTag: { team, opponentTeam, gameNum } | undefined,  // present only for
+//     Gameboard Game-view saves (see saveGameConfig below) — ties this config
+//     to one specific real game rather than being a freeform named variation.
 // }
 //
 // Dedup key = team + presentIds (sorted) + order (as tie-break for ranking
 // changes) + pattern (serialized) — see fingerprintConfig() in rotations.js,
 // which builds the comparable string this module just stores/queries against
-// verbatim rather than re-deriving it here.
+// verbatim rather than re-deriving it here. Game-tagged configs (gameTag
+// present) don't use this dedup path at all — they upsert by team+gameNum
+// instead, see saveGameConfig.
 
 function rotationConfigsRef(coachName) {
   return collection(db, 'rotationConfigs', coachName, 'configs');
@@ -242,6 +247,67 @@ export async function saveRotationConfig(coachName, config) {
     createdAt: serverTimestamp(),
   });
   return ref.id;
+}
+
+// ── Gameboard: per-game saved configs ────────────────────────────────────────
+// Same rotationConfigs/{coachName}/configs collection as above (so these
+// show up in the Rotations page's Saved Configurations gallery too), but
+// tagged with `gameTag: { team, opponentTeam, gameNum }`. Unlike a normal
+// Rotations-page save (unlimited variations per team), there is only ever
+// ONE config per coach+team+gameNum — saving again from the Gameboard's
+// Game view overwrites the existing doc for that team+gameNum instead of
+// adding a new one. This is per-coach: two coaches can save totally
+// different configs for the same team+game and neither overwrites the
+// other's — Firestore path already scopes everything under the coach's own
+// name, same as every other rotationConfigs doc.
+
+export async function getGameConfig(coachName, team, gameNum) {
+  try {
+    const q = query(
+      rotationConfigsRef(coachName),
+      where('team', '==', team),
+      where('gameTag.gameNum', '==', gameNum),
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    // Should only ever be one match (enforced by saveGameConfig's
+    // overwrite-existing behavior) — if more exist from before this
+    // constraint was added, most-recently-created wins.
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    docs.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    return docs[0];
+  } catch (err) {
+    console.error('getGameConfig error:', err);
+    return null;
+  }
+}
+
+export async function saveGameConfig(coachName, team, gameNum, config) {
+  const existing = await getGameConfig(coachName, team, gameNum);
+  const payload = { ...config, createdAt: serverTimestamp() };
+  if (existing) {
+    const ref = doc(db, 'rotationConfigs', coachName, 'configs', existing.id);
+    await setDoc(ref, payload); // full overwrite, not merge — old pattern/order shouldn't linger
+    return existing.id;
+  }
+  const ref = await addDoc(rotationConfigsRef(coachName), payload);
+  return ref.id;
+}
+
+// All of this coach's game-tagged configs for a team in one query — used by
+// the Rotations page's "Apply to Gameboard" picker to show which of the
+// team's games already have a saved config, without querying 10 times.
+export async function getGameConfigsForTeam(coachName, team) {
+  try {
+    const q = query(rotationConfigsRef(coachName), where('team', '==', team));
+    const snap = await getDocs(q);
+    return snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(c => c.gameTag);
+  } catch (err) {
+    console.error('getGameConfigsForTeam error:', err);
+    return [];
+  }
 }
 
 export async function renameRotationConfig(coachName, configId, newTitle) {

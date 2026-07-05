@@ -23,9 +23,10 @@ export const COACHES = [
 // identify teams by color name, not coach/team name — this is the link
 // between the two). Also used for color chips/badges in the UI.
 // hex values are close visual approximations, not official brand codes.
-// `shortName`, when present, is used ONLY in dropdown menus where space is
-// tight — `name` is the canonical value and must match the schedule sheet's
-// Visitor/Home color columns verbatim, so it's never shortened.
+// `shortName`, when present, is used ONLY in space-constrained UI (dropdown
+// menus, the Gameboard team popover title) — `name` is the canonical value
+// and must match the schedule sheet's Visitor/Home color columns verbatim,
+// so it's never shortened at the data level.
 export const TEAM_COLORS = {
   'Team Humberto':     { name: 'Purple',        hex: '#7B3FA0' },
   'Team Alex':         { name: 'Deep Orange',   hex: '#C1440E' },
@@ -35,7 +36,7 @@ export const TEAM_COLORS = {
   'Team Tati':         { name: 'Neon Yellow',   hex: '#F5EA0A' },
   'Team Sedat':        { name: 'White',         hex: '#FFFFFF' },
   'Team Andre':        { name: 'Forest Green',  hex: '#1B5E20' },
-  'Team Alfred-Levar': { name: 'Lime Shock',    hex: '#8BC98A' },
+  'Team Alfred-Levar': { name: 'Lime Shock',    hex: '#8BC98A', shortName: 'Lime' },
   'Team Kevin':        { name: 'Gold',          hex: '#F5A623' },
   'Team Mike C.':      { name: 'Black',         hex: '#0A0A0A' },
   'Team Chris':        { name: 'True Red',      hex: '#E30613' },

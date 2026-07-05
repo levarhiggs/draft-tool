@@ -7,6 +7,7 @@
 export const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQjE0aS5--XrlMU0YAnvS_dQVontr10xdYNPg5OxDe6rkoOzvGkQZ1vsRnKjfPSPP7SHr5g7YJRKbwp/pub?output=csv';
 export const PHOTOS_FOLDER_ID = '1oJCTtCalNQTcQbMsZaOAa4VyAnJr35EV';
 export const VIDEOS_FOLDER_ID = '1xJq9RH6DTvP3xsAwABlBzBqWw2NtX63q';
+export const ICONS_FOLDER_ID  = '1vp_UF_Zk3uKiCJ_6I9pCya7nFveR3_II';
 export const DRIVE_API_KEY    = 'AIzaSyAoIlK4ncTUeJjPeOYJLXuj2GoWnMge3X8';
 
 export const COL = {
@@ -26,6 +27,7 @@ export const COL = {
 // ──────────────────────────────────────────────────────────────────────────────
 
 const driveIndex = {};
+const iconIndex = {};
 
 // ── Sheet fetch ───────────────────────────────────────────────────────────────
 
@@ -74,6 +76,10 @@ export async function buildDriveIndex() {
     listDriveFolder(PHOTOS_FOLDER_ID),
     listDriveFolder(VIDEOS_FOLDER_ID),
   ]);
+  // A failed/rate-limited Drive call resolves to [] (see listDriveFolder's
+  // catch) — skip caching in that case so a transient failure can't get
+  // permanently "stuck" as an empty index for the rest of the session.
+  if (photos.length === 0 && videos.length === 0) return;
   photos.forEach(({ name, id }) => {
     const pid = stripExtension(name);
     if (!driveIndex[pid]) driveIndex[pid] = {};
@@ -85,6 +91,25 @@ export async function buildDriveIndex() {
     driveIndex[pid].videoId = id;
   });
   sessionStorage.setItem('driveIndex', JSON.stringify(driveIndex));
+}
+
+// ── Team icons (filename, minus extension, matches TEAM_COLORS[team].name) ────
+
+export async function buildIconIndex() {
+  const cached = sessionStorage.getItem('iconIndex');
+  if (cached) { Object.assign(iconIndex, JSON.parse(cached)); return; }
+
+  const icons = await listDriveFolder(ICONS_FOLDER_ID);
+  if (icons.length === 0) return; // don't cache a failed/empty fetch
+  icons.forEach(({ name, id }) => {
+    iconIndex[stripExtension(name)] = id;
+  });
+  sessionStorage.setItem('iconIndex', JSON.stringify(iconIndex));
+}
+
+export function iconUrl(colorName) {
+  const fileId = iconIndex[colorName];
+  return fileId ? driveFileUrl(fileId, 'img') : null;
 }
 
 async function listDriveFolder(folderId) {

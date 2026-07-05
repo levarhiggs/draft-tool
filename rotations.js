@@ -1,9 +1,13 @@
 // rotations.js — Rotations feature: team roster grid, rules engine wiring,
 // drag-and-drop tile ordering, suggestion generation, localStorage persistence.
 import { fetchPlayers, buildDriveIndex, photoUrl, COL } from './players-data.js';
-import { getCompositeRank, getRotationConfigs, saveRotationConfig, renameRotationConfig, deleteRotationConfig } from './firebase.js';
+import {
+  getCompositeRank, getRotationConfigs, saveRotationConfig, renameRotationConfig,
+  deleteRotationConfig, getGameConfigsForTeam, saveGameConfig,
+} from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_COLORS } from './coaches-config.js';
+import { fetchSchedule, COL as SCHED_COL } from './schedule-data.js';
 import {
   computePlayerStatus, computeQuarterStatus, computeGameStatus,
   countPresent, expectedOnCourt, generateSuggestions, totalQuartersPlayed,
@@ -49,6 +53,7 @@ async function init() {
   wireGenerate();
   wireExport();
   wireSavedConfigMenu();
+  wireApplyGameboardModal();
   wirePopoverDismiss();
 
   // Restore last-viewed team, if any, from a small "last team" pointer key
@@ -588,20 +593,26 @@ function wireExport() {
     }
   });
 
-  // "Apply to Gameboard" is disabled in the markup until the Gameboard page
-  // exists, but Save Configuration should still fire when it's eventually
-  // enabled and clicked — wire it now so nothing else needs to change later.
+  // Apply to Gameboard always fires Save Configuration first (so the exact
+  // grid state being applied also exists as a freeform saved config, same
+  // as Export does) before opening the game-picker modal on the big grid's
+  // current order/pattern/absent state.
   document.getElementById('btn-apply-gameboard').addEventListener('click', async () => {
     await trySaveConfiguration();
-    // Gameboard integration itself is a deliberate no-op for now.
+    openApplyGameboardModal({
+      order: [...order],
+      pattern: new Map([...pattern.entries()].map(([id, p]) => [id, [...p]])),
+      presentIds: order.filter(id => !absent.has(id)),
+    });
   });
 }
 
 // Menu that opens when a saved-config tile's mini-grid is clicked/tapped —
 // "Apply to Grid" replaces the current editable grid's full state (tile
 // order, on/off pattern, and who's marked absent) with this saved config's
-// data. "Apply to Gameboard" is disabled until the Gameboard page exists,
-// same placeholder treatment as the main action row's button.
+// data. "Apply to Gameboard" opens the same game-picker modal as the main
+// action row's button, but sourced from this specific saved tile's data
+// instead of the live editable grid.
 function wireSavedConfigMenu() {
   document.getElementById('rot-savedconfig-menu').addEventListener('click', e => e.stopPropagation());
 
@@ -610,6 +621,233 @@ function wireSavedConfigMenu() {
     applySavedConfigToGrid(activeSavedConfigId);
     activeSavedConfigId = null;
   });
+
+  document.getElementById('btn-savedconfig-apply-gameboard').addEventListener('click', () => {
+    hidePopover('rot-savedconfig-menu');
+    const cfg = savedConfigsCache.find(c => c.id === activeSavedConfigId);
+    activeSavedConfigId = null;
+    if (!cfg) return;
+    openApplyGameboardModal({
+      order: [...cfg.order],
+      pattern: new Map(Object.entries(cfg.pattern || {}).map(([id, p]) => [id, [...p]])),
+      presentIds: [...(cfg.presentIds || [])],
+    });
+  });
+
+  // Deep-links to gameboard.html's Game view, pre-filtered to this saved
+  // config's team + game number. Only present on game-tagged (Saved
+  // Gameboards) tiles — see wireSavedConfigCardInteractions' open handler,
+  // which shows/hides this button per-tile before the popover appears.
+  document.getElementById('btn-savedconfig-goto-game').addEventListener('click', () => {
+    hidePopover('rot-savedconfig-menu');
+    const cfg = savedConfigsCache.find(c => c.id === activeSavedConfigId);
+    activeSavedConfigId = null;
+    if (!cfg?.gameTag) return;
+    const params = new URLSearchParams({ team: cfg.gameTag.team, game: String(cfg.gameTag.gameNum) });
+    window.location.href = `gameboard.html?${params.toString()}`;
+  });
+}
+
+// ── Apply to Gameboard ────────────────────────────────────────────────────────
+// Copies a source configuration (order/pattern/presentIds — either the live
+// editable grid, or one specific saved-config tile, byte-for-byte, no
+// recalculation) into one or more of the current team's real scheduled
+// games. Each selected game becomes/overwrites that game's single entry in
+// "Saved Gameboards" (see firebase.js's saveGameConfig, same one-per-
+// coach+team+gameNum upsert Gameboard's Game view already uses).
+
+let applyGameboardSource = null; // { order, pattern, presentIds }
+let applyGameboardTeamGames = []; // this team's games, index+1 = game number
+let allScheduleGames = null; // cached fetchSchedule() result, shared across opens
+
+async function ensureScheduleLoaded() {
+  if (!allScheduleGames) allScheduleGames = await fetchSchedule();
+  return allScheduleGames;
+}
+
+function opponentColorForGame(game, ownColorName) {
+  return game[SCHED_COL.V] === ownColorName ? game[SCHED_COL.H] : game[SCHED_COL.V];
+}
+
+function teamNameForColorName(colorName) {
+  const entry = Object.entries(TEAM_COLORS).find(([, v]) => v.name === colorName);
+  return entry ? entry[0] : null;
+}
+
+async function openApplyGameboardModal(source) {
+  const coach = getCurrentCoach();
+  if (!coach) {
+    alert('To apply a configuration to the Gameboard, log in');
+    return;
+  }
+  if (!currentTeam) return;
+
+  applyGameboardSource = source;
+
+  const modal = document.getElementById('modal-apply-gameboard');
+  const list = document.getElementById('apply-gameboard-list');
+  const emptyMsg = document.getElementById('apply-gameboard-empty');
+
+  const games = await ensureScheduleLoaded();
+  const ownColorName = teamColorName(currentTeam);
+  applyGameboardTeamGames = ownColorName
+    ? games.filter(g => g[SCHED_COL.V] === ownColorName || g[SCHED_COL.H] === ownColorName)
+    : [];
+
+  if (applyGameboardTeamGames.length === 0) {
+    list.innerHTML = '';
+    emptyMsg.classList.remove('hidden');
+    modal.classList.remove('hidden');
+    return;
+  }
+  emptyMsg.classList.add('hidden');
+
+  // Firestore key = the sheet's absolute Game # (SCHED_COL.GAME), shared
+  // and stable across both teams playing each other — NOT the per-team
+  // display sequence (i+1) below, which is only used for the human-facing
+  // "Game N" label. Keying by the display sequence was the root cause of a
+  // config saved from one team's perspective not showing up correctly from
+  // the opponent's — see gameboard.js's loadActiveGame for the matching fix.
+  const existingConfigs = await getGameConfigsForTeam(coach.name, currentTeam);
+  const configBySheetGameNum = new Map(existingConfigs.map(c => [c.gameTag.gameNum, c]));
+
+  // Pre-check every game that doesn't already have a saved Gameboard —
+  // coaches tend to reuse the same rotation across most/all games, so
+  // defaulting to "apply everywhere it isn't already set" is less clicking
+  // than starting from nothing. Games that DO already have a config start
+  // unchecked, since overwriting those is the less common/more deliberate action.
+  list.innerHTML = applyGameboardTeamGames.map((game, i) => {
+    const displayNum = i + 1;
+    const sheetGameNum = game[SCHED_COL.GAME];
+    const oppColorName = opponentColorForGame(game, ownColorName);
+    const oppTeam = teamNameForColorName(oppColorName);
+    const oppLabel = oppTeam ? teamColorDisplayName(oppTeam) : oppColorName;
+    const existing = configBySheetGameNum.get(sheetGameNum);
+
+    // No existing config -> reserve the same layout space with an empty
+    // placeholder rather than a gray dot, so checkbox/label columns still
+    // line up across rows without implying "there's something here to see."
+    let dotHtml = '<span class="apply-gameboard-dot"></span>';
+    if (existing) {
+      const dotClass = existing.isValid ? 'apply-gameboard-dot-valid' : 'apply-gameboard-dot-invalid';
+      const dotTitle = existing.isValid ? 'Existing configuration is valid' : 'Existing configuration is not valid';
+      dotHtml = `<span class="apply-gameboard-dot ${dotClass}" title="${dotTitle}"></span>`;
+    }
+
+    return `
+      <label class="apply-gameboard-row">
+        ${dotHtml}
+        <input type="checkbox" data-sheet-gamenum="${escHtml(sheetGameNum)}" data-display-num="${displayNum}" ${existing ? '' : 'checked'} />
+        <span class="apply-gameboard-row-label">Game ${displayNum} — vs. ${escHtml((oppLabel || '?').toUpperCase())}</span>
+      </label>`;
+  }).join('');
+
+  updateApplyGameboardSelectAllLabel();
+  list.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', updateApplyGameboardSelectAllLabel);
+  });
+
+  modal.classList.remove('hidden');
+}
+
+// Button reads "Select All" when at least one row is unchecked, "Deselect
+// All" only once every row is already checked — so it always describes
+// what clicking it will do next, not a fixed label.
+function updateApplyGameboardSelectAllLabel() {
+  const btn = document.getElementById('btn-apply-gameboard-select-all');
+  const boxes = document.querySelectorAll('#apply-gameboard-list input[type="checkbox"]');
+  const allChecked = boxes.length > 0 && [...boxes].every(cb => cb.checked);
+  btn.textContent = allChecked ? 'Deselect All' : 'Select All';
+}
+
+function wireApplyGameboardModal() {
+  const modal = document.getElementById('modal-apply-gameboard');
+  const warningModal = document.getElementById('modal-apply-gameboard-warning');
+
+  document.getElementById('btn-apply-gameboard-cancel').addEventListener('click', () => {
+    modal.classList.add('hidden');
+  });
+  modal.addEventListener('click', e => {
+    if (e.target === e.currentTarget) modal.classList.add('hidden');
+  });
+
+  document.getElementById('btn-apply-gameboard-select-all').addEventListener('click', () => {
+    const boxes = document.querySelectorAll('#apply-gameboard-list input[type="checkbox"]');
+    const allChecked = [...boxes].every(cb => cb.checked);
+    boxes.forEach(cb => { cb.checked = !allChecked; });
+    updateApplyGameboardSelectAllLabel();
+  });
+
+  document.getElementById('btn-apply-gameboard-confirm').addEventListener('click', async () => {
+    // Sheet Game # is the actual Firestore key (see openApplyGameboardModal's
+    // comment) — carry both it and the display sequence number together so
+    // downstream code never has to re-derive one from the other.
+    const checked = [...document.querySelectorAll('#apply-gameboard-list input[type="checkbox"]:checked')]
+      .map(el => ({ sheetGameNum: el.dataset.sheetGamenum, displayNum: parseInt(el.dataset.displayNum, 10) }));
+    if (checked.length === 0) {
+      alert('Select at least one game.');
+      return;
+    }
+
+    const coach = getCurrentCoach();
+    const existingConfigs = await getGameConfigsForTeam(coach.name, currentTeam);
+    const configuredGameNums = new Set(existingConfigs.map(c => c.gameTag.gameNum));
+    const overwriteCount = checked.filter(c => configuredGameNums.has(c.sheetGameNum)).length;
+
+    if (overwriteCount > 0) {
+      document.getElementById('apply-gameboard-warning-text').textContent =
+        `${overwriteCount} of your ${checked.length} selected game${checked.length === 1 ? '' : 's'} already ${overwriteCount === 1 ? 'has' : 'have'} a saved configuration — overwrite ${overwriteCount === 1 ? 'it' : 'them'}?`;
+      modal.classList.add('hidden');
+      warningModal.classList.remove('hidden');
+      warningModal.dataset.pendingGames = JSON.stringify(checked);
+      return;
+    }
+
+    modal.classList.add('hidden');
+    await applyToGames(checked);
+  });
+
+  document.getElementById('btn-apply-gameboard-warning-cancel').addEventListener('click', () => {
+    warningModal.classList.add('hidden');
+  });
+  document.getElementById('btn-apply-gameboard-warning-continue').addEventListener('click', async () => {
+    const games = JSON.parse(warningModal.dataset.pendingGames || '[]');
+    warningModal.classList.add('hidden');
+    await applyToGames(games);
+  });
+  warningModal.addEventListener('click', e => {
+    if (e.target === e.currentTarget) warningModal.classList.add('hidden');
+  });
+}
+
+async function applyToGames(games) {
+  const coach = getCurrentCoach();
+  if (!coach || !applyGameboardSource) return;
+
+  const { order: srcOrder, pattern: srcPattern, presentIds } = applyGameboardSource;
+  const isValid = computeGameStatus(srcPattern, new Set(srcOrder.filter(id => !presentIds.includes(id))), srcOrder).valid;
+
+  await Promise.all(games.map(async ({ sheetGameNum, displayNum }) => {
+    const game = applyGameboardTeamGames.find(g => g[SCHED_COL.GAME] === sheetGameNum);
+    const ownColorName = teamColorName(currentTeam);
+    const oppColorName = opponentColorForGame(game, ownColorName);
+    const oppTeam = teamNameForColorName(oppColorName);
+
+    const config = {
+      team: currentTeam,
+      order: [...srcOrder],
+      pattern: Object.fromEntries(srcPattern.entries()),
+      presentIds: [...presentIds],
+      isValid,
+      title: `Game ${displayNum} vs. ${teamColorDisplayName(oppTeam || '') || oppColorName || '?'}`,
+      // Firestore key is the sheet's absolute Game # (shared across both
+      // teams in this matchup) — see openApplyGameboardModal's comment.
+      gameTag: { team: currentTeam, opponentTeam: oppTeam || null, gameNum: sheetGameNum },
+    };
+    await saveGameConfig(coach.name, currentTeam, sheetGameNum, config);
+  }));
+
+  await refreshSavedConfigsGallery();
 }
 
 function applySavedConfigToGrid(configId) {
@@ -852,6 +1090,8 @@ async function refreshSavedConfigsGallery() {
 
 function renderSavedConfigsGallery() {
   const wrap = document.getElementById('rot-saved-configs-wrap');
+  const gameboardsSection = document.getElementById('rot-saved-gameboards-section');
+  const gameboardsGrid = document.getElementById('rot-saved-gameboards-grid');
   const grid = document.getElementById('rot-saved-configs-grid');
   const coach = getCurrentCoach();
 
@@ -861,8 +1101,24 @@ function renderSavedConfigsGallery() {
   }
 
   wrap.classList.remove('hidden');
-  grid.innerHTML = savedConfigsCache.map(savedConfigCardHTML).join('');
 
+  // Game-tagged saves (from the Gameboard's Game view) render in their own
+  // "Saved Gameboards" stack above the freeform ones — sorted by game
+  // number so they read in season order, not save order.
+  const gameboardConfigs = savedConfigsCache
+    .filter(c => c.gameTag)
+    .sort((a, b) => (a.gameTag.gameNum || 0) - (b.gameTag.gameNum || 0));
+  const freeformConfigs = savedConfigsCache.filter(c => !c.gameTag);
+
+  gameboardsSection.classList.toggle('hidden', gameboardConfigs.length === 0);
+  gameboardsGrid.innerHTML = gameboardConfigs.map(savedConfigCardHTML).join('');
+  grid.innerHTML = freeformConfigs.map(savedConfigCardHTML).join('');
+
+  wireSavedConfigCardInteractions(gameboardsGrid, coach);
+  wireSavedConfigCardInteractions(grid, coach);
+}
+
+function wireSavedConfigCardInteractions(grid, coach) {
   grid.querySelectorAll('.rot-saved-config-title').forEach(el => {
     el.addEventListener('blur', async () => {
       const id = el.closest('.saved-config-card').dataset.configId;
@@ -903,6 +1159,8 @@ function renderSavedConfigsGallery() {
     const open = e => {
       e.stopPropagation();
       activeSavedConfigId = el.dataset.configId;
+      const cfg = savedConfigsCache.find(c => c.id === activeSavedConfigId);
+      document.getElementById('btn-savedconfig-goto-game').classList.toggle('hidden', !cfg?.gameTag);
       positionPopover(document.getElementById('rot-savedconfig-menu'), el);
     };
     el.addEventListener('click', open);

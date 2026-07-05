@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CSBC 2026 SJV Summer Directory</title>
-  <meta property="og:title" content="CSBC 2026 SJV Summer Directory" />
-  <meta property="og:description" content="Player directory and rankings for CSBC SJV Summer 2026 draft." />
-  <meta name="description" content="Player directory and rankings for CSBC SJV Summer 2026 draft." />
+  <title>Schedules — CSBC 2026 SJV Summer Directory</title>
+  <meta property="og:title" content="Schedules — CSBC 2026 SJV Summer Directory" />
+  <meta property="og:description" content="Season game schedule, scores, and results for CSBC SJV Summer 2026 teams." />
+  <meta name="description" content="Season game schedule, scores, and results for CSBC SJV Summer 2026 teams." />
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="favicon.png" type="image/png" />
   <link rel="manifest" href="manifest.json" />
@@ -24,7 +24,7 @@
         <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Open menu" aria-expanded="false">
           <span></span><span></span><span></span>
         </button>
-        <h1>CSBC SJV Player Directory - Summer 2026</h1>
+        <h1>Schedules</h1>
       </div>
       <div class="header-controls">
         <div id="coach-badge" class="coach-badge hidden">
@@ -32,45 +32,6 @@
           <button id="btn-logout" class="btn-sm">Log Out</button>
         </div>
         <button id="btn-login" class="btn-primary">Coach Login</button>
-        <button id="btn-drawer-toggle" class="btn-drawer-toggle" aria-label="Toggle filters">
-          <span id="drawer-toggle-icon">▾ Filters</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Collapsible drawer: sort + search + filters -->
-    <div id="header-drawer" class="header-drawer">
-      <!-- Sort bar -->
-      <div class="sort-bar">
-        <span class="bar-label">Sort:</span>
-        <button class="sort-btn" data-sort="alpha">A – Z</button>
-        <button class="sort-btn active" data-sort="id">ID #</button>
-        <button class="sort-btn" data-sort="birthday">Age</button>
-        <button class="sort-btn" data-sort="team">Team</button>
-        <button class="sort-btn" data-sort="rank">Rank</button>
-      </div>
-
-      <!-- Search bar -->
-      <div class="search-bar">
-        <input id="player-search" type="search" placeholder="Search players…" autocomplete="off" />
-      </div>
-
-      <!-- Filter bar -->
-      <div class="filter-bar">
-        <div class="filter-row">
-          <span class="bar-label">Filter:</span>
-          <button class="filter-chip filter-fav" id="filter-favorites">♥ Favorites</button>
-          <button class="filter-chip filter-noshow hidden" id="filter-noshows">✕ No Shows</button>
-          <div id="filter-grades" class="filter-group"></div>
-        </div>
-        <div class="filter-row">
-          <span class="bar-label">Seed:</span>
-          <div id="filter-seeds" class="filter-group"></div>
-        </div>
-        <div class="filter-row">
-          <span class="bar-label">Team:</span>
-          <div id="filter-teams" class="filter-group"></div>
-        </div>
       </div>
     </div>
   </header>
@@ -82,17 +43,80 @@
       <span>Menu</span>
       <button id="btn-menu-close" class="btn-menu-close" aria-label="Close menu">✕</button>
     </div>
-    <a href="index.html" class="side-menu-link active">🏀 Player Directory</a>
+    <a href="index.html" class="side-menu-link active">📅 Schedules</a>
+    <a href="gameboard.html" class="side-menu-link">🎯 Gameboard</a>
     <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
+    <a href="directory.html" class="side-menu-link">🏀 Player Directory</a>
     <a href="draft-results.html" class="side-menu-link">🏆 Draft Results</a>
-    <a href="schedule.html" class="side-menu-link">📅 Schedules</a>
   </nav>
 
   <main>
-    <div id="player-grid" class="player-grid">
-      <div class="loading">Loading players…</div>
+    <div class="sched-page">
+
+      <!-- Toolbar -->
+      <div class="sched-toolbar">
+        <label class="rot-team-select-label">
+          Team
+          <select id="sched-team-select">
+            <option value="">All Teams</option>
+          </select>
+        </label>
+
+        <div class="rot-avatar-toggle" role="group" aria-label="View style">
+          <span class="bar-label">View:</span>
+          <button class="avatar-toggle-btn active" data-view="calendar">Calendar</button>
+          <button class="avatar-toggle-btn" data-view="table">Table</button>
+        </div>
+      </div>
+
+      <div id="sched-empty-state" class="loading">Loading schedule…</div>
+
+      <!-- Table view -->
+      <div id="sched-table-wrap" class="sched-table-wrap hidden">
+        <table class="sched-table">
+          <thead>
+            <tr>
+              <th>Matchup</th>
+              <th>Winner</th>
+              <th>Final Score</th>
+              <th id="sched-th-gamenum">Game #</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Last Updated</th>
+            </tr>
+          </thead>
+          <tbody id="sched-table-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Calendar view -->
+      <div id="sched-calendar-wrap" class="sched-calendar-wrap hidden">
+        <div class="sched-cal-nav">
+          <button id="sched-cal-prev" class="btn-secondary" type="button">‹ Prev</button>
+          <div id="sched-cal-month-label" class="sched-cal-month-label"></div>
+          <button id="sched-cal-next" class="btn-secondary" type="button">Next ›</button>
+        </div>
+        <!-- The weekday-labels row lives OUTSIDE the horizontally-scrolling
+             wrapper below, so its position:sticky (pinning it while the page
+             scrolls down) is relative to the real page — not a wrapper with
+             overflow-x set, which forces an implicit overflow-y scroll
+             container too and silently breaks sticky positioning. Its
+             horizontal scroll position is kept in sync with the grid below
+             via a small JS listener (see wireCalendarScrollSync), so columns
+             still stay aligned when swiping sideways on narrow screens. -->
+        <div id="sched-cal-weekdays" class="sched-cal-weekdays">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div id="sched-cal-scroll" class="sched-cal-scroll">
+          <div id="sched-cal-grid" class="sched-cal-grid"></div>
+        </div>
+      </div>
+
     </div>
   </main>
+
+  <!-- Game info popover (single click/tap on a game slot) -->
+  <div id="sched-popover" class="sched-popover hidden"></div>
 
   <!-- Coach Login Modal -->
   <div id="modal-login" class="modal-overlay hidden">
@@ -114,7 +138,30 @@
     </div>
   </div>
 
-  <script type="module" src="app.js"></script>
+  <!-- Score entry modal -->
+  <div id="modal-score" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>Enter Score</h2>
+      <p id="score-modal-matchup" class="sched-score-matchup"></p>
+      <p id="score-permission-note" class="sched-permission-note hidden">You're not a participant in this game, so the score is view-only — you can still leave a comment below.</p>
+      <label id="score-visitor-label"><span id="score-visitor-label-text">Visitor score</span>
+        <input id="score-visitor-input" type="number" min="0" step="1" inputmode="numeric" />
+      </label>
+      <label id="score-home-label"><span id="score-home-label-text">Home score</span>
+        <input id="score-home-input" type="number" min="0" step="1" inputmode="numeric" />
+      </label>
+      <label id="score-comment-label"><span>Comment (optional)</span>
+        <textarea id="score-comment-input" rows="2" placeholder="e.g. Good game!" maxlength="100"></textarea>
+      </label>
+      <p id="score-error" class="error-msg hidden">Enter both scores.</p>
+      <div class="modal-actions">
+        <button id="btn-score-cancel" class="btn-secondary">Cancel</button>
+        <button id="btn-score-save" class="btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="schedule.js"></script>
   <script type="module" src="coach-login.js"></script>
   <script type="module" src="side-menu.js"></script>
   <script>
