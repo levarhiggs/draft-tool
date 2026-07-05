@@ -1273,6 +1273,14 @@ main {
   justify-content: center;
 }
 
+.rot-header-grid-label {
+  font-weight: 800;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: var(--clr-text);
+  text-align: center;
+}
+
 .rot-row-avatar {
   cursor: pointer;
   user-select: none;
@@ -1312,6 +1320,16 @@ main {
   white-space: nowrap;
 }
 .rot-cell-name:hover { color: var(--clr-accent); }
+
+.rot-header-hint {
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--clr-muted);
+  cursor: default;
+  white-space: normal;
+  line-height: 1.25;
+}
+.rot-header-hint:hover { color: var(--clr-muted); }
 
 .rot-cell-quarter-header {
   background: transparent;
@@ -1386,7 +1404,181 @@ main {
 .rot-actions {
   display: flex;
   justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-top: 16px;
+}
+
+.rot-actions .btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rot-export-option {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--clr-text);
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.rot-export-option:hover { background: var(--clr-card); }
+.rot-export-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.rot-export-option:disabled:hover { background: none; }
+
+/* Applied temporarily to #rot-grid-wrap right before an html2canvas
+   capture (see runImageExport) — hides the grip/avatar/name columns and
+   re-declares the grid's column tracks so the status dot, initials chip,
+   and Q1-Q4 cells shift left to fill the gap, matching the printed export's
+   scope. Removed immediately after the capture completes. */
+.rot-export-scoped .rot-cell-grip,
+.rot-export-scoped .rot-cell-avatar,
+.rot-export-scoped .rot-cell-name {
+  display: none !important;
+}
+.rot-export-scoped .rot-row {
+  grid-template-columns: 22px 40px repeat(4, 64px) !important;
+}
+.rot-export-scoped .rot-actions {
+  display: none !important;
+}
+/* The wrapper otherwise stretches to the page's full width (a plain block
+   element), while the scoped-down grid content is much narrower — without
+   this, html2canvas captures the whole wide box, leaving a big blank gap
+   to the right of Q4. Shrink-wrapping it to its actual content width (and
+   dropping the grid's normal 560px min-width, sized for the full
+   grip/avatar/name/Q1-Q4 layout, not the scoped one) makes the captured
+   image end right after the Q4 column instead. */
+.rot-export-scoped {
+  width: fit-content;
+  margin: 0 auto;
+}
+.rot-export-scoped .rot-grid {
+  min-width: 0 !important;
+}
+
+.rot-export-header {
+  text-align: center;
+  margin-bottom: 12px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--clr-text);
+}
+
+.rot-export-timestamp {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 0.78rem;
+  color: var(--clr-muted);
+  font-style: italic;
+}
+
+.rot-export-credit {
+  text-align: center;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  color: var(--clr-muted);
+  opacity: 0.75;
+}
+
+/* ── Saved Rotation Configurations gallery ── */
+.rot-saved-configs-wrap {
+  margin-top: 28px;
+}
+
+.rot-saved-configs-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--clr-text);
+  margin-bottom: 12px;
+}
+
+.rot-saved-configs-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .rot-saved-configs-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .rot-saved-configs-grid { grid-template-columns: 1fr; }
+}
+
+.saved-config-card {
+  position: relative;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.saved-config-delete {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 6px;
+  opacity: 0.6;
+  transition: opacity 0.15s, background 0.15s;
+}
+.saved-config-delete:hover {
+  opacity: 1;
+  background: var(--clr-card);
+}
+
+.rot-saved-config-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--clr-border);
+}
+
+.saved-config-validity {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: #fff;
+}
+.saved-config-validity.valid { background: var(--clr-success); }
+.saved-config-validity.invalid { background: var(--clr-danger); }
+
+.rot-saved-config-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--clr-text);
+  cursor: text;
+  outline: none;
+  border-radius: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rot-saved-config-title:hover, .rot-saved-config-title:focus {
+  background: var(--clr-card);
 }
 
 /* ── Popovers ── */
@@ -1529,6 +1721,27 @@ main {
   gap: 4px;
 }
 
+/* Saved-config tiles' mini-grid doubles as a button (opens the Apply to
+   Grid / Apply to Gameboard menu) — the Generate Options suggestion cards
+   reuse the same base .rot-mini-grid class but are NOT clickable, so this
+   interactive styling is scoped to the saved-config variant only. */
+.saved-config-open-menu {
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 4px;
+  margin: -4px;
+  border-radius: 6px;
+  text-align: left;
+  width: 100%;
+  transition: background 0.12s;
+}
+.saved-config-open-menu:hover,
+.saved-config-open-menu:focus-visible {
+  background: var(--clr-card);
+  outline: none;
+}
+
 .rot-mini-row {
   display: grid;
   grid-template-columns: 90px repeat(4, 20px) 32px;
@@ -1552,11 +1765,21 @@ main {
   display: inline-block;
 }
 .rot-mini-on { background: var(--clr-accent); }
+.rot-mini-absent { background: #000; }
 
 .rot-mini-total {
   text-align: right;
   color: var(--clr-text);
   font-weight: 600;
+}
+
+.rot-mini-row-absent .rot-mini-name {
+  text-decoration: line-through;
+  color: var(--clr-muted);
+}
+.rot-mini-row-absent .rot-mini-total {
+  color: var(--clr-muted);
+  font-weight: 400;
 }
 
 @media (max-width: 640px) {
@@ -1566,6 +1789,29 @@ main {
   .rot-row-avatar-img { width: 40px; height: 40px; }
   .rot-cell-quarter { height: 38px; }
   .rot-cell-avatar-img, .rot-cell-avatar-initials { width: 28px; height: 28px; }
+
+  /* Generate Options + Export Rotation share one row (roughly matching the
+     Q1-Q4 columns' combined width, since this container scrolls
+     horizontally in sync with the grid above it) instead of each button
+     wrapping onto its own line. Apply to Gameboard gets its own full-width
+     row below — it's a different kind of action (sends elsewhere) rather
+     than "do something with the grid you're looking at right now". */
+  .rot-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .rot-actions #btn-apply-gameboard {
+    grid-column: 1 / -1;
+  }
+  .rot-actions .btn-primary {
+    padding-left: 10px;
+    padding-right: 10px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 /* ── Schedules page ── */
@@ -1822,4 +2068,66 @@ main {
   color: var(--clr-muted);
   font-size: 0.9rem;
   margin-top: -6px;
+}
+
+/* ── Print export (Rotations page) ──────────────────────────────────────────
+   Triggered by window.print() from the "Export Rotation" -> Print option.
+   Hides everything except the rotation grid itself and forces a clean,
+   light, ink-friendly layout regardless of the app's normal dark theme —
+   deliberately different from the "Download Image" path, which captures
+   the live on-screen appearance as-is via html2canvas instead. */
+@media print {
+  body * { visibility: hidden; }
+  #rot-grid-wrap, #rot-grid-wrap * { visibility: visible; }
+  #rot-grid-wrap {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    width: fit-content;
+    margin: 0 auto;
+    background: #fff !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  #rot-grid-wrap .rot-actions { display: none !important; }
+
+  /* Only the status dot, initials chip, and Q1-Q4 cells print — grip
+     handle, photo avatar, and full name are drag/edit affordances not
+     needed on a printed lineup card. Grid columns are re-declared (not
+     just hiding the cells) since CSS Grid still reserves track space for
+     display:none items' original column positions otherwise. */
+  .rot-cell-grip, .rot-cell-avatar, .rot-cell-name {
+    display: none !important;
+  }
+  .rot-row {
+    grid-template-columns: 22px 40px repeat(4, 64px) !important;
+  }
+  /* Same reasoning as .rot-export-scoped for the Download Image path: the
+     grid's normal 560px min-width is sized for the full grip/avatar/name
+     layout, which would otherwise force the printed page wider than the
+     scoped-down content actually needs. */
+  .rot-grid {
+    min-width: 0 !important;
+  }
+  .rot-row, .rot-header-row {
+    background: #fff !important;
+    border-color: #ccc !important;
+  }
+  .rot-cell-name, .rot-header-hint, .rot-cell-quarter-header,
+  .rot-mini-total, .rot-firstname-ref, .rot-export-timestamp, .rot-export-credit,
+  .rot-export-header {
+    color: #111 !important;
+  }
+  .rot-cell-quarter {
+    border-color: #999 !important;
+    background: #fff !important;
+  }
+  .rot-cell-on {
+    background: #eef3ff !important;
+    border-color: #4f8ef7 !important;
+  }
+  .rot-quarter-error {
+    color: #b00020 !important;
+  }
 }

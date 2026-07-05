@@ -1,7 +1,8 @@
 // firebase.js — read/write rankings, notes, team assignments, favorites
 import { db } from './firebase-config.js';
 import {
-  doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField, serverTimestamp, arrayUnion
+  doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField, serverTimestamp, arrayUnion,
+  collection, getDocs, query, where, addDoc, deleteDoc,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // Firestore document shape for players/{playerId}:
@@ -201,4 +202,54 @@ export async function saveGameComment(gameNum, text, coachName) {
     comments: arrayUnion(entry),
   }, { merge: true });
   return entry;
+}
+
+// ── Saved Rotation Configurations ────────────────────────────────────────────
+// Firestore shape: rotationConfigs/{coachName}/configs/{autoId}
+// {
+//   team: string,
+//   order: [playerId, ...],                 // tile/rank order at save time
+//   pattern: { [playerId]: [bool,bool,bool,bool] },
+//   presentIds: [playerId, ...],             // present (non-absent) players, for the N-available dedup key
+//   isValid: bool,
+//   title: string,                           // auto-generated, user-editable afterward
+//   createdAt: timestamp,
+// }
+//
+// Dedup key = team + presentIds (sorted) + order (as tie-break for ranking
+// changes) + pattern (serialized) — see fingerprintConfig() in rotations.js,
+// which builds the comparable string this module just stores/queries against
+// verbatim rather than re-deriving it here.
+
+function rotationConfigsRef(coachName) {
+  return collection(db, 'rotationConfigs', coachName, 'configs');
+}
+
+export async function getRotationConfigs(coachName, team) {
+  try {
+    const q = query(rotationConfigsRef(coachName), where('team', '==', team));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error('getRotationConfigs error:', err);
+    return [];
+  }
+}
+
+export async function saveRotationConfig(coachName, config) {
+  const ref = await addDoc(rotationConfigsRef(coachName), {
+    ...config,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function renameRotationConfig(coachName, configId, newTitle) {
+  const ref = doc(db, 'rotationConfigs', coachName, 'configs', configId);
+  await updateDoc(ref, { title: newTitle });
+}
+
+export async function deleteRotationConfig(coachName, configId) {
+  const ref = doc(db, 'rotationConfigs', coachName, 'configs', configId);
+  await deleteDoc(ref);
 }

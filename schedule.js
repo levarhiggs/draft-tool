@@ -97,11 +97,14 @@ function populateTeamSelect() {
   select.innerHTML = '<option value="">All Teams</option>' +
     TEAMS.filter(t => t !== 'Undrafted')
       .map(t => {
-        const colorName = teamColorName(t);
         // Coaches refer to teams by color first ("LIME SHOCK") once colors
         // are assigned — lead with that, team name second, matching how
-        // the league actually talks about matchups.
-        const label = colorName ? `${colorName.toUpperCase()} — ${t}` : t;
+        // the league actually talks about matchups. Uses the short display
+        // name (e.g. "Grey" instead of "Grey Concrete") so long names don't
+        // overflow the dropdown's fixed width — display-only, never used
+        // for matching against the sheet (see teamColorDisplayName below).
+        const displayColor = teamColorDisplayName(t);
+        const label = displayColor ? `${displayColor.toUpperCase()} — ${t}` : t;
         return `<option value="${escHtml(t)}">${escHtml(label)}</option>`;
       }).join('');
 }
@@ -126,6 +129,14 @@ function wireToolbar() {
 
 function teamColorName(team) {
   return TEAM_COLORS[team]?.name || null;
+}
+
+// Display-only variant for dropdowns/menus — prefers the short label
+// (e.g. "Grey" for "Grey Concrete") where one exists, so long color names
+// don't overflow tight UI. Never used for matching against sheet data.
+function teamColorDisplayName(team) {
+  const entry = TEAM_COLORS[team];
+  return entry ? (entry.shortName || entry.name) : null;
 }
 
 function gameMatchesFilter(game) {

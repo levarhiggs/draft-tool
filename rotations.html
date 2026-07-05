@@ -27,6 +27,11 @@
         <h1>Rotations</h1>
       </div>
       <div class="header-controls">
+        <div id="coach-badge" class="coach-badge hidden">
+          <span id="coach-badge-name"></span>
+          <button id="btn-logout" class="btn-sm">Log Out</button>
+        </div>
+        <button id="btn-login" class="btn-primary">Coach Login</button>
         <a href="index.html" class="back-link">← Directory</a>
       </div>
     </div>
@@ -68,14 +73,37 @@
 
       <!-- Grid -->
       <div id="rot-grid-wrap" class="rot-grid-wrap hidden">
+        <div id="rot-export-header" class="rot-export-header hidden"></div>
         <div id="rot-grid" class="rot-grid"></div>
 
         <div class="rot-actions">
           <button id="btn-generate" class="btn-primary">🎲 Generate Options</button>
+          <button id="btn-export" class="btn-primary">📤 Export Rotation</button>
+          <button id="btn-apply-gameboard" class="btn-primary" disabled>🎯 Apply to Gameboard</button>
         </div>
+        <div id="rot-export-timestamp" class="rot-export-timestamp hidden"></div>
+        <div id="rot-export-credit" class="rot-export-credit hidden">CSBC Coach App by L. Higgs</div>
+      </div>
+
+      <!-- Export menu: Print / Download Image -->
+      <div id="rot-export-menu" class="rot-popover hidden">
+        <button id="btn-export-print" class="rot-export-option" type="button">🖨️ Print</button>
+        <button id="btn-export-image" class="rot-export-option" type="button">🖼️ Download Image</button>
+      </div>
+
+      <!-- Saved config tile menu: Apply to Grid / Apply to Gameboard -->
+      <div id="rot-savedconfig-menu" class="rot-popover hidden">
+        <button id="btn-savedconfig-apply-grid" class="rot-export-option" type="button">📋 Apply to Grid</button>
+        <button id="btn-savedconfig-apply-gameboard" class="rot-export-option" type="button" disabled>🎯 Apply to Gameboard</button>
       </div>
 
       <div id="rot-empty-state" class="loading">Select a team to build its rotation.</div>
+
+      <!-- Saved Rotation Configurations (logged-in coaches only, current team) -->
+      <div id="rot-saved-configs-wrap" class="rot-saved-configs-wrap hidden">
+        <h2 class="rot-saved-configs-title">Saved Rotation Configurations</h2>
+        <div id="rot-saved-configs-grid" class="rot-saved-configs-grid"></div>
+      </div>
     </div>
   </main>
 
@@ -97,7 +125,41 @@
     </div>
   </div>
 
+  <!-- Invalid-configuration export confirmation -->
+  <div id="modal-export-warning" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>Invalid Rotation</h2>
+      <p>This is not a valid configuration. Export anyways?</p>
+      <div class="modal-actions">
+        <button id="btn-export-warning-cancel" class="btn-secondary">Cancel</button>
+        <button id="btn-export-warning-continue" class="btn-primary">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Coach Login Modal -->
+  <div id="modal-login" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>Coach Login</h2>
+      <label>Select your name
+        <select id="login-name">
+          <option value="">— choose —</option>
+        </select>
+      </label>
+      <label>PIN
+        <input id="login-pin" type="password" maxlength="6" placeholder="Enter your PIN" />
+      </label>
+      <p id="login-error" class="error-msg hidden">Incorrect PIN. Try again.</p>
+      <div class="modal-actions">
+        <button id="btn-login-cancel" class="btn-secondary">Cancel</button>
+        <button id="btn-login-submit" class="btn-primary">Log In</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script type="module" src="rotations.js"></script>
+  <script type="module" src="coach-login.js"></script>
   <script type="module" src="side-menu.js"></script>
   <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/draft-tool/sw.js');

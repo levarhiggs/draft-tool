@@ -1,8 +1,9 @@
 // rotations.js — Rotations feature: team roster grid, rules engine wiring,
 // drag-and-drop tile ordering, suggestion generation, localStorage persistence.
 import { fetchPlayers, buildDriveIndex, photoUrl, COL } from './players-data.js';
-import { getCompositeRank } from './firebase.js';
-import { TEAMS } from './coaches-config.js';
+import { getCompositeRank, getRotationConfigs, saveRotationConfig, renameRotationConfig, deleteRotationConfig } from './firebase.js';
+import { getCurrentCoach } from './coach-login.js';
+import { TEAMS, TEAM_COLORS } from './coaches-config.js';
 import {
   computePlayerStatus, computeQuarterStatus, computeGameStatus,
   countPresent, expectedOnCourt, generateSuggestions, totalQuartersPlayed,
@@ -25,6 +26,7 @@ let playersById  = {};             // id -> player record (current team only)
 let pattern      = new Map();      // id -> [bool,bool,bool,bool]
 let absent       = new Set();
 let avatarStyle  = 'photo';        // 'photo' | 'initials'
+let activeSavedConfigId = null;    // config id the saved-config popover menu is currently open for
 
 const INITIALS_COLORS = ['#4f8ef7', '#4ecf87', '#e0a75c', '#e05c5c', '#9b6fe0', '#5cc7e0', '#e05c9e', '#8890a8'];
 
@@ -45,6 +47,8 @@ async function init() {
   populateTeamSelect();
   wireToolbar();
   wireGenerate();
+  wireExport();
+  wireSavedConfigMenu();
   wirePopoverDismiss();
 
   // Restore last-viewed team, if any, from a small "last team" pointer key
@@ -53,12 +57,41 @@ async function init() {
     document.getElementById('rot-team-select').value = lastTeam;
     await loadTeam(lastTeam);
   }
+
+  // Logging in/out changes whose saved configs (if any) should be visible.
+  document.addEventListener('coachChanged', () => { refreshSavedConfigsGallery(); });
 }
 
 function populateTeamSelect() {
   const select = document.getElementById('rot-team-select');
   select.innerHTML = '<option value="">— choose a team —</option>' +
-    TEAMS.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('');
+    TEAMS.filter(t => t !== 'Undrafted').map(t => {
+      // Same COLOR — Team Coach convention used on the Schedules page —
+      // coaches refer to teams by color first once colors are assigned.
+      // Uses the short display name (e.g. "Grey" instead of "Grey
+      // Concrete") so long names don't overflow the dropdown's fixed
+      // width — display-only, the full name is still used everywhere else
+      // (e.g. teamHeaderLabel for the export/print header, which has room).
+      const displayColor = teamColorDisplayName(t);
+      const label = displayColor ? `${displayColor.toUpperCase()} — ${t}` : t;
+      return `<option value="${escHtml(t)}">${escHtml(label)}</option>`;
+    }).join('');
+}
+
+function teamColorName(team) {
+  return TEAM_COLORS[team]?.name || null;
+}
+
+function teamColorDisplayName(team) {
+  const entry = TEAM_COLORS[team];
+  return entry ? (entry.shortName || entry.name) : null;
+}
+
+// "LIME SHOCK — Team Alfred-Levar" — same convention as the team dropdown
+// and the Schedules page, used as the exported/printed header.
+function teamHeaderLabel(team) {
+  const colorName = teamColorName(team);
+  return colorName ? `${colorName.toUpperCase()} — ${team}` : team;
 }
 
 function wireToolbar() {
@@ -133,6 +166,8 @@ async function loadTeam(team) {
   document.getElementById('rot-empty-state').classList.add('hidden');
   document.getElementById('rot-grid-wrap').classList.remove('hidden');
   renderGrid();
+
+  await refreshSavedConfigsGallery();
 }
 
 // ── Persistence ────────────────────────────────────────────────────────────────
@@ -165,8 +200,8 @@ function renderGrid() {
   const headerRow = `
     <div class="rot-row rot-header-row">
       <div class="rot-cell-grip"></div>
-      <div class="rot-cell-avatar"></div>
-      <div class="rot-cell-name"></div>
+      <div class="rot-cell-avatar rot-header-grid-label">GRID</div>
+      <div class="rot-cell-name rot-header-hint">Double-click photo: mark absent. Drag photo: adjust ranking.</div>
       <div class="rot-cell-dot"></div>
       <div class="rot-cell-initials-ref"></div>
       ${[0, 1, 2, 3].map(q => quarterHeaderHTML(q, pattern, absent, order)).join('')}
@@ -426,6 +461,8 @@ function wirePopoverDismiss() {
   document.addEventListener('click', () => {
     hidePopover('rot-popover');
     hidePopover('rot-quarter-popover');
+    hidePopover('rot-export-menu');
+    hidePopover('rot-savedconfig-menu');
   });
 }
 
@@ -508,6 +545,406 @@ function wireGenerate() {
   document.getElementById('modal-suggestions').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeSuggestionsModal();
   });
+}
+
+// ── Export Rotation (print / download image) ────────────────────────────────
+// "Apply to Gameboard" is intentionally a no-op placeholder until the
+// Gameboard page exists — the button is disabled in the markup so there's
+// nothing to wire up here yet.
+
+let pendingExportAction = null; // 'print' | 'image', set while the invalid-config warning is showing
+
+function wireExport() {
+  document.getElementById('btn-export').addEventListener('click', e => {
+    e.stopPropagation();
+    positionPopover(document.getElementById('rot-export-menu'), e.currentTarget);
+  });
+  document.getElementById('rot-export-menu').addEventListener('click', e => e.stopPropagation());
+
+  document.getElementById('btn-export-print').addEventListener('click', () => {
+    hidePopover('rot-export-menu');
+    startExport('print');
+  });
+  document.getElementById('btn-export-image').addEventListener('click', () => {
+    hidePopover('rot-export-menu');
+    startExport('image');
+  });
+
+  document.getElementById('btn-export-warning-cancel').addEventListener('click', () => {
+    pendingExportAction = null;
+    document.getElementById('modal-export-warning').classList.add('hidden');
+  });
+  document.getElementById('btn-export-warning-continue').addEventListener('click', () => {
+    const action = pendingExportAction;
+    pendingExportAction = null;
+    document.getElementById('modal-export-warning').classList.add('hidden');
+    if (action === 'print') runPrintExport();
+    else if (action === 'image') runImageExport();
+  });
+  document.getElementById('modal-export-warning').addEventListener('click', e => {
+    if (e.target === e.currentTarget) {
+      pendingExportAction = null;
+      e.currentTarget.classList.add('hidden');
+    }
+  });
+
+  // "Apply to Gameboard" is disabled in the markup until the Gameboard page
+  // exists, but Save Configuration should still fire when it's eventually
+  // enabled and clicked — wire it now so nothing else needs to change later.
+  document.getElementById('btn-apply-gameboard').addEventListener('click', async () => {
+    await trySaveConfiguration();
+    // Gameboard integration itself is a deliberate no-op for now.
+  });
+}
+
+// Menu that opens when a saved-config tile's mini-grid is clicked/tapped —
+// "Apply to Grid" replaces the current editable grid's full state (tile
+// order, on/off pattern, and who's marked absent) with this saved config's
+// data. "Apply to Gameboard" is disabled until the Gameboard page exists,
+// same placeholder treatment as the main action row's button.
+function wireSavedConfigMenu() {
+  document.getElementById('rot-savedconfig-menu').addEventListener('click', e => e.stopPropagation());
+
+  document.getElementById('btn-savedconfig-apply-grid').addEventListener('click', () => {
+    hidePopover('rot-savedconfig-menu');
+    applySavedConfigToGrid(activeSavedConfigId);
+    activeSavedConfigId = null;
+  });
+}
+
+function applySavedConfigToGrid(configId) {
+  const cfg = savedConfigsCache.find(c => c.id === configId);
+  if (!cfg) return;
+
+  order = [...cfg.order];
+  pattern = new Map(Object.entries(cfg.pattern || {}).map(([id, pat]) => [id, [...pat]]));
+  const presentSet = new Set(cfg.presentIds || []);
+  absent = new Set(order.filter(id => !presentSet.has(id)));
+
+  saveState();
+  renderGrid();
+}
+
+async function startExport(action) {
+  // Save Configuration always fires first, before the export itself — see
+  // trySaveConfiguration() for the full login/dedup/create flow. It never
+  // blocks the export from proceeding (log-in prompt or silent dedup are
+  // both non-blocking outcomes), it just may add a new gallery tile first.
+  await trySaveConfiguration();
+
+  const gameStatus = computeGameStatus(pattern, absent, order);
+  if (!gameStatus.valid) {
+    pendingExportAction = action;
+    document.getElementById('modal-export-warning').classList.remove('hidden');
+    return;
+  }
+  if (action === 'print') runPrintExport();
+  else runImageExport();
+}
+
+function runPrintExport() {
+  // Same reasoning as runImageExport: Drive-hosted photos can't reliably
+  // print either (and definitely can't be captured by html2canvas for the
+  // image path) — force initials mode for the print output too, restoring
+  // the user's actual preference once the print dialog closes.
+  const originalAvatarStyle = avatarStyle;
+  avatarStyle = 'initials';
+  renderGrid();
+
+  const headerEl = document.getElementById('rot-export-header');
+  const timestampEl = document.getElementById('rot-export-timestamp');
+  const creditEl = document.getElementById('rot-export-credit');
+  headerEl.textContent = teamHeaderLabel(currentTeam);
+  headerEl.classList.remove('hidden');
+  timestampEl.textContent = formatExportTimestamp(new Date());
+  timestampEl.classList.remove('hidden');
+  creditEl.classList.remove('hidden');
+
+  const restore = () => {
+    avatarStyle = originalAvatarStyle;
+    headerEl.classList.add('hidden');
+    timestampEl.classList.add('hidden');
+    creditEl.classList.add('hidden');
+    renderGrid();
+    window.removeEventListener('afterprint', restore);
+  };
+  window.addEventListener('afterprint', restore);
+
+  // A dedicated print stylesheet (see style.css @media print rules) hides
+  // everything except #rot-grid-wrap (including its own action buttons)
+  // and renders it in a clean, light, ink-friendly layout, with the
+  // timestamp shown in the buttons' place — window.print() picks all of
+  // this up automatically via the @media print rules in style.css.
+  window.print();
+}
+
+// Formats like "July 4, 2026 @ 10:32 AM" — used to stamp exported images
+// with when they were generated, in place of the (hidden-during-capture)
+// action buttons.
+function formatExportTimestamp(date) {
+  const datePart = date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  const timePart = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return `Generated ${datePart} @ ${timePart}`;
+}
+
+function runImageExport() {
+  const target = document.getElementById('rot-grid-wrap');
+  if (typeof html2canvas !== 'function') {
+    alert('Image export is unavailable right now — please try again in a moment.');
+    return;
+  }
+
+  // Player photos are served from Google Drive (a cross-origin host with no
+  // CORS headers), which html2canvas cannot read pixel data from — the
+  // browser blocks it as a "tainted canvas" security measure, not something
+  // fixable via html2canvas options. Force the initials avatar style (pure
+  // CSS/text, no external images) for the duration of the capture so the
+  // export never has blank/missing photo cells, then restore whatever the
+  // user actually had selected once the capture completes.
+  const originalAvatarStyle = avatarStyle;
+  avatarStyle = 'initials';
+  renderGrid();
+
+  // A bold "COLOR — Team Coach" header identifies whose rotation this is,
+  // and the action buttons (Generate Options / Export Rotation / Apply to
+  // Gameboard) don't belong in a shareable snapshot — swap them out for a
+  // "Generated <date> @ <time>" stamp (plus a small app-credit line) for
+  // the duration of the capture only.
+  const headerEl = document.getElementById('rot-export-header');
+  const timestampEl = document.getElementById('rot-export-timestamp');
+  const creditEl = document.getElementById('rot-export-credit');
+  headerEl.textContent = teamHeaderLabel(currentTeam);
+  headerEl.classList.remove('hidden');
+  timestampEl.textContent = formatExportTimestamp(new Date());
+  timestampEl.classList.remove('hidden');
+  creditEl.classList.remove('hidden');
+
+  // Same column scoping as print (dot + initials chip + Q1-Q4 only, no
+  // grip/avatar/name) is applied via a temporary class rather than
+  // duplicating the print media-query rules — html2canvas snapshots
+  // whatever is actually on screen at capture time, so the DOM has to be
+  // visually narrowed first, then restored right after. A double
+  // requestAnimationFrame ensures the browser has actually reflowed the
+  // narrower layout before html2canvas reads it (a synchronous class-add
+  // is sometimes still captured pre-layout otherwise).
+  target.classList.add('rot-export-scoped');
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    html2canvas(target, { backgroundColor: null, scale: 2 }).then(canvas => {
+      const link = document.createElement('a');
+      const teamSlug = (currentTeam || 'rotation').replace(/\s+/g, '-').toLowerCase();
+      link.download = `${teamSlug}-rotation.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+
+      // Desktop-only convenience: also copy the image to the clipboard so
+      // it can be pasted straight into a text/chat app without digging
+      // through Downloads. Requires the async Clipboard API with
+      // ClipboardItem support (Chrome/Edge desktop; Firefox desktop behind
+      // a permission prompt) — unsupported on effectively all mobile
+      // browsers, where this silently does nothing and the download above
+      // is the only outcome, which is fine.
+      if (navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+        canvas.toBlob(blob => {
+          if (!blob) return;
+          navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+            .catch(err => console.warn('Clipboard copy skipped:', err));
+        }, 'image/png');
+      }
+    }).catch(err => {
+      console.error('Image export failed:', err);
+      alert('Image export failed — please try again.');
+    }).finally(() => {
+      target.classList.remove('rot-export-scoped');
+      headerEl.classList.add('hidden');
+      timestampEl.classList.add('hidden');
+      creditEl.classList.add('hidden');
+      avatarStyle = originalAvatarStyle;
+      renderGrid();
+    });
+  }));
+}
+
+// ── Save Configuration ───────────────────────────────────────────────────────
+// Fires before Export Rotation and (eventually) Apply to Gameboard. Never
+// blocks the calling action:
+//   - not logged in -> info alert, then returns
+//   - logged in, exact duplicate already saved -> silently returns
+//   - logged in, new configuration -> saves it, appends a gallery tile
+let savedConfigsCache = []; // current team's saved configs, refreshed on team load / after a save
+
+async function trySaveConfiguration() {
+  const coach = getCurrentCoach();
+  if (!coach) {
+    alert('To save custom rotations to your coach account, log in');
+    return;
+  }
+  if (!currentTeam) return;
+
+  const presentOrder = order.filter(id => !absent.has(id));
+  const fingerprint = fingerprintConfig(currentTeam, order, presentOrder, pattern);
+
+  // Dedup match: Account (implicit — configs are stored per-coach) + Team +
+  // Player Rank Order + # of Available Players + Quarters configuration.
+  const alreadySaved = savedConfigsCache.some(c => c._fingerprint === fingerprint);
+  if (alreadySaved) return;
+
+  const isValid = computeGameStatus(pattern, absent, order).valid;
+  const title = generateConfigTitle(presentOrder.length);
+
+  const configToSave = {
+    team: currentTeam,
+    order: [...order],
+    pattern: Object.fromEntries(pattern.entries()),
+    presentIds: presentOrder,
+    isValid,
+    title,
+  };
+
+  try {
+    const id = await saveRotationConfig(coach.name, configToSave);
+    savedConfigsCache.push({ id, ...configToSave, _fingerprint: fingerprint });
+    renderSavedConfigsGallery();
+  } catch (err) {
+    console.error('Save Configuration failed:', err);
+    // Deliberately silent beyond the console — a failed background save
+    // shouldn't block the export/apply action the coach actually clicked.
+  }
+}
+
+// Comparable string uniquely identifying "this exact rotation" for dedup
+// purposes: team + sorted present-player-id set (# available, order-
+// independent) + full rank order (captures a pure reordering with the same
+// on/off pattern as a distinct save) + serialized on/off pattern per player.
+function fingerprintConfig(team, fullOrder, presentOrder, patternMap) {
+  const presentKey = [...presentOrder].sort().join(',');
+  const orderKey = fullOrder.join(',');
+  const patternKey = fullOrder
+    .map(id => `${id}:${(patternMap.get(id) || []).map(b => (b ? 1 : 0)).join('')}`)
+    .join('|');
+  return `${team}::${presentKey}::${orderKey}::${patternKey}`;
+}
+
+// "8-man - Config 3" — N reflects how many players were present/available
+// at save time; the trailing number is a single global sequence across all
+// of this coach's saved configs for the team (not per-N-group), matching
+// however many configs already exist.
+function generateConfigTitle(presentCount) {
+  const nextNum = savedConfigsCache.length + 1;
+  return `${presentCount}-man - Config ${nextNum}`;
+}
+
+async function refreshSavedConfigsGallery() {
+  const coach = getCurrentCoach();
+  const wrap = document.getElementById('rot-saved-configs-wrap');
+  if (!coach || !currentTeam) {
+    wrap.classList.add('hidden');
+    savedConfigsCache = [];
+    return;
+  }
+
+  const configs = await getRotationConfigs(coach.name, currentTeam);
+  savedConfigsCache = configs.map(c => ({
+    ...c,
+    _fingerprint: fingerprintConfig(c.team, c.order, c.presentIds, new Map(Object.entries(c.pattern || {}))),
+  }));
+  renderSavedConfigsGallery();
+}
+
+function renderSavedConfigsGallery() {
+  const wrap = document.getElementById('rot-saved-configs-wrap');
+  const grid = document.getElementById('rot-saved-configs-grid');
+  const coach = getCurrentCoach();
+
+  if (!coach || !currentTeam || savedConfigsCache.length === 0) {
+    wrap.classList.add('hidden');
+    return;
+  }
+
+  wrap.classList.remove('hidden');
+  grid.innerHTML = savedConfigsCache.map(savedConfigCardHTML).join('');
+
+  grid.querySelectorAll('.rot-saved-config-title').forEach(el => {
+    el.addEventListener('blur', async () => {
+      const id = el.closest('.saved-config-card').dataset.configId;
+      const newTitle = el.textContent.trim();
+      const cfg = savedConfigsCache.find(c => c.id === id);
+      if (!cfg || !newTitle || newTitle === cfg.title) { el.textContent = cfg?.title || ''; return; }
+      cfg.title = newTitle;
+      try {
+        await renameRotationConfig(coach.name, id, newTitle);
+      } catch (err) {
+        console.error('Rename failed:', err);
+      }
+    });
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+    });
+  });
+
+  grid.querySelectorAll('.saved-config-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.closest('.saved-config-card').dataset.configId;
+      const cfg = savedConfigsCache.find(c => c.id === id);
+      if (!cfg) return;
+      const confirmed = confirm(`Delete "${cfg.title}"? This cannot be undone.`);
+      if (!confirmed) return;
+      try {
+        await deleteRotationConfig(coach.name, id);
+        savedConfigsCache = savedConfigsCache.filter(c => c.id !== id);
+        renderSavedConfigsGallery();
+      } catch (err) {
+        console.error('Delete failed:', err);
+        alert('Delete failed — please try again.');
+      }
+    });
+  });
+
+  grid.querySelectorAll('.saved-config-open-menu').forEach(el => {
+    const open = e => {
+      e.stopPropagation();
+      activeSavedConfigId = el.dataset.configId;
+      positionPopover(document.getElementById('rot-savedconfig-menu'), el);
+    };
+    el.addEventListener('click', open);
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); }
+    });
+  });
+}
+
+function savedConfigCardHTML(cfg) {
+  const patternMap = new Map(Object.entries(cfg.pattern || {}));
+  const presentSet = new Set(cfg.presentIds || []);
+  // Absent players still get a row (not omitted) so the tile reflects the
+  // full roster at save time — struck-through name, black quarter squares
+  // instead of the usual on/off blue, and no quarter count (they didn't play).
+  const miniRows = cfg.order.map(id => {
+    const p = playersById[id];
+    const name = (p?.[COL.NAME] || id).split(/\s+/)[0];
+    const isAbsent = !presentSet.has(id);
+    const pat = patternMap.get(id) || [false, false, false, false];
+    if (isAbsent) {
+      const cells = pat.map(() => '<span class="rot-mini-cell rot-mini-absent"></span>').join('');
+      return `<div class="rot-mini-row rot-mini-row-absent"><span class="rot-mini-name">${escHtml(name)}</span>${cells}<span class="rot-mini-total">—</span></div>`;
+    }
+    const cells = pat.map(on => `<span class="rot-mini-cell${on ? ' rot-mini-on' : ''}"></span>`).join('');
+    const total = pat.filter(Boolean).length;
+    return `<div class="rot-mini-row"><span class="rot-mini-name">${escHtml(name)}</span>${cells}<span class="rot-mini-total">${total}q</span></div>`;
+  }).join('');
+
+  const validityCircle = cfg.isValid
+    ? '<span class="saved-config-validity valid" title="Valid rotation">✓</span>'
+    : '<span class="saved-config-validity invalid" title="Invalid rotation">✕</span>';
+
+  return `
+    <div class="saved-config-card" data-config-id="${escHtml(cfg.id)}">
+      <button class="saved-config-delete" type="button" title="Delete this configuration" aria-label="Delete this configuration">🗑️</button>
+      <div class="rot-mini-grid saved-config-open-menu" role="button" tabindex="0" data-config-id="${escHtml(cfg.id)}" aria-label="Configuration options">${miniRows}</div>
+      <div class="rot-saved-config-footer">
+        ${validityCircle}
+        <div class="rot-saved-config-title" contenteditable="true" spellcheck="false">${escHtml(cfg.title)}</div>
+      </div>
+    </div>`;
 }
 
 function showSuggestionsModal() {

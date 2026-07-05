@@ -24,11 +24,15 @@ service cloud.firestore {
     match /scheduleGames/{gameNum} {
       allow read, write: if true;
     }
+    match /rotationConfigs/{coachName}/configs/{configId} {
+      allow read, write: if true;
+    }
   }
 }
 ```
 - `coaches/{coachName}` stores each coach's favorites (used by the Player Directory).
 - `scheduleGames/{gameNum}` stores coach-entered game scores (used by the Schedules page). If this collection isn't in the *live* rules yet, score saves will fail with a generic "Save failed" error in the app (Firestore permission-denied under the hood) — check the browser console for the real error if this happens again.
+- `rotationConfigs/{coachName}/configs/{configId}` stores each coach's saved rotation configurations per team (used by the Rotations page's "Save Configuration" feature, triggered automatically by Export Rotation / Apply to Gameboard). Same permission-denied failure mode applies if this nested collection path isn't in the live rules.
 
 ---
 
