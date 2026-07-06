@@ -1957,6 +1957,35 @@ main {
 .sched-cell-muted { color: var(--clr-muted); }
 .sched-last-updated { font-size: 0.8em; font-style: italic; }
 
+/* Team filter dots: same filter as the dropdown, just a faster tap target.
+   Sized to shrink (not wrap) at any width, same convention as Gameboard's
+   game-number bar — 12 dots must always fit on one row. */
+.sched-team-dots {
+  display: flex;
+  justify-content: center;
+  gap: clamp(4px, 1.5vw, 10px);
+  flex-wrap: nowrap;
+}
+
+.sched-team-dot {
+  width: clamp(18px, 5vw, 26px);
+  height: clamp(18px, 5vw, 26px);
+  border-radius: 50%;
+  border: 2px solid var(--clr-border);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.sched-team-dot:hover {
+  border-color: var(--clr-text);
+}
+
+.sched-team-dot.active {
+  border-color: var(--clr-accent);
+  box-shadow: 0 0 0 2px var(--clr-bg), 0 0 0 4px var(--clr-accent);
+}
+
 /* ── Gameboard page ── */
 .gb-page {
   display: flex;

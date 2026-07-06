@@ -39,6 +39,7 @@ async function init() {
   }
 
   populateTeamSelect();
+  renderTeamDots();
   wireToolbar();
   wireScoreModal();
   wireCalendarNav();
@@ -109,10 +110,43 @@ function populateTeamSelect() {
       }).join('');
 }
 
+// One dot per team, color-coded, in the same 1-12 order as TEAMS (which
+// mirrors the coaches array) — a faster tap target for the same filter the
+// dropdown already drives. Clicking a dot toggles it: selecting an already-
+// active team's dot clears the filter back to "All Teams", same as picking
+// the dropdown's blank option. Kept in sync with the dropdown in both
+// directions (see wireToolbar and setTeamFilter below).
+function renderTeamDots() {
+  const wrap = document.getElementById('sched-team-dots');
+  wrap.innerHTML = TEAMS.filter(t => t !== 'Undrafted').map(t => {
+    const info = TEAM_COLORS[t];
+    const hex = info?.hex || '#8890a8';
+    const label = teamColorDisplayName(t) || t;
+    const active = currentTeamFilter === t;
+    return `<button type="button" class="sched-team-dot${active ? ' active' : ''}" data-team="${escHtml(t)}" style="background:${hex}" title="${escHtml(label)}" aria-label="Filter to ${escHtml(label)}" aria-pressed="${active}"></button>`;
+  }).join('');
+
+  wrap.querySelectorAll('.sched-team-dot').forEach(dot => {
+    dot.addEventListener('click', () => {
+      const team = dot.dataset.team;
+      setTeamFilter(currentTeamFilter === team ? '' : team);
+    });
+  });
+}
+
+// Single point of truth for changing the team filter from either control —
+// updates state, both UI widgets, and re-renders, so the dropdown and the
+// dot strip never fall out of sync with each other.
+function setTeamFilter(team) {
+  currentTeamFilter = team;
+  document.getElementById('sched-team-select').value = team;
+  renderTeamDots();
+  render();
+}
+
 function wireToolbar() {
   document.getElementById('sched-team-select').addEventListener('change', e => {
-    currentTeamFilter = e.target.value;
-    render();
+    setTeamFilter(e.target.value);
   });
 
   document.querySelectorAll('.avatar-toggle-btn[data-view]').forEach(btn => {
