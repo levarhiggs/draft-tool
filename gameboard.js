@@ -184,6 +184,7 @@ let activeQuarter = 0;         // 0-3, single-select
 let gameTeam = '';             // currently selected team in Game view
 let teamGames = [];            // this team's games, in date order (sequence = index+1)
 let activeGameIdx = -1;        // index into teamGames
+let activeSheetGameNum = null; // the currently-loaded game's absolute sheet Game # (see loadActiveGame)
 let ownSide = null;            // { team, players, order, pattern, absent }
 let oppSide = null;            // same shape, opponent
 
@@ -298,6 +299,7 @@ async function loadActiveGame() {
   if (activeGameIdx === -1) {
     ownSide = null;
     oppSide = null;
+    activeSheetGameNum = null;
     renderGameView();
     return;
   }
@@ -319,21 +321,80 @@ async function loadActiveGame() {
   // sequence index. Using the sequence number here was the root cause of
   // configs not carrying over correctly between the two teams' Game views.
   const sheetGameNum = game[SCHED_COL.GAME];
+  activeSheetGameNum = sheetGameNum;
 
   ownSide = await buildRosterSide(gameTeam);
   oppSide = oppTeam ? await buildRosterSide(oppTeam) : null;
 
-  // Layer each side's most-recently-saved config (per logged-in coach, per
-  // team+sheetGameNum) on top of the blank roster baseline, if one exists.
+  // Layer saved state on top of the blank roster baseline: a logged-in
+  // coach's most-recently-saved Firestore config (per coach+team+
+  // sheetGameNum), or — with no coach logged in — this browser tab's own
+  // in-progress session draft, if either exists.
   const coach = getCurrentCoach();
   if (coach) {
     await Promise.all([
       applySavedGameConfig(ownSide, coach.name, gameTeam, sheetGameNum),
       oppSide ? applySavedGameConfig(oppSide, coach.name, oppTeam, sheetGameNum) : Promise.resolve(),
     ]);
+  } else {
+    applyLocalGameState(ownSide, gameTeam, sheetGameNum);
+    if (oppSide) applyLocalGameState(oppSide, oppTeam, sheetGameNum);
   }
 
   renderGameView();
+}
+
+// ── Logged-out session-local draft state ────────────────────────────────────
+// A logged-out user can still build a rotation on the fly, but has nowhere
+// to save it (Save to Gameboard requires a coach login, same as Rotations'
+// Save Configuration). Without this, buildRosterSide() always starts from
+// a blank slate, so navigating away (switch game, switch team) and back
+// silently discarded all their edits — this mirrors that same in-memory
+// state into sessionStorage on every edit, and restores it as the baseline
+// instead of blank when there's no logged-in coach to load a real saved
+// config for. Cleared automatically when the tab closes (sessionStorage's
+// normal lifetime) — never touches Firestore, never conflicts with a
+// coach's actual saved configs, and is silently superseded by a real login
+// at any point (see loadActiveGame — logged-in always takes the Firestore
+// path instead, never sessionStorage).
+function localGameStateKey(team, sheetGameNum) {
+  return `gameboard_draft_${team}_${sheetGameNum}`;
+}
+
+function saveLocalGameState(team, sheetGameNum, side) {
+  try {
+    const data = {
+      pattern: Object.fromEntries(side.pattern.entries()),
+      absent: [...side.absent],
+    };
+    sessionStorage.setItem(localGameStateKey(team, sheetGameNum), JSON.stringify(data));
+  } catch { /* sessionStorage unavailable/full — silently skip, not critical */ }
+}
+
+function applyLocalGameState(side, team, sheetGameNum) {
+  let raw;
+  try {
+    raw = sessionStorage.getItem(localGameStateKey(team, sheetGameNum));
+  } catch { return; }
+  if (!raw) return;
+  let data;
+  try { data = JSON.parse(raw); } catch { return; }
+
+  const patternMap = new Map(Object.entries(data.pattern || {}));
+  side.order.forEach(id => {
+    if (patternMap.has(id)) side.pattern.set(id, [...patternMap.get(id)]);
+  });
+  side.absent = new Set((data.absent || []).filter(id => side.order.includes(id)));
+}
+
+// Called from every quarter-toggle / absence-toggle interaction. A
+// logged-in coach's edits are only persisted explicitly via the Save to
+// Gameboard button (matching Rotations' Save Configuration pattern) — this
+// only fires the lightweight sessionStorage draft save for a logged-out
+// user, so it's a no-op (not wasted work) once someone logs in.
+function autoSaveIfLoggedOut(side) {
+  if (getCurrentCoach() || activeSheetGameNum == null) return;
+  saveLocalGameState(side.team, activeSheetGameNum, side);
 }
 
 async function applySavedGameConfig(side, coachName, team, sheetGameNum) {
@@ -541,12 +602,14 @@ function wireSideTileInteractions(container, side) {
       const pat = side.pattern.get(id) || [false, false, false, false];
       pat[activeQuarter] = !pat[activeQuarter];
       side.pattern.set(id, pat);
+      autoSaveIfLoggedOut(side);
       renderGameView();
     };
 
     const toggleAbsent = () => {
       if (side.absent.has(id)) side.absent.delete(id);
       else side.absent.add(id);
+      autoSaveIfLoggedOut(side);
       renderGameView();
     };
 
