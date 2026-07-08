@@ -241,6 +241,15 @@ function wirePopoverDismiss() {
     if (!(jerseyPopover.contains(e.target) || e.target.closest('.gb-inout-tile'))) {
       jerseyPopover.classList.add('hidden');
     }
+    const summaryPopover = document.getElementById('gb-livestat-summary-popover');
+    if (!(summaryPopover.contains(e.target) || e.target.closest('.gb-gamelog-score-circle'))) {
+      summaryPopover.classList.add('hidden');
+    }
+    // Live Stat panel: any click that reaches here wasn't on the panel
+    // itself (its own click handler stops propagation) or on the tile that
+    // opened/would toggle it (also stops propagation) — so it's genuinely
+    // an "outside" tap and should dismiss the panel, per the user's spec.
+    if (liveStatActivePlayer) closeLiveStatPanel();
   });
 }
 
@@ -266,6 +275,15 @@ let activeSheetGameNum = null; // the currently-loaded game's absolute sheet Gam
 let ownSide = null;            // { team, players, order, pattern, absent }
 let oppSide = null;            // same shape, opponent
 let jerseyMode = false;        // Jersey # view toggle — see wireJerseyToggle
+let liveStatMode = false;      // LIVE STAT toggle
+let liveStatActivePlayer = null; // { side, id } of the tapped/highlighted IN player, or null
+// Append-only running log for the CURRENT quarter only — cleared whenever
+// Live Stat mode is switched off, or the quarter/game/team changes. No
+// cross-quarter skip-around or persistence yet; this is deliberately
+// scoped to "quarter 1 only, no swapping players, no toggling mode
+// off/on" per the user's explicit constraint for this first pass.
+// Entry shape: { side, playerId, statKey, favorable, label }
+let liveStatLog = [];
 
 function teamColorNameFor(team) {
   return TEAM_COLORS[team]?.name || null;
@@ -335,6 +353,9 @@ function defaultGameIdxFor(games) {
 async function loadGameTeam(team) {
   gameTeam = team;
   activeQuarter = 0;
+  liveStatMode = false;
+  liveStatActivePlayer = null;
+  resetLiveStatLog();
   await ensureGameDataLoaded();
 
   teamGames = gamesForTeam(team);
@@ -453,6 +474,14 @@ function takenJerseyNumbers(side) {
 }
 
 async function loadActiveGame() {
+  // A new game rebuilds ownSide/oppSide from scratch below — any panel
+  // referencing the OLD side objects would be stale even if the player id
+  // happened to coincidentally match. The log itself is also game-specific
+  // (no cross-game persistence yet), so it resets here too.
+  liveStatActivePlayer = null;
+  liveStatMode = false;
+  resetLiveStatLog();
+
   if (activeGameIdx === -1) {
     ownSide = null;
     oppSide = null;
@@ -573,6 +602,35 @@ function renderGameView() {
   renderQuarterTabs();
   renderInOutColumns();
   updateSaveButtonVisibility();
+  updateLiveStatToggle();
+}
+
+// # of non-absent players IN for the CURRENTLY ACTIVE quarter on one side —
+// same IN/OUT split logic renderSideContainers already uses, factored out
+// so the Live Stat toggle can check it without re-rendering tiles.
+function countInForActiveQuarter(side) {
+  if (!side) return 0;
+  return side.order.filter(id => !side.absent.has(id) && (side.pattern.get(id) || [])[activeQuarter]).length;
+}
+
+// LIVE STAT toggle bar (see gameboard.html, between the IN and OUT rows) —
+// only appears once both sides have EXACTLY 5 IN for the active quarter.
+// Phase 1 is OFF/ON display only; phase 2 will wire real scoring behavior
+// to the ON state.
+function updateLiveStatToggle() {
+  const btn = document.getElementById('gb-livestat-toggle');
+  const ready = countInForActiveQuarter(ownSide) === 5 && countInForActiveQuarter(oppSide) === 5;
+  btn.classList.toggle('hidden', !ready);
+  if (!ready && liveStatMode) { liveStatMode = false; resetLiveStatLog(); }
+  if (!liveStatMode) liveStatActivePlayer = null; // stale reference guard — mode off means no panel can be open
+  btn.classList.toggle('gb-livestat-on', liveStatMode);
+  document.getElementById('gb-livestat-state').textContent = liveStatMode ? 'ON' : 'OFF';
+
+  // Indicator #2: Game Log panel covers the mini-grids entirely while Live
+  // Stat mode is on.
+  document.getElementById('gb-gamelog-panel').classList.toggle('hidden', !liveStatMode);
+  document.getElementById('gb-gamelog-quarter').textContent = String(activeQuarter + 1);
+  if (liveStatMode) renderGameLogLines();
 }
 
 function miniGridDot(side) {
@@ -677,8 +735,13 @@ function renderQuarterTabs() {
   tabs.querySelectorAll('button').forEach(btn => {
     btn.addEventListener('click', () => {
       activeQuarter = parseInt(btn.dataset.quarter, 10);
+      // Quarter-to-quarter log skip-around isn't handled yet (explicitly
+      // out of scope for now) — switching quarters just ends the Live Stat
+      // session cleanly rather than carrying a Q1 log into Q2's view.
+      liveStatActivePlayer = null;
+      if (liveStatMode) { liveStatMode = false; resetLiveStatLog(); }
       renderQuarterTabs();
-      renderInOutColumns();
+      renderGameView();
     });
   });
 }
@@ -686,6 +749,223 @@ function renderQuarterTabs() {
 function renderInOutColumns() {
   renderSideContainers(ownSide, 'gb-own-in', 'gb-own-out', false);
   renderSideContainers(oppSide, 'gb-opp-in', 'gb-opp-out', true);
+  renderLiveStatPanel();
+}
+
+// Same first-name/first-5-letters/uppercase convention as Rotations'
+// firstNameRefLabel, reused here for the stat panel's player crumb.
+function fiveLetterName(name) {
+  const firstName = (name || '?').split(/\s+/)[0] || name;
+  return firstName.slice(0, 5).toUpperCase();
+}
+
+// 8 stat buttons: 4 favorable (green outline) left column, 4 unfavorable
+// (red outline) right column. `shotValue` (3/2/1) drives both the log
+// line's point value and the makes/attempts counter key — ASST/FOUL have
+// no shotValue since they're plain running tallies, not a make/miss pair.
+const LIVE_STAT_BUTTONS = [
+  { key: '3pt-made',  label: '3PT', favorable: true,  shotValue: 3, made: true },
+  { key: '3pt-miss',  label: '3PT', favorable: false, shotValue: 3, made: false },
+  { key: '2pt-made',  label: '2PT', favorable: true,  shotValue: 2, made: true },
+  { key: '2pt-miss',  label: '2PT', favorable: false, shotValue: 2, made: false },
+  { key: '1pt-made',  label: '1PT', favorable: true,  shotValue: 1, made: true },
+  { key: '1pt-miss',  label: '1PT', favorable: false, shotValue: 1, made: false },
+  { key: 'asst',      label: 'ASST', favorable: true },
+  { key: 'foul',      label: 'FOUL', favorable: false },
+];
+
+// Makes/attempts counters, per player per shot value, for the CURRENT
+// quarter's log only — cleared alongside liveStatLog (see resetLiveStatLog).
+// Keyed by `${playerId}-${shotValue}` since jersey # can change mid-game
+// (unlikely but not guaranteed unique) while playerId always is.
+let liveStatShotCounts = {}; // { "playerId-3": { made, attempts }, ... }
+// Plain running counts for the non-shot stats (ASST/FOUL) — same lifetime
+// and reset rules as liveStatShotCounts above.
+let liveStatSimpleCounts = {}; // { "playerId-asst": 2, "playerId-foul": 1, ... }
+
+function shotCountKey(playerId, shotValue) {
+  return `${playerId}-${shotValue}`;
+}
+
+function simpleCountKey(playerId, statKey) {
+  return `${playerId}-${statKey}`;
+}
+
+function resetLiveStatLog() {
+  liveStatLog = [];
+  liveStatShotCounts = {};
+  liveStatSimpleCounts = {};
+}
+
+// Builds the human-readable log line for one entry AT THE TIME IT WAS
+// LOGGED — attempts/makes counts are baked into the entry itself (not
+// recomputed later), so undo can cleanly roll the counter back by exactly
+// one without needing to replay the whole log. No team-name prefix — the
+// team is conveyed by rendering this text in that team's color instead
+// (see renderGameLogLines), so the line leads straight with jersey # and
+// first name.
+function liveStatLogLineText(entry) {
+  const jerseyLabel = entry.jerseyNum == null ? '—' : `#${entry.jerseyNum}`;
+  const firstName = (entry.playerName || '?').split(/\s+/)[0] || entry.playerName;
+  const who = `${jerseyLabel} ${firstName}`;
+
+  if (entry.shotValue != null) {
+    const verb = entry.made ? 'scores' : 'misses';
+    return `${who} ${verb} ${entry.shotValue}. (${entry.madeAfter}-${entry.attemptsAfter})`;
+  }
+  if (entry.statKey === 'asst') return `${who} records an assist. (${entry.countAfter})`;
+  if (entry.statKey === 'foul') return `${who} commits a foul. (${entry.countAfter})`;
+  return who;
+}
+
+// Stat-entry panel: appears when a player is tapped in the IN column while
+// Live Stat mode is on, covering the OPPOSITE side's entire IN container
+// (see LIVE_STATS mockup discussion — tap a White player, panel covers
+// Lime's IN column, not White's own). `liveStatActivePlayer` tracks which
+// player + side triggered it; null means no panel is showing.
+function renderLiveStatPanel() {
+  // Always clear any previously-injected panel first — renderSideContainers
+  // already rebuilt both IN containers' innerHTML from scratch this render
+  // pass, so there's nothing stale to remove, but this keeps the function
+  // safe to call even if that assumption ever changes.
+  document.querySelectorAll('.gb-livestat-panel').forEach(el => el.remove());
+
+  if (!liveStatActivePlayer || !liveStatMode) return;
+  const { side, id } = liveStatActivePlayer;
+  const player = side.players[id];
+  if (!player) return;
+
+  // Opposite container: own side's player -> panel covers opponent's IN
+  // column, and vice versa.
+  const targetId = side === ownSide ? 'gb-opp-in' : 'gb-own-in';
+  const target = document.getElementById(targetId);
+  if (!target) return;
+
+  const jerseyNum = jerseyNumberFor(player);
+  const jerseyLabel = jerseyNum == null ? '—' : String(jerseyNum);
+
+  const buttonsHtml = LIVE_STAT_BUTTONS.map(b => `
+    <button class="gb-livestat-stat-btn${b.favorable ? '' : ' gb-livestat-stat-unfavorable'}" data-key="${b.key}" type="button">${b.label}</button>
+  `).join('');
+
+  const panel = document.createElement('div');
+  panel.className = 'gb-livestat-panel';
+  panel.innerHTML = `
+    <div class="gb-livestat-panel-header">
+      <span>Player<br><span class="gb-livestat-panel-name">${escHtml(fiveLetterName(player[COL.NAME]))}</span></span>
+      <span>Jersey #<br><span class="gb-livestat-panel-name">${escHtml(jerseyLabel)}</span></span>
+    </div>
+    <div class="gb-livestat-panel-grid">${buttonsHtml}</div>
+    <button class="gb-livestat-undo-btn" type="button">↩ Undo</button>
+  `;
+
+  panel.addEventListener('click', e => {
+    e.stopPropagation();
+    const undoBtn = e.target.closest('.gb-livestat-undo-btn');
+    if (undoBtn) {
+      undoLastLiveStatEntry();
+      return;
+    }
+    const statBtn = e.target.closest('.gb-livestat-stat-btn');
+    if (statBtn) {
+      logLiveStatEntry(side, player, statBtn.dataset.key);
+      closeLiveStatPanel();
+    }
+  });
+
+  target.appendChild(panel);
+}
+
+function logLiveStatEntry(side, player, statKey) {
+  const def = LIVE_STAT_BUTTONS.find(b => b.key === statKey);
+  if (!def) return;
+
+  const entry = {
+    side, statKey,
+    playerId: player[COL.ID],
+    playerName: player[COL.NAME] || 'Unknown',
+    jerseyNum: jerseyNumberFor(player),
+    favorable: def.favorable,
+    shotValue: def.shotValue ?? null,
+    made: def.made ?? null,
+  };
+
+  if (def.shotValue != null) {
+    const key = shotCountKey(entry.playerId, def.shotValue);
+    const counts = liveStatShotCounts[key] || { made: 0, attempts: 0 };
+    counts.attempts += 1;
+    if (def.made) counts.made += 1;
+    liveStatShotCounts[key] = counts;
+    entry.madeAfter = counts.made;
+    entry.attemptsAfter = counts.attempts;
+  } else {
+    const key = simpleCountKey(entry.playerId, statKey);
+    const count = (liveStatSimpleCounts[key] || 0) + 1;
+    liveStatSimpleCounts[key] = count;
+    entry.countAfter = count;
+  }
+
+  liveStatLog.push(entry);
+  renderGameLogLines();
+}
+
+function undoLastLiveStatEntry() {
+  const entry = liveStatLog.pop();
+  if (!entry) return;
+  if (entry.shotValue != null) {
+    const key = shotCountKey(entry.playerId, entry.shotValue);
+    const counts = liveStatShotCounts[key];
+    if (counts) {
+      counts.attempts -= 1;
+      if (entry.made) counts.made -= 1;
+    }
+  } else {
+    const key = simpleCountKey(entry.playerId, entry.statKey);
+    if (liveStatSimpleCounts[key] != null) liveStatSimpleCounts[key] -= 1;
+  }
+  renderGameLogLines();
+  updateScoreCircles();
+}
+
+function renderGameLogLines() {
+  const el = document.getElementById('gb-gamelog-lines');
+  if (!el) return;
+  if (liveStatLog.length === 0) {
+    el.innerHTML = '<div class="gb-gamelog-empty">No stats logged yet this quarter.</div>';
+    return;
+  }
+  // Each line is tinted with that entry's own team color (replaces the old
+  // "TEAM NAME:" text prefix) and prefixed with its 1-based entry number so
+  // read order is unambiguous once lines start scrolling.
+  el.innerHTML = liveStatLog.map((entry, i) => {
+    const hex = TEAM_COLORS[entry.side.team]?.hex || 'inherit';
+    return `<div class="gb-gamelog-line" style="color:${hex}">${i + 1}. ${escHtml(liveStatLogLineText(entry))}</div>`;
+  }).join('');
+  // Newest entry (last in DOM order) must stay in view as the log grows —
+  // scroll the container to its bottom every time a line is added/removed.
+  el.scrollTop = el.scrollHeight;
+}
+
+// Updates the score circles' displayed value in place, WITHOUT rebuilding
+// the IN/OUT tile grid — used by Undo specifically, since the stat panel
+// (anchored inside one of those tiles) must stay open across an undo per
+// the user's spec, ruling out the full renderInOutColumns() a normal stat
+// tap uses (see closeLiveStatPanel).
+function updateScoreCircles() {
+  document.querySelectorAll('.gb-gamelog-score-circle').forEach(el => {
+    const team = el.dataset.scoreTeam;
+    const side = ownSide?.team === team ? ownSide : (oppSide?.team === team ? oppSide : null);
+    if (side) el.textContent = String(teamPointsFromLog(side));
+  });
+}
+
+function closeLiveStatPanel() {
+  liveStatActivePlayer = null;
+  // Re-renders both the highlighted-tile ring (applied inline at render
+  // time in wireSideTileInteractions) and the panel itself — a light touch
+  // (skips the matchup row / quarter tabs / toggle bar, all unaffected)
+  // rather than the full renderGameView().
+  renderInOutColumns();
 }
 
 // Standard relative-luminance check (WCAG-style) to auto-pick readable
@@ -702,7 +982,11 @@ function readableTextColor(hex) {
 // center gap, facing the opposing side's thumbnails: own team (left column)
 // = name, then thumbnail on the right; opponent (right column) = thumbnail
 // on the left, then name. `mirrored` flips the tile's own internal order.
-function playerTileHtml(side, id, mirrored) {
+// `isIn` outlines the thumbnail in this team's own color, ONLY for IN tiles
+// AND only while Live Stat mode is on — one of the three visual indicators
+// that Live Stat mode is active (see updateLiveStatToggle), reverts to a
+// plain thumbnail the moment it's switched off.
+function playerTileHtml(side, id, mirrored, isIn) {
   const p = side.players[id];
   const fullName = p?.[COL.NAME] || 'Unknown';
   const firstName = fullName.split(/\s+/)[0] || fullName;
@@ -724,22 +1008,103 @@ function playerTileHtml(side, id, mirrored) {
       : `<div class="gb-inout-avatar-img gb-inout-avatar-placeholder">🏀</div>`;
   }
   const nameHtml = `<span class="gb-inout-name">${escHtml(firstName)}</span>`;
-  const avatarWrapHtml = `<div class="gb-inout-avatar">${avatarHtml}</div>`;
+  const avatarStyle = (isIn && liveStatMode) ? ` style="border:2px solid ${TEAM_COLORS[side.team]?.hex || 'transparent'}"` : '';
+  const avatarWrapHtml = `<div class="gb-inout-avatar"${avatarStyle}>${avatarHtml}</div>`;
   return `
     <div class="gb-inout-tile${isAbsent ? ' gb-inout-tile-absent' : ''}" data-id="${escHtml(id)}" role="button" tabindex="0">
       ${mirrored ? avatarWrapHtml + nameHtml : nameHtml + avatarWrapHtml}
     </div>`;
 }
 
+// Sum of made shots' point values, this side, current quarter's log only.
+function teamPointsFromLog(side) {
+  return liveStatLog.reduce((sum, e) => sum + (e.side === side && e.made && e.shotValue ? e.shotValue : 0), 0);
+}
+
+// Live Stat mode indicator #1: a team-colored circle at the IN header's
+// outer edge, showing this team's running point total for the quarter's
+// log so far. Tapping it opens the per-player stat summary (see
+// showLiveStatSummary).
+function gameLogScoreCircleHtml(side) {
+  const hex = TEAM_COLORS[side.team]?.hex || '#8890a8';
+  const style = `background:${hex};color:${readableTextColor(hex)}`;
+  return `<div class="gb-gamelog-score-circle" style="${style}" data-score-team="${escHtml(side.team)}">${teamPointsFromLog(side)}</div>`;
+}
+
+// Per-player Points/Assists/Fouls for this side, this quarter's log only —
+// only players who actually have a log entry are included (a coach hasn't
+// logged anything for the other 3-4 IN players yet, no point listing them
+// as all-zero rows). Same source-of-truth reduce as teamPointsFromLog,
+// just broken out per player instead of summed across the team.
+function playerStatTotals(side) {
+  const totals = {}; // playerId -> { points, assists, fouls }
+  liveStatLog.forEach(e => {
+    if (e.side !== side) return;
+    const t = totals[e.playerId] || { points: 0, assists: 0, fouls: 0 };
+    if (e.made && e.shotValue) t.points += e.shotValue;
+    if (e.statKey === 'asst') t.assists += 1;
+    if (e.statKey === 'foul') t.fouls += 1;
+    totals[e.playerId] = t;
+  });
+  return totals;
+}
+
+// Read-only per-player quarter summary (tap a team's score circle while
+// Live Stat is on) — no editable fields, no quickset entry/Go row, just
+// Points/Assists/Fouls for whichever players have logged activity this
+// quarter. Reuses the Lineup Manager's popover styling but a dedicated
+// element (#gb-livestat-summary-popover) since the two are conceptually
+// different popovers that could in principle both have content queued.
+function showLiveStatSummary(anchorEl, side) {
+  const popover = document.getElementById('gb-livestat-summary-popover');
+  const totals = playerStatTotals(side);
+
+  const playerIds = side.order.filter(id => totals[id]);
+  const rows = playerIds.length === 0
+    ? '<div class="sched-popover-hint">No stats logged yet this quarter.</div>'
+    : `
+      <div class="gb-livestat-summary-row gb-livestat-summary-header">
+        <span></span><span>Points</span><span>Assists</span><span>Fouls</span>
+      </div>
+      ${playerIds.map(id => {
+        const p = side.players[id];
+        const t = totals[id];
+        return `
+          <div class="gb-livestat-summary-row">
+            <span>${escHtml(fiveLetterName(p?.[COL.NAME]))}</span>
+            <span>${t.points}</span>
+            <span>${t.assists}</span>
+            <span>${t.fouls}</span>
+          </div>`;
+      }).join('')}
+    `;
+
+  const colorName = TEAM_COLORS[side.team]?.name || side.team;
+  popover.innerHTML = `
+    <div class="sched-popover-title">Team ${escHtml(colorName)} (Q${activeQuarter + 1})</div>
+    ${rows}
+  `;
+
+  positionPopover(popover, anchorEl);
+}
+
 function teamIconInlineHtml(team) {
   const colorName = teamColorNameFor(team) || '';
   const icon = iconUrl(colorName);
   if (!icon) return '';
-  // This icon is always a button opening the Lineup Manager (see
-  // showLineupManager) — jersey assignment, quick 5-digit lineup entry for
-  // the active quarter, all in one place, regardless of whether Jersey #
-  // tile-view mode happens to be on or off.
-  return `<div class="gb-inout-team-icon gb-inout-team-icon-clickable" data-jersey-roster-team="${escHtml(team)}"><img src="${icon}" alt="${escHtml(colorName)}" loading="lazy" /></div>`;
+  // This icon opens the Lineup Manager (see showLineupManager) — jersey
+  // assignment, quick 5-digit lineup entry for the active quarter — except
+  // while Live Stat mode is on, where the icon is purely the team-color
+  // indicator (see below) and tapping it does nothing; the Lineup Manager
+  // doesn't make sense mid-live-tracking since IN/OUT membership is locked
+  // to stat-panel taps only in that mode (see wireSideTileInteractions).
+  const clickableClass = liveStatMode ? '' : ' gb-inout-team-icon-clickable';
+  // The team-color border is a third Live Stat mode indicator (alongside
+  // the score circle and IN-tile outlines) — only appears while
+  // liveStatMode is on, same as those.
+  const hex = TEAM_COLORS[team]?.hex || 'transparent';
+  const style = liveStatMode ? ` style="border:2px solid ${hex}"` : '';
+  return `<div class="gb-inout-team-icon${clickableClass}" data-jersey-roster-team="${escHtml(team)}"${style}><img src="${icon}" alt="${escHtml(colorName)}" loading="lazy" /></div>`;
 }
 
 // mirrored=false for the own-team column (name left, thumbnail right —
@@ -775,20 +1140,36 @@ function renderSideContainers(side, inId, outId, mirrored) {
   const inHeaderInner = mirrored
     ? `${icon}<div class="gb-inout-header">IN</div>`
     : `<div class="gb-inout-header">IN</div>${icon}`;
-  const inHeaderHtml = `<div class="gb-inout-in-header${mirrored ? ' gb-inout-in-header-left' : ''}">${inHeaderInner}</div>`;
+  // Live Stat mode's score circle sits at the row's TRUE outer edge (far
+  // left for the own/left side, far right for the opponent/right side) —
+  // the opposite extreme from the IN label + team icon, which stay put
+  // nearest the center gap.
+  const scoreCircle = liveStatMode ? gameLogScoreCircleHtml(side) : '';
+  const liveStatClass = liveStatMode ? ' gb-inout-in-header-livestat' : '';
+  const inHeaderHtml = mirrored
+    ? `<div class="gb-inout-in-header gb-inout-in-header-left${liveStatClass}">${inHeaderInner}${scoreCircle}</div>`
+    : `<div class="gb-inout-in-header${liveStatClass}">${scoreCircle}${inHeaderInner}</div>`;
   const outHeaderClass = mirrored ? '' : ' gb-inout-header-right';
 
-  inEl.innerHTML = `${inHeaderHtml}${inIds.map(id => playerTileHtml(side, id, mirrored)).join('')}`;
-  outEl.innerHTML = `<div class="gb-inout-header${outHeaderClass}">OUT</div>${outIds.map(id => playerTileHtml(side, id, mirrored)).join('')}`;
+  inEl.innerHTML = `${inHeaderHtml}${inIds.map(id => playerTileHtml(side, id, mirrored, true)).join('')}`;
+  outEl.innerHTML = `<div class="gb-inout-header${outHeaderClass}">OUT</div>${outIds.map(id => playerTileHtml(side, id, mirrored, false)).join('')}`;
 
-  wireSideTileInteractions(inEl, side);
-  wireSideTileInteractions(outEl, side);
+  wireSideTileInteractions(inEl, side, true);
+  wireSideTileInteractions(outEl, side, false);
 
   const teamIcon = inEl.querySelector('.gb-inout-team-icon-clickable');
   if (teamIcon) {
     teamIcon.addEventListener('click', e => {
       e.stopPropagation();
       showLineupManager(teamIcon, side);
+    });
+  }
+
+  const scoreCircleEl = inEl.querySelector('.gb-gamelog-score-circle');
+  if (scoreCircleEl) {
+    scoreCircleEl.addEventListener('click', e => {
+      e.stopPropagation();
+      showLiveStatSummary(scoreCircleEl, side);
     });
   }
 }
@@ -986,10 +1367,31 @@ function showLineupManager(anchorEl, side) {
   positionPopover(popover, anchorEl);
 }
 
-function wireSideTileInteractions(container, side) {
+function wireSideTileInteractions(container, side, isIn) {
   container.querySelectorAll('.gb-inout-tile').forEach(tile => {
     const id = tile.dataset.id;
     let lastTap = 0;
+
+    // Live Stat mode takes over tile behavior entirely, whenever it's on
+    // (highest priority — overrides Jersey # mode too, which is unlikely to
+    // be on at the same time but shouldn't fight with this if it is). OUT
+    // tiles are fully inert (dimmed, no listeners at all — the only
+    // interaction left in this mode is tapping an IN player). IN tiles open
+    // the stat panel instead of toggling quarter/absence.
+    if (liveStatMode) {
+      if (!isIn) {
+        tile.classList.add('gb-inout-tile-livestat-disabled');
+        return;
+      }
+      const isActive = liveStatActivePlayer?.side === side && liveStatActivePlayer?.id === id;
+      if (isActive) tile.classList.add('gb-inout-tile-livestat-active');
+      tile.addEventListener('click', e => {
+        e.stopPropagation();
+        liveStatActivePlayer = isActive ? null : { side, id };
+        renderInOutColumns();
+      });
+      return;
+    }
 
     // Jersey-# mode overrides all normal tap behavior for a player with no
     // saved number yet — tapping prompts for entry instead of moving them
@@ -1129,6 +1531,20 @@ function wireJerseyToggle() {
   });
 }
 
+// Phase 1: OFF/ON display only. Phase 2 will wire real live-scoring
+// behavior to the ON state (see LIVE_STATS_SPEC.md / mockup discussion).
+function wireLiveStatToggle() {
+  document.getElementById('gb-livestat-toggle').addEventListener('click', () => {
+    liveStatMode = !liveStatMode;
+    // Log is explicitly scoped to "this Live Stat session" for now (no
+    // cross-session/quarter persistence yet, per the user's constraint) —
+    // turning it off clears the slate so turning it back on starts fresh
+    // rather than silently resuming stale counts.
+    if (!liveStatMode) resetLiveStatLog();
+    renderGameView();
+  });
+}
+
 function wireSaveGameConfigButton() {
   document.getElementById('btn-save-game-config').addEventListener('click', saveActiveGameConfig);
 }
@@ -1165,6 +1581,7 @@ async function initGameView() {
   wireGameTeamSelect();
   wireSaveGameConfigButton();
   wireJerseyToggle();
+  wireLiveStatToggle();
 
   const { team: linkedTeam, sheetGameNum: linkedSheetGameNum } = deepLinkParams();
   if (linkedTeam) {

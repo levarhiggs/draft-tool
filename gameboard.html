@@ -81,8 +81,18 @@
                ...), not the schedule sheet's absolute Game # column. -->
           <div id="gb-gamenum-bar" class="gb-gamenum-bar"></div>
 
-          <!-- Matchup row: own team icon + mini-grid, VS., opponent mini-grid + icon -->
-          <div id="gb-matchup-row" class="gb-matchup-row"></div>
+          <!-- Matchup row: own team icon + mini-grid, VS., opponent mini-grid
+               + icon. Live Stat mode (phase 1: no functionality yet, just
+               the visual indicator) covers this with the Game Log panel —
+               see gb-gamelog-panel below and updateLiveStatToggle in
+               gameboard.js. -->
+          <div class="gb-matchup-wrap">
+            <div id="gb-matchup-row" class="gb-matchup-row"></div>
+            <div id="gb-gamelog-panel" class="gb-gamelog-panel hidden">
+              <div class="gb-gamelog-title">GAME LOG — QUARTER <span id="gb-gamelog-quarter">1</span></div>
+              <div id="gb-gamelog-lines" class="gb-gamelog-lines"></div>
+            </div>
+          </div>
 
           <!-- Quarter tabs, left-aligned above the own-team IN column below
                (same 2-col grid as .gb-inout-columns) + jersey # toggle,
@@ -92,16 +102,24 @@
             <button id="gb-jersey-toggle" class="gb-jersey-toggle-btn" type="button" title="Jersey # view" aria-pressed="false">J#</button>
           </div>
 
-          <!-- IN/OUT containers, own team (left) + opponent (right) -->
+          <!-- IN row (own + opponent side-by-side) -->
           <div class="gb-inout-columns">
-            <div class="gb-inout-column">
-              <div id="gb-own-in" class="gb-inout-container gb-inout-in"></div>
-              <div id="gb-own-out" class="gb-inout-container gb-inout-out"></div>
-            </div>
-            <div class="gb-inout-column">
-              <div id="gb-opp-in" class="gb-inout-container gb-inout-in"></div>
-              <div id="gb-opp-out" class="gb-inout-container gb-inout-out"></div>
-            </div>
+            <div id="gb-own-in" class="gb-inout-container gb-inout-in"></div>
+            <div id="gb-opp-in" class="gb-inout-container gb-inout-in"></div>
+          </div>
+
+          <!-- Live Stat toggle: only shown once both sides have exactly 5
+               IN for the active quarter (see updateLiveStatToggle in
+               gameboard.js). Phase 1: OFF/ON only, no scoring behavior yet
+               (phase 2). -->
+          <button id="gb-livestat-toggle" class="gb-livestat-toggle hidden" type="button">
+            LIVE STAT - <span id="gb-livestat-state">OFF</span>
+          </button>
+
+          <!-- OUT row (own + opponent side-by-side) -->
+          <div class="gb-inout-columns">
+            <div id="gb-own-out" class="gb-inout-container gb-inout-out"></div>
+            <div id="gb-opp-out" class="gb-inout-container gb-inout-out"></div>
           </div>
 
           <button id="btn-save-game-config" class="btn-primary gb-save-btn hidden" type="button">💾 Save to Gameboard</button>
@@ -126,6 +144,9 @@
 
   <!-- Jersey # picker popover (tap an unset player tile in Jersey # mode) -->
   <div id="gb-jersey-popover" class="sched-popover gb-jersey-popover hidden"></div>
+
+  <!-- Live Stat per-player quarter summary (tap a team's score circle) -->
+  <div id="gb-livestat-summary-popover" class="sched-popover gb-jersey-popover hidden"></div>
 
   <!-- Coach Login Modal -->
   <div id="modal-login" class="modal-overlay hidden">

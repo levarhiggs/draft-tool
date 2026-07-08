@@ -2483,6 +2483,10 @@ main {
 .gb-gamenum-btn:hover { border-color: var(--clr-accent); color: var(--clr-accent); }
 .gb-gamenum-btn.active { background: var(--clr-accent); border-color: var(--clr-accent); color: #fff; }
 
+.gb-matchup-wrap {
+  position: relative;
+}
+
 /* Matchup row holds only the two mini-grids + VS. now — team icons moved
    into the IN containers below (see .gb-inout-in-header) so this row stays
    as narrow as possible and never wraps alongside the game-number bar. */
@@ -2492,6 +2496,64 @@ main {
   justify-content: center;
   gap: clamp(8px, 2.5vw, 20px);
   flex-wrap: nowrap;
+}
+
+/* Live Stat mode indicator #2: covers the mini-grids entirely (disabling
+   their double-click-to-Rotations functionality underneath, since a plain
+   covering element blocks the click from ever reaching them) — phase 1 is
+   just this placeholder panel, no game-log content or interactivity yet. */
+.gb-gamelog-panel {
+  position: absolute;
+  inset: 0;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+  text-align: center;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.gb-gamelog-title {
+  flex-shrink: 0;
+  padding: 10px 12px 4px;
+}
+
+/* Log lines append in order (oldest first, newest last in DOM), genuinely
+   scrollable (not crop-from-top) — auto-scrolled to the bottom on every
+   append/undo (see renderGameLogLines in gameboard.js) so the newest entry
+   is always the one in view, with a visible scrollbar to browse back
+   through older ones. */
+.gb-gamelog-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 4px 14px 10px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+}
+
+.gb-gamelog-line {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  line-height: 1.3;
+  flex-shrink: 0;
+  text-align: left;
+}
+
+.gb-gamelog-empty {
+  color: var(--clr-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  margin: auto;
 }
 
 .gb-matchup-vs {
@@ -2701,15 +2763,49 @@ main {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: clamp(4px, 2vw, 16px);
+  margin-bottom: 12px;
 }
 
-.gb-inout-column {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* Live Stat toggle: full-width, sandwiched between the IN row and OUT row
+   below it (see gameboard.html) — only visible once both sides have
+   exactly 5 IN for the active quarter (see updateLiveStatToggle in
+   gameboard.js). When hidden, the OUT row's margin-top of 0 plus the IN
+   row's own margin-bottom above closes the gap naturally rather than
+   leaving a blank slot. */
+/* Same OFF/ON scheme as the J# toggle (.gb-jersey-toggle-btn): transparent/
+   outlined/muted at rest, solid accent fill once active — just stretched
+   full-width instead of a small circular button. */
+.gb-livestat-toggle {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  color: var(--clr-muted);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+  padding: 12px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.gb-livestat-toggle:hover {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+}
+.gb-livestat-toggle.gb-livestat-on {
+  background: var(--clr-accent);
+  border-color: var(--clr-accent);
+  color: #fff;
+}
+.gb-livestat-toggle #gb-livestat-state {
+  color: inherit;
 }
 
 .gb-inout-container {
+  position: relative;
   background: var(--clr-card);
   border: 1px solid var(--clr-border);
   border-radius: var(--radius);
@@ -2718,6 +2814,105 @@ main {
   flex-direction: column;
   gap: 6px;
   min-height: 60px;
+}
+
+/* Live Stat mode: OUT tiles are fully inert (no toggling/absence, since the
+   only interaction left in this mode is tapping an IN player to log a
+   stat) — dimmed to read as disabled, same visual language as absent
+   tiles minus the strikethrough (these players aren't absent, just not
+   currently actionable). */
+.gb-inout-tile-livestat-disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+/* The IN player currently highlighted (stat panel open for them) — a
+   filled ring in their own team color, set inline per-tile alongside the
+   Live Stat outline (see wireSideTileInteractions/playerTileHtml). */
+.gb-inout-tile-livestat-active {
+  background: var(--clr-surface);
+  border-radius: 6px;
+}
+
+/* Stat-entry panel (tap an IN player while Live Stat is on) — pops over
+   the OPPOSITE side's IN column, covering it entirely while open. Visual
+   + navigation only for now (phase 1) — button taps don't log anything
+   yet, just close the panel (see showLiveStatPanel in gameboard.js). */
+.gb-livestat-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gb-livestat-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.7rem;
+  color: var(--clr-muted);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.gb-livestat-panel-name {
+  font-size: 1rem;
+  color: var(--clr-text);
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.gb-livestat-panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  flex: 1;
+}
+
+.gb-livestat-stat-btn {
+  background: var(--clr-card);
+  border: 2px solid var(--clr-success);
+  border-radius: 8px;
+  color: var(--clr-text);
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.gb-livestat-stat-btn:hover {
+  background: var(--clr-success);
+  color: #0f1117;
+}
+.gb-livestat-stat-btn.gb-livestat-stat-unfavorable {
+  border-color: var(--clr-danger);
+}
+.gb-livestat-stat-btn.gb-livestat-stat-unfavorable:hover {
+  background: var(--clr-danger);
+  color: #fff;
+}
+
+.gb-livestat-undo-btn {
+  align-self: center;
+  background: transparent;
+  border: 1px solid var(--clr-border);
+  border-radius: 6px;
+  color: var(--clr-muted);
+  padding: 6px 16px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.gb-livestat-undo-btn:hover {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
 }
 
 /* Team color icon now lives just after the IN label (moved out of the
@@ -2739,6 +2934,27 @@ main {
    header sits nearest the center gap from the right side. */
 .gb-inout-in-header-left {
   justify-content: flex-start;
+}
+
+/* Live Stat mode: the score circle (see gameLogScoreCircleHtml in
+   gameboard.js) sits at the row's true outer edge, opposite the IN label +
+   team icon which stay nearest the center gap — space-between spreads the
+   two elements to opposite ends instead of the plain single-group
+   flex-end/flex-start used outside Live Stat mode. */
+.gb-inout-in-header-livestat {
+  justify-content: space-between;
+}
+
+.gb-gamelog-score-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.15rem;
+  flex-shrink: 0;
 }
 
 .gb-inout-team-icon {
@@ -2766,6 +2982,31 @@ main {
 
 .gb-jersey-roster-row {
   align-items: center;
+}
+
+/* Read-only per-player Points/Assists/Fouls summary (tap a team's score
+   circle in Live Stat mode — see showLiveStatSummary in gameboard.js).
+   4-column grid: name + 3 stat columns, no editable controls. */
+.gb-livestat-summary-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 6px;
+  padding: 3px 0;
+  text-align: center;
+}
+.gb-livestat-summary-row span:first-child {
+  text-align: left;
+  font-weight: 700;
+}
+.gb-livestat-summary-header {
+  color: var(--clr-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--clr-border);
+  padding-bottom: 5px;
+  margin-bottom: 3px;
 }
 
 .gb-jersey-roster-input {
