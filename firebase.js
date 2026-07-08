@@ -10,7 +10,10 @@ import {
 //   rankings:  { "CoachName": 4.8 },   // numeric value used for composite avg
 //   modifiers: { "CoachName": "Low" },  // label stored separately, no effect on avg
 //   notes:     { "CoachName": "..." },
-//   team:      "Team Blue"
+//   team:      "Team Blue",
+//   jerseyNumbers: { "CoachName": 4 }  // 1-8, per-coach (coaches don't share
+//     a canonical numbering scheme, and don't always know the other team's
+//     numbers) — same keyed-by-coach-name pattern as rankings/modifiers/notes
 // }
 
 function playerRef(playerId) {
@@ -36,7 +39,7 @@ export function subscribePlayer(playerId, callback) {
 }
 
 function emptyData() {
-  return { composite: null, count: 0, rankings: {}, modifiers: {}, notes: {}, team: '', noShow: false };
+  return { composite: null, count: 0, rankings: {}, modifiers: {}, notes: {}, team: '', noShow: false, jerseyNumbers: {} };
 }
 
 function buildComposite(data) {
@@ -53,6 +56,7 @@ function buildComposite(data) {
     notes:     data.notes     || {},
     team:      data.team      || '',
     noShow:    data.noShow    || false,
+    jerseyNumbers: data.jerseyNumbers || {},
   };
 }
 
@@ -106,6 +110,24 @@ export async function saveNote(playerId, coachName, text) {
 
 export async function deleteNote(playerId, coachName) {
   await updateDoc(playerRef(playerId), { [`notes.${coachName}`]: deleteField() });
+}
+
+// Jersey # is set once per player, per coach, and rarely changes mid-season
+// (players are required to have one to play; different coaches don't
+// necessarily know each other's numbering until they meet). 1-8 per the
+// user's spec.
+export async function saveJerseyNumber(playerId, coachName, number) {
+  const ref  = playerRef(playerId);
+  const snap = await getDoc(ref);
+  if (snap.exists()) {
+    await updateDoc(ref, { [`jerseyNumbers.${coachName}`]: number });
+  } else {
+    await setDoc(ref, { rankings: {}, modifiers: {}, notes: {}, team: '', jerseyNumbers: { [coachName]: number } });
+  }
+}
+
+export async function clearJerseyNumber(playerId, coachName) {
+  await updateDoc(playerRef(playerId), { [`jerseyNumbers.${coachName}`]: deleteField() });
 }
 
 // Coach favorites stored in coaches/{coachName}
@@ -169,6 +191,22 @@ export async function getScheduleGame(gameNum) {
   } catch (err) {
     console.error('getScheduleGame error:', err);
     return null;
+  }
+}
+
+// Bulk read of every scheduleGames doc in one round trip, keyed by game
+// number (string, matching the doc ID) — used by Gameboard's Board view to
+// compute season stats for all 12 teams without issuing 60 individual
+// getDoc calls.
+export async function getAllScheduleGames() {
+  try {
+    const snap = await getDocs(collection(db, 'scheduleGames'));
+    const games = {};
+    snap.forEach(doc => { games[doc.id] = doc.data(); });
+    return games;
+  } catch (err) {
+    console.error('getAllScheduleGames error:', err);
+    return {};
   }
 }
 

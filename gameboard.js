@@ -3,8 +3,8 @@
 import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_COLORS } from './coaches-config.js';
 import { buildIconIndex, iconUrl, fetchPlayers, buildDriveIndex, photoUrl, COL } from './players-data.js';
-import { fetchSchedule, COL as SCHED_COL } from './schedule-data.js';
-import { getCompositeRank, getGameConfig, saveGameConfig } from './firebase.js';
+import { fetchSchedule, parseGameDate, COL as SCHED_COL } from './schedule-data.js';
+import { getCompositeRank, getGameConfig, saveGameConfig, getAllScheduleGames, saveJerseyNumber, clearJerseyNumber } from './firebase.js';
 import {
   computePlayerStatus, computeQuarterStatus, computeGameStatus, countPresent,
 } from './rotations-engine.js';
@@ -25,10 +25,75 @@ function setView(view) {
 // 3-per-row grid, no bands.
 const USE_PODIUM_LAYOUT = false;
 
+// ── Season stats (Points Made/Allowed, Wins/Losses, Scoring Ratio, etc.) ────
+// Computed client-side from the schedule sheet's V/H columns (which team
+// color played in each game #) cross-referenced with scheduleGames/{gameNum}
+// Firestore docs (the actual scores). Recomputed fresh every time Board view
+// loads — no caching across page loads, since a score can be saved from a
+// different tab/page (Schedules) that this page has no way to be notified
+// of live (this app has no cross-tab messaging anywhere).
+let teamStats = {}; // team (TEAMS entry, e.g. "Team Blue") -> stats object
+
+function emptyTeamStats() {
+  return { pointsMade: 0, pointsAllowed: 0, wins: 0, losses: 0, gamesPlayed: 0 };
+}
+
+// Ties are not expected to occur in this league (every game gets a winner
+// eventually) — a scheduleGames doc with a null winner is treated as
+// not-yet-played (skipped) rather than specially counted, matching how the
+// rest of the app already treats missing scores.
+async function loadTeamStats() {
+  const [games, scheduleGames] = await Promise.all([fetchSchedule(), getAllScheduleGames()]);
+  const stats = {};
+  TEAMS.filter(t => t !== 'Undrafted').forEach(t => { stats[t] = emptyTeamStats(); });
+
+  games.forEach(game => {
+    const result = scheduleGames[game[SCHED_COL.GAME]];
+    if (!result || result.vScore == null || result.hScore == null) return;
+
+    const vTeam = teamNameForColor(game[SCHED_COL.V]);
+    const hTeam = teamNameForColor(game[SCHED_COL.H]);
+    if (vTeam && stats[vTeam]) {
+      stats[vTeam].pointsMade += result.vScore;
+      stats[vTeam].pointsAllowed += result.hScore;
+      stats[vTeam].gamesPlayed += 1;
+      if (result.winner === 'V') stats[vTeam].wins += 1;
+      else if (result.winner === 'H') stats[vTeam].losses += 1;
+    }
+    if (hTeam && stats[hTeam]) {
+      stats[hTeam].pointsMade += result.hScore;
+      stats[hTeam].pointsAllowed += result.vScore;
+      stats[hTeam].gamesPlayed += 1;
+      if (result.winner === 'H') stats[hTeam].wins += 1;
+      else if (result.winner === 'V') stats[hTeam].losses += 1;
+    }
+  });
+
+  teamStats = stats;
+}
+
+function statsFor(team) {
+  return teamStats[team] || emptyTeamStats();
+}
+
+function scoringRatioFor(team) {
+  const s = statsFor(team);
+  if (s.pointsAllowed === 0) return s.pointsMade === 0 ? 0 : Infinity;
+  return s.pointsMade / s.pointsAllowed;
+}
+
+function winLossPctFor(team) {
+  const s = statsFor(team);
+  return s.gamesPlayed === 0 ? 0 : (s.wins / s.gamesPlayed) * 100;
+}
+
 function tileHtml(team, i) {
   const info = TEAM_COLORS[team];
   const colorName = info?.name || '';
   const icon = iconUrl(colorName);
+  const s = statsFor(team);
+  const ratio = scoringRatioFor(team);
+  const ratioStr = ratio === Infinity ? '—' : ratio.toFixed(2);
   return `
     <div class="gb-team-tile" data-team="${team}" role="button" tabindex="0">
       <span class="gb-team-tile-color">${colorName.toUpperCase()}</span>
@@ -39,7 +104,7 @@ function tileHtml(team, i) {
       </div>
       <div class="gb-team-tile-label">
         <span class="gb-team-tile-coach">${team}</span>
-        <span class="gb-team-tile-stats">W: 0 - L:0 - R:0</span>
+        <span class="gb-team-tile-stats">W: ${s.wins} - L:${s.losses} - R:${ratioStr}</span>
       </div>
     </div>`;
 }
@@ -69,8 +134,9 @@ function renderBoardGrid() {
 }
 
 // ── Team stats popover (click/tap a Board tile) ─────────────────────────────
-// All stats are placeholders until score tracking (Schedules' scheduleGames
-// Firestore data) is wired in to compute them for real.
+// Stats are computed for real from Schedules' scheduleGames Firestore data
+// (see loadTeamStats above) — only True Rank remains a placeholder, pending
+// a formula decision (see LIVE_STATS_SPEC.md).
 
 function positionPopover(popoverEl, anchorEl) {
   const rect = anchorEl.getBoundingClientRect();
@@ -87,25 +153,32 @@ function positionPopover(popoverEl, anchorEl) {
 }
 
 // Each stat row is tappable — tapping it shows a short blurb explaining
-// what the stat means and how it's calculated. Wording below is placeholder
-// text until real copy is written for the rest; the interaction/wiring is final.
-const STAT_DEFS = [
-  { key: 'pointsMade',     label: 'Points Made',      value: '0', blurb: 'Total # of points scored against opponents this entire season; a measure of offensive strength.' },
-  { key: 'pointsAllowed',  label: 'Points Allowed',   value: '0', blurb: 'Total # of points scored on this team by opponents this season; a measure of defensive strength.' },
-  { key: 'scoringRatio',   label: 'Scoring Ratio',    value: '0.00', blurb: 'Points Made divided by Points Allowed; the higher the ratio the stronger the performance.' },
-  { key: 'wins',           label: 'Wins',             value: '0' }, // self-explanatory, no tap blurb
-  { key: 'losses',         label: 'Losses',           value: '0' }, // self-explanatory, no tap blurb
-  { key: 'gamesPlayed',    label: 'Games Played',     value: '0' }, // self-explanatory, no tap blurb
-  { key: 'winLossRatio',   label: 'Win/Loss %',       value: '0.0%', blurb: 'Wins divided by # of games played so far; the higher percentage of wins, the better.' },
-  { key: 'trueRank',       label: 'True Rank',        value: '—', blurb: "Team's score ratio adjusted for actual number of games played so far; ranked highest adjusted score to lowest across all 12 teams; more nuanced than Score Ratio or Win/Loss % ranking alone." },
-];
+// what the stat means and how it's calculated. True Rank's formula is not
+// yet decided (see LIVE_STATS_SPEC.md) so it stays a placeholder '—'.
+function statDefsFor(team) {
+  const s = statsFor(team);
+  const ratio = scoringRatioFor(team);
+  const ratioStr = ratio === Infinity ? '—' : ratio.toFixed(2);
+  const pct = winLossPctFor(team);
+  return [
+    { key: 'pointsMade',     label: 'Points Made',      value: String(s.pointsMade), blurb: 'Total # of points scored against opponents this entire season; a measure of offensive strength.' },
+    { key: 'pointsAllowed',  label: 'Points Allowed',   value: String(s.pointsAllowed), blurb: 'Total # of points scored on this team by opponents this season; a measure of defensive strength.' },
+    { key: 'scoringRatio',   label: 'Scoring Ratio',    value: ratioStr, blurb: 'Points Made divided by Points Allowed; the higher the ratio the stronger the performance.' },
+    { key: 'wins',           label: 'Wins',             value: String(s.wins) }, // self-explanatory, no tap blurb
+    { key: 'losses',         label: 'Losses',           value: String(s.losses) }, // self-explanatory, no tap blurb
+    { key: 'gamesPlayed',    label: 'Games Played',     value: String(s.gamesPlayed) }, // self-explanatory, no tap blurb
+    { key: 'winLossRatio',   label: 'Win/Loss %',       value: `${pct.toFixed(1)}%`, blurb: 'Wins divided by # of games played so far; the higher percentage of wins, the better.' },
+    { key: 'trueRank',       label: 'True Rank',        value: '—', blurb: "Team's score ratio adjusted for actual number of games played so far; ranked highest adjusted score to lowest across all 12 teams; more nuanced than Score Ratio or Win/Loss % ranking alone." },
+  ];
+}
 
 function showTeamPopover(anchorEl, team) {
   const popover = document.getElementById('gb-team-popover');
   const info = TEAM_COLORS[team];
   const displayName = info?.shortName || info?.name || '';
+  const statDefs = statDefsFor(team);
 
-  const rows = STAT_DEFS.map(stat => stat.blurb
+  const rows = statDefs.map(stat => stat.blurb
     ? `<div class="sched-popover-row gb-stat-row" data-stat="${stat.key}" role="button" tabindex="0">
         <span>${escHtml(stat.label)}</span><span>${escHtml(stat.value)}</span>
       </div>`
@@ -123,7 +196,7 @@ function showTeamPopover(anchorEl, team) {
   popover.querySelectorAll('.gb-stat-row').forEach(row => {
     row.addEventListener('click', e => {
       e.stopPropagation();
-      const stat = STAT_DEFS.find(s => s.key === row.dataset.stat);
+      const stat = statDefs.find(s => s.key === row.dataset.stat);
       const blurbEl = popover.querySelector('#gb-stat-blurb');
       const alreadyShowingThis = !blurbEl.classList.contains('hidden') && blurbEl.dataset.stat === stat.key;
       popover.querySelectorAll('.gb-stat-row').forEach(r => r.classList.remove('gb-stat-row-active'));
@@ -161,8 +234,13 @@ function wireBoardTileClicks() {
 function wirePopoverDismiss() {
   document.addEventListener('click', e => {
     const popover = document.getElementById('gb-team-popover');
-    if (popover.contains(e.target) || e.target.closest('.gb-team-tile')) return;
-    popover.classList.add('hidden');
+    if (!(popover.contains(e.target) || e.target.closest('.gb-team-tile'))) {
+      popover.classList.add('hidden');
+    }
+    const jerseyPopover = document.getElementById('gb-jersey-popover');
+    if (!(jerseyPopover.contains(e.target) || e.target.closest('.gb-inout-tile'))) {
+      jerseyPopover.classList.add('hidden');
+    }
   });
 }
 
@@ -187,6 +265,7 @@ let activeGameIdx = -1;        // index into teamGames
 let activeSheetGameNum = null; // the currently-loaded game's absolute sheet Game # (see loadActiveGame)
 let ownSide = null;            // { team, players, order, pattern, absent }
 let oppSide = null;            // same shape, opponent
+let jerseyMode = false;        // Jersey # view toggle — see wireJerseyToggle
 
 function teamColorNameFor(team) {
   return TEAM_COLORS[team]?.name || null;
@@ -235,13 +314,31 @@ function teamNameForColor(colorName) {
   return entry ? entry[0] : null;
 }
 
+// Picks the first game whose date is today or later (day-level compare —
+// a game earlier today still counts as "next" even if its start time has
+// already passed, per the user's spec). Falls back to the team's LAST game
+// if every game is already in the past, so the view still lands somewhere
+// meaningful post-season rather than snapping back to game 1.
+function defaultGameIdxFor(games) {
+  if (games.length === 0) return -1;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const idx = games.findIndex(g => {
+    const d = parseGameDate(g[SCHED_COL.DATE], g[SCHED_COL.TIME]);
+    if (!d) return false;
+    d.setHours(0, 0, 0, 0);
+    return d >= today;
+  });
+  return idx !== -1 ? idx : games.length - 1;
+}
+
 async function loadGameTeam(team) {
   gameTeam = team;
   activeQuarter = 0;
   await ensureGameDataLoaded();
 
   teamGames = gamesForTeam(team);
-  activeGameIdx = teamGames.length ? 0 : -1;
+  activeGameIdx = defaultGameIdxFor(teamGames);
 
   document.getElementById('gb-game-empty-state').classList.toggle('hidden', !!team);
   document.getElementById('gb-game-content').classList.toggle('hidden', !team);
@@ -275,6 +372,7 @@ async function buildRosterSide(team) {
       const data = await getCompositeRank(p[COL.ID]);
       p._composite = data.composite;
       p._teamFB = data.team || '';
+      p._jerseyByCoach = data.jerseyNumbers || {};
     }
   }));
 
@@ -293,6 +391,65 @@ async function buildRosterSide(team) {
     pattern: new Map(order.map(id => [id, [false, false, false, false]])),
     absent: new Set(),
   };
+}
+
+// ── Jersey # (per-coach, per-player, not tied to any one game) ──────────────
+// Required for every player to play at all, but coaches don't share a
+// canonical numbering scheme with each other and don't always know the
+// opposing team's numbers — so each coach records their own view of it,
+// mirroring rankings/modifiers/notes' existing per-coach Firestore pattern.
+// Logged-out: kept in sessionStorage only, same "draft until you log in"
+// convention used elsewhere on this page (see saveLocalGameState above).
+function sessionJerseyKey(playerId) {
+  return `gameboard_jersey_${playerId}`;
+}
+
+function jerseyNumberFor(player) {
+  const coach = getCurrentCoach();
+  if (coach) {
+    const n = player._jerseyByCoach?.[coach.name];
+    return n == null ? null : n;
+  }
+  try {
+    const raw = sessionStorage.getItem(sessionJerseyKey(player[COL.ID]));
+    return raw == null ? null : parseInt(raw, 10);
+  } catch { return null; }
+}
+
+async function setJerseyNumberFor(player, number) {
+  const coach = getCurrentCoach();
+  if (coach) {
+    player._jerseyByCoach = { ...(player._jerseyByCoach || {}), [coach.name]: number };
+    await saveJerseyNumber(player[COL.ID], coach.name, number);
+  } else {
+    try { sessionStorage.setItem(sessionJerseyKey(player[COL.ID]), String(number)); }
+    catch { /* sessionStorage unavailable/full — silently skip, not critical */ }
+  }
+}
+
+async function clearJerseyNumberFor(player) {
+  const coach = getCurrentCoach();
+  if (coach) {
+    if (player._jerseyByCoach) delete player._jerseyByCoach[coach.name];
+    await clearJerseyNumber(player[COL.ID], coach.name);
+  } else {
+    try { sessionStorage.removeItem(sessionJerseyKey(player[COL.ID])); }
+    catch { /* sessionStorage unavailable/full — silently skip, not critical */ }
+  }
+}
+
+// Numbers already taken on a team (each coach's own numbering — two coaches
+// can't collide with each other since jerseyNumbers is per-coach, but two
+// players on the SAME roster, viewed by the SAME coach, must not share a
+// number). Returns { [number]: player }.
+function takenJerseyNumbers(side) {
+  const taken = {};
+  side.order.forEach(id => {
+    const p = side.players[id];
+    const num = jerseyNumberFor(p);
+    if (num != null) taken[num] = p;
+  });
+  return taken;
 }
 
 async function loadActiveGame() {
@@ -489,6 +646,26 @@ function renderMatchupRow() {
       </div>
     </div>
   `;
+
+  wireMiniGridDeepLinks(row);
+}
+
+// Double-clicking either mini-grid jumps to Rotations for that same team,
+// pre-selected — Rotations' own team-select already restores that team's
+// last-saved rotation config from localStorage (see rotations.js loadState),
+// so no config payload needs to be passed through the URL.
+function wireMiniGridDeepLinks(row) {
+  const wraps = row.querySelectorAll('.gb-matchup-grid-wrap');
+  if (wraps[0] && ownSide) {
+    wraps[0].addEventListener('dblclick', () => {
+      window.location.href = `rotations.html?team=${encodeURIComponent(ownSide.team)}`;
+    });
+  }
+  if (wraps[1] && oppSide) {
+    wraps[1].addEventListener('dblclick', () => {
+      window.location.href = `rotations.html?team=${encodeURIComponent(oppSide.team)}`;
+    });
+  }
 }
 
 function renderQuarterTabs() {
@@ -511,6 +688,16 @@ function renderInOutColumns() {
   renderSideContainers(oppSide, 'gb-opp-in', 'gb-opp-out', true);
 }
 
+// Standard relative-luminance check (WCAG-style) to auto-pick readable
+// black/white text over any team's hex — avoids hand-maintaining a
+// light/dark lookup per team as colors get added/changed.
+function readableTextColor(hex) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? '#000000' : '#ffffff';
+}
+
 // Tiles mirror across the two columns so thumbnails always sit nearest the
 // center gap, facing the opposing side's thumbnails: own team (left column)
 // = name, then thumbnail on the right; opponent (right column) = thumbnail
@@ -520,10 +707,22 @@ function playerTileHtml(side, id, mirrored) {
   const fullName = p?.[COL.NAME] || 'Unknown';
   const firstName = fullName.split(/\s+/)[0] || fullName;
   const isAbsent = side.absent.has(id);
-  const photo = photoUrl(p);
-  const avatarHtml = photo
-    ? `<img src="${photo}" alt="${escHtml(fullName)}" class="gb-inout-avatar-img" />`
-    : `<div class="gb-inout-avatar-img gb-inout-avatar-placeholder">🏀</div>`;
+  let avatarHtml;
+  if (jerseyMode) {
+    const num = jerseyNumberFor(p);
+    if (num == null) {
+      avatarHtml = `<div class="gb-jersey-avatar gb-jersey-unset">#</div>`;
+    } else {
+      const hex = TEAM_COLORS[side.team]?.hex || '#000000';
+      const style = `background:${hex};color:${readableTextColor(hex)};border-color:${hex}`;
+      avatarHtml = `<div class="gb-jersey-avatar" style="${style}">${num}</div>`;
+    }
+  } else {
+    const photo = photoUrl(p);
+    avatarHtml = photo
+      ? `<img src="${photo}" alt="${escHtml(fullName)}" class="gb-inout-avatar-img" />`
+      : `<div class="gb-inout-avatar-img gb-inout-avatar-placeholder">🏀</div>`;
+  }
   const nameHtml = `<span class="gb-inout-name">${escHtml(firstName)}</span>`;
   const avatarWrapHtml = `<div class="gb-inout-avatar">${avatarHtml}</div>`;
   return `
@@ -536,7 +735,11 @@ function teamIconInlineHtml(team) {
   const colorName = teamColorNameFor(team) || '';
   const icon = iconUrl(colorName);
   if (!icon) return '';
-  return `<div class="gb-inout-team-icon"><img src="${icon}" alt="${escHtml(colorName)}" loading="lazy" /></div>`;
+  // This icon is always a button opening the Lineup Manager (see
+  // showLineupManager) — jersey assignment, quick 5-digit lineup entry for
+  // the active quarter, all in one place, regardless of whether Jersey #
+  // tile-view mode happens to be on or off.
+  return `<div class="gb-inout-team-icon gb-inout-team-icon-clickable" data-jersey-roster-team="${escHtml(team)}"><img src="${icon}" alt="${escHtml(colorName)}" loading="lazy" /></div>`;
 }
 
 // mirrored=false for the own-team column (name left, thumbnail right —
@@ -580,12 +783,225 @@ function renderSideContainers(side, inId, outId, mirrored) {
 
   wireSideTileInteractions(inEl, side);
   wireSideTileInteractions(outEl, side);
+
+  const teamIcon = inEl.querySelector('.gb-inout-team-icon-clickable');
+  if (teamIcon) {
+    teamIcon.addEventListener('click', e => {
+      e.stopPropagation();
+      showLineupManager(teamIcon, side);
+    });
+  }
+}
+
+// Simple jersey silhouette (collar notch + short sleeves), fill color set
+// per-call so it can match the tapped player's own team color rather than
+// a fixed emoji glyph (emoji can't be recolored via CSS).
+function jerseyIconSvg(hex) {
+  return `<svg class="gb-jersey-icon" viewBox="0 0 24 24" fill="${hex}" aria-hidden="true">
+    <path d="M8 2 L2 6 L4.5 9.5 L7 8 L7 21 L17 21 L17 8 L19.5 9.5 L22 6 L16 2 L14 4 Q12 5.5 10 4 Z" />
+  </svg>`;
+}
+
+// One-tap 1-8 picker popover (tapping a bare "#" tile in Jersey # mode) —
+// a text prompt + Enter was too many steps for something used constantly
+// during a live game. Reuses the same positionPopover helper as the Board
+// view team-stats popover. Numbers already assigned to someone else on this
+// same roster render dimmed — tapping one unassigns it from its current
+// owner (freeing it up) rather than reassigning it to this player, so a
+// duplicate is never created even for a moment.
+function showJerseyPicker(anchorEl, player, side) {
+  const popover = document.getElementById('gb-jersey-popover');
+  const name = player[COL.NAME] || 'Player';
+  const hex = TEAM_COLORS[side.team]?.hex || '#8890a8';
+  const icon = jerseyIconSvg(hex);
+
+  // Renders the button grid in place without touching the rest of the page
+  // (renderGameView() would tear down and rebuild every tile, including the
+  // one this popover is anchored to). Unassigning a taken number just frees
+  // it up and re-renders this same grid — so a coach can immediately tap it
+  // again to actually assign it, instead of the popover closing and forcing
+  // them to reopen it on the same tile. Only a real assignment (tapping a
+  // free number) is the terminal action that closes the popover.
+  function renderButtons() {
+    const taken = takenJerseyNumbers(side);
+    const buttons = Array.from({ length: 8 }, (_, i) => i + 1)
+      .map(n => {
+        const owner = taken[n];
+        const cls = owner ? ' gb-jersey-pick-taken' : '';
+        const title = owner ? ` title="Assigned to ${escHtml(owner[COL.NAME] || 'another player')} — tap to unassign"` : '';
+        return `<button class="gb-jersey-pick-btn${cls}" data-num="${n}"${title} type="button">${icon}<span>${n}</span></button>`;
+      })
+      .join('');
+
+    popover.innerHTML = `
+      <div class="sched-popover-title">${escHtml(name)} — Jersey #</div>
+      <div class="gb-jersey-pick-grid">${buttons}</div>
+    `;
+
+    popover.querySelectorAll('.gb-jersey-pick-btn').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        const num = parseInt(btn.dataset.num, 10);
+        const owner = taken[num];
+        if (owner) {
+          await clearJerseyNumberFor(owner);
+          renderButtons();
+        } else {
+          await setJerseyNumberFor(player, num);
+          popover.classList.add('hidden');
+          renderGameView();
+        }
+      });
+    });
+  }
+
+  renderButtons();
+  positionPopover(popover, anchorEl);
+}
+
+// Roster-wide jersey list (tapping a team's icon in Jersey # mode) — lets a
+// coach see every player's number at once and unassign any one of them,
+// rather than hunting for the specific tile that has a wrong number.
+// "Lineup Manager" — the team roster/lineup settings popover (tap either
+// side's team icon, any time — not gated on Jersey # tile-view mode). Two
+// jobs in one place:
+// 1. View/edit every player's jersey # (inline input, auto-advances to the
+//    next row on entry; entering a number already taken by a teammate
+//    silently clears it from that teammate first — same "last write wins,
+//    no duplicates" rule the tap-picker already enforces, just triggered by
+//    typing here instead of tapping).
+// 2. A 5-digit quick-lineup field: enter the jersey #s of the 5 players who
+//    should be IN for the CURRENTLY ACTIVE quarter only, tap Go. Digit
+//    order never matters — IN/OUT box order is always governed by the
+//    existing composite-rank order, never by typing order. Any digit with
+//    no matching jersey #, or matching an absent player, is silently
+//    skipped rather than erroring — the rest of the string still applies.
+function showLineupManager(anchorEl, side) {
+  const popover = document.getElementById('gb-jersey-popover');
+
+  // Pre-fill from whichever players are currently IN for the active
+  // quarter, sorted ascending by jersey # (not roster order) per the user's
+  // spec — a stable, predictable read-out rather than mirroring whatever
+  // order the mini-grid happens to list them in.
+  const currentInDigits = side.order
+    .filter(id => !side.absent.has(id) && (side.pattern.get(id) || [])[activeQuarter])
+    .map(id => jerseyNumberFor(side.players[id]))
+    .filter(n => n != null)
+    .sort((a, b) => a - b)
+    .join('');
+
+  function renderRows() {
+    const rows = side.order.map(id => {
+      const p = side.players[id];
+      const num = jerseyNumberFor(p);
+      const name = p?.[COL.NAME] || 'Unknown';
+      return `
+        <div class="sched-popover-row gb-jersey-roster-row">
+          <span>${escHtml(name)}</span>
+          <input class="gb-jersey-roster-input" type="text" inputmode="numeric" maxlength="1" data-id="${escHtml(id)}" value="${num == null ? '' : num}" placeholder="—" />
+        </div>`;
+    }).join('');
+
+    // Header reads by team COLOR (what's actually printed on a jersey),
+    // not the coach-name-based TEAMS key ("Team Alfred-Levar") — plus the
+    // quarter this Lineup Manager instance is currently editing, since the
+    // 5-digit Go button below only ever acts on the active quarter.
+    const colorName = TEAM_COLORS[side.team]?.name || side.team;
+    const headerLabel = `Team ${colorName} (Q${activeQuarter + 1})`;
+
+    popover.innerHTML = `
+      <div class="sched-popover-title">${escHtml(headerLabel)}</div>
+      <div class="gb-jersey-quickset-row">
+        <input id="gb-jersey-quickset-input" type="text" inputmode="numeric" maxlength="5" placeholder="12345" value="${escHtml(currentInDigits)}" />
+        <button id="gb-jersey-quickset-go" type="button">Go</button>
+      </div>
+      ${rows}
+    `;
+
+    const rosterInputs = popover.querySelectorAll('.gb-jersey-roster-input');
+    rosterInputs.forEach((input, i) => {
+      // Restrict keystrokes to 1-8 only (plus editing/navigation keys) —
+      // rejected at keydown so an invalid character never even appears,
+      // rather than typed-then-stripped.
+      input.addEventListener('keydown', e => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        if (['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) return;
+        if (!/^[1-8]$/.test(e.key)) e.preventDefault();
+      });
+
+      // 'input' (not 'change'/blur) so a single valid digit acts immediately
+      // — that's what makes the auto-advance-on-entry behavior possible.
+      // Paste can still slip non-digits past the keydown guard, so this
+      // still re-validates rather than trusting the field blindly.
+      input.addEventListener('input', async () => {
+        const raw = input.value.replace(/[^1-8]/g, '').slice(0, 1);
+        input.value = raw;
+        const player = side.players[input.dataset.id];
+
+        if (raw === '') {
+          await clearJerseyNumberFor(player);
+          renderRows();
+          return;
+        }
+
+        const num = parseInt(raw, 10);
+        const taken = takenJerseyNumbers(side);
+        const owner = taken[num];
+        if (owner && owner[COL.ID] !== player[COL.ID]) {
+          await clearJerseyNumberFor(owner);
+        }
+        await setJerseyNumberFor(player, num);
+        renderRows();
+        // Auto-advance to the next player's field (wrapping to the first
+        // after the last) once a valid single digit is entered — lets a
+        // coach move through the whole roster without touching the mouse.
+        const nextInputs = popover.querySelectorAll('.gb-jersey-roster-input');
+        const next = nextInputs[(i + 1) % nextInputs.length];
+        next?.focus();
+        next?.select();
+      });
+    });
+
+    document.getElementById('gb-jersey-quickset-go').addEventListener('click', async () => {
+      const digits = document.getElementById('gb-jersey-quickset-input').value.replace(/\D/g, '').split('');
+      const matchedIds = new Set();
+      digits.forEach(d => {
+        const num = parseInt(d, 10);
+        const id = side.order.find(oid => !side.absent.has(oid) && jerseyNumberFor(side.players[oid]) === num);
+        if (id) matchedIds.add(id);
+      });
+      side.order.forEach(id => {
+        if (side.absent.has(id)) return;
+        const pat = side.pattern.get(id) || [false, false, false, false];
+        pat[activeQuarter] = matchedIds.has(id);
+        side.pattern.set(id, pat);
+      });
+      autoSaveIfLoggedOut(side);
+      popover.classList.add('hidden');
+      renderGameView();
+    });
+  }
+
+  renderRows();
+  positionPopover(popover, anchorEl);
 }
 
 function wireSideTileInteractions(container, side) {
   container.querySelectorAll('.gb-inout-tile').forEach(tile => {
     const id = tile.dataset.id;
     let lastTap = 0;
+
+    // Jersey-# mode overrides all normal tap behavior for a player with no
+    // saved number yet — tapping prompts for entry instead of moving them
+    // between IN/OUT or toggling a quarter cell. Once a number exists, the
+    // tile goes back to behaving normally (per the user's spec).
+    if (jerseyMode && jerseyNumberFor(side.players[id]) == null) {
+      tile.addEventListener('click', e => {
+        e.stopPropagation();
+        showJerseyPicker(tile, side.players[id], side);
+      });
+      return;
+    }
     // A native double-click fires click, click, dblclick on the SAME
     // element (unlike Rotations' grid, where toggle-absent and
     // show-status live on two different sub-elements so click/dblclick
@@ -704,6 +1120,15 @@ function wireGameTeamSelect() {
   });
 }
 
+function wireJerseyToggle() {
+  document.getElementById('gb-jersey-toggle').addEventListener('click', e => {
+    jerseyMode = !jerseyMode;
+    e.currentTarget.classList.toggle('active', jerseyMode);
+    e.currentTarget.setAttribute('aria-pressed', String(jerseyMode));
+    renderGameView();
+  });
+}
+
 function wireSaveGameConfigButton() {
   document.getElementById('btn-save-game-config').addEventListener('click', saveActiveGameConfig);
 }
@@ -739,6 +1164,7 @@ async function initGameView() {
   populateGameTeamSelect();
   wireGameTeamSelect();
   wireSaveGameConfigButton();
+  wireJerseyToggle();
 
   const { team: linkedTeam, sheetGameNum: linkedSheetGameNum } = deepLinkParams();
   if (linkedTeam) {
@@ -789,6 +1215,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setView(getCurrentCoach() ? 'game' : 'board');
   renderBoardGrid();
   buildIconIndex().then(renderBoardGrid);
+  loadTeamStats().then(renderBoardGrid);
   wireBoardTileClicks();
   wirePopoverDismiss();
   initGameView();

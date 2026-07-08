@@ -84,8 +84,13 @@
           <!-- Matchup row: own team icon + mini-grid, VS., opponent mini-grid + icon -->
           <div id="gb-matchup-row" class="gb-matchup-row"></div>
 
-          <!-- Quarter tabs: single-select, filters both IN/OUT container sets -->
-          <div id="gb-quarter-tabs" class="gb-quarter-tabs"></div>
+          <!-- Quarter tabs, left-aligned above the own-team IN column below
+               (same 2-col grid as .gb-inout-columns) + jersey # toggle,
+               right-aligned above the opponent column's player names -->
+          <div class="gb-quarter-row">
+            <div id="gb-quarter-tabs" class="gb-quarter-tabs"></div>
+            <button id="gb-jersey-toggle" class="gb-jersey-toggle-btn" type="button" title="Jersey # view" aria-pressed="false">J#</button>
+          </div>
 
           <!-- IN/OUT containers, own team (left) + opponent (right) -->
           <div class="gb-inout-columns">
@@ -118,6 +123,9 @@
 
   <!-- Team stats popover (click/tap a Board tile) -->
   <div id="gb-team-popover" class="sched-popover hidden"></div>
+
+  <!-- Jersey # picker popover (tap an unset player tile in Jersey # mode) -->
+  <div id="gb-jersey-popover" class="sched-popover gb-jersey-popover hidden"></div>
 
   <!-- Coach Login Modal -->
   <div id="modal-login" class="modal-overlay hidden">

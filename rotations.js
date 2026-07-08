@@ -56,11 +56,21 @@ async function init() {
   wireApplyGameboardModal();
   wirePopoverDismiss();
 
-  // Restore last-viewed team, if any, from a small "last team" pointer key
-  const lastTeam = localStorage.getItem('rotations_lastTeam');
-  if (lastTeam && TEAMS.includes(lastTeam)) {
-    document.getElementById('rot-team-select').value = lastTeam;
-    await loadTeam(lastTeam);
+  // Deep link support: rotations.html?team=Team+Name (used by Gameboard's
+  // mini-grid double-click, see gameboard.js's wireMiniGridDeepLinks) takes
+  // precedence over the last-viewed-team pointer below on initial load only.
+  const linkedTeam = new URLSearchParams(window.location.search).get('team');
+  if (linkedTeam && TEAMS.includes(linkedTeam)) {
+    localStorage.setItem('rotations_lastTeam', linkedTeam);
+    document.getElementById('rot-team-select').value = linkedTeam;
+    await loadTeam(linkedTeam);
+  } else {
+    // Restore last-viewed team, if any, from a small "last team" pointer key
+    const lastTeam = localStorage.getItem('rotations_lastTeam');
+    if (lastTeam && TEAMS.includes(lastTeam)) {
+      document.getElementById('rot-team-select').value = lastTeam;
+      await loadTeam(lastTeam);
+    }
   }
 
   // Logging in/out changes whose saved configs (if any) should be visible.
@@ -848,6 +858,15 @@ async function applyToGames(games) {
   }));
 
   await refreshSavedConfigsGallery();
+
+  // "First game" = earliest by this team's own display sequence, not
+  // checkbox/DOM order (defensive — the modal happens to list them
+  // chronologically already, but sorting here doesn't rely on that holding).
+  const firstGame = [...games].sort((a, b) => a.displayNum - b.displayNum)[0];
+  if (firstGame && confirm('Go to Gameboard now?')) {
+    const params = new URLSearchParams({ team: currentTeam, game: String(firstGame.sheetGameNum) });
+    window.location.href = `gameboard.html?${params.toString()}`;
+  }
 }
 
 function applySavedConfigToGrid(configId) {
