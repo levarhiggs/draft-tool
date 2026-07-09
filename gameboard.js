@@ -4,7 +4,7 @@ import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_COLORS } from './coaches-config.js';
 import { buildIconIndex, iconUrl, fetchPlayers, buildDriveIndex, photoUrl, COL } from './players-data.js';
 import { fetchSchedule, parseGameDate, COL as SCHED_COL } from './schedule-data.js';
-import { getCompositeRank, getGameConfig, saveGameConfig, getAllScheduleGames, saveJerseyNumber, clearJerseyNumber, saveLiveStatLog } from './firebase.js';
+import { getCompositeRank, getGameConfig, saveGameConfig, getAllScheduleGames, saveJerseyNumber, clearJerseyNumber, saveLiveStatLog, getLiveStatLog } from './firebase.js';
 import {
   computePlayerStatus, computeQuarterStatus, computeGameStatus, countPresent,
 } from './rotations-engine.js';
@@ -476,8 +476,9 @@ function takenJerseyNumbers(side) {
 async function loadActiveGame() {
   // A new game rebuilds ownSide/oppSide from scratch below — any panel
   // referencing the OLD side objects would be stale even if the player id
-  // happened to coincidentally match. The log itself is also game-specific
-  // (no cross-game persistence yet), so it resets here too.
+  // happened to coincidentally match. Clear the log as a safe default here;
+  // if a coach is logged in and has a saved log for the new team+game, it
+  // gets restored below (see restoreLiveStatLog) instead of staying empty.
   liveStatActivePlayer = null;
   liveStatMode = false;
   resetLiveStatLog();
@@ -521,10 +522,12 @@ async function loadActiveGame() {
     await Promise.all([
       applySavedGameConfig(ownSide, coach.name, gameTeam, sheetGameNum),
       oppSide ? applySavedGameConfig(oppSide, coach.name, oppTeam, sheetGameNum) : Promise.resolve(),
+      restoreLiveStatLog(coach.name, gameTeam, sheetGameNum),
     ]);
   } else {
     applyLocalGameState(ownSide, gameTeam, sheetGameNum);
     if (oppSide) applyLocalGameState(oppSide, oppTeam, sheetGameNum);
+    resetLiveStatLog(); // no coach logged in -> no saved log to restore
   }
 
   renderGameView();
@@ -615,13 +618,11 @@ function countInForActiveQuarter(side) {
 
 // LIVE STAT toggle bar (see gameboard.html, between the IN and OUT rows) —
 // only appears once both sides have EXACTLY 5 IN for the active quarter.
-// Phase 1 is OFF/ON display only; phase 2 will wire real scoring behavior
-// to the ON state.
 function updateLiveStatToggle() {
   const btn = document.getElementById('gb-livestat-toggle');
   const ready = countInForActiveQuarter(ownSide) === 5 && countInForActiveQuarter(oppSide) === 5;
   btn.classList.toggle('hidden', !ready);
-  if (!ready && liveStatMode) { liveStatMode = false; resetLiveStatLog(); }
+  if (!ready && liveStatMode) liveStatMode = false; // auto-off only — log is NOT cleared, see wireLiveStatToggle
   if (!liveStatMode) liveStatActivePlayer = null; // stale reference guard — mode off means no panel can be open
   btn.classList.toggle('gb-livestat-on', liveStatMode);
   document.getElementById('gb-livestat-state').textContent = liveStatMode ? 'ON' : 'OFF';
@@ -796,6 +797,45 @@ function resetLiveStatLog() {
   liveStatLog = [];
   liveStatShotCounts = {};
   liveStatSimpleCounts = {};
+}
+
+// Rebuilds liveStatShotCounts/liveStatSimpleCounts from a full entry list
+// (used after restoring a saved log — see restoreLiveStatLog) so undo and
+// future log-line "N of M attempts" math keep working correctly on
+// restored data, not just entries logged fresh this session.
+function rebuildLiveStatCounts() {
+  liveStatShotCounts = {};
+  liveStatSimpleCounts = {};
+  liveStatLog.forEach(entry => {
+    if (entry.shotValue != null) {
+      const key = shotCountKey(entry.playerId, entry.shotValue);
+      const counts = liveStatShotCounts[key] || { made: 0, attempts: 0 };
+      counts.attempts += 1;
+      if (entry.made) counts.made += 1;
+      liveStatShotCounts[key] = counts;
+    } else {
+      const key = simpleCountKey(entry.playerId, entry.statKey);
+      liveStatSimpleCounts[key] = (liveStatSimpleCounts[key] || 0) + 1;
+    }
+  });
+}
+
+// Loads a coach's previously-saved log for this team+game from Firestore
+// (see saveLiveStatLog/getLiveStatLog in firebase.js) and restores it into
+// liveStatLog — Firestore entries store 'own'/'opp' as a plain string
+// (side objects aren't serializable), so this re-attaches the live
+// ownSide/oppSide object reference each entry needs for rendering/undo.
+async function restoreLiveStatLog(coachName, team, sheetGameNum) {
+  const saved = await getLiveStatLog(coachName, team, sheetGameNum);
+  if (!saved || !Array.isArray(saved.entries) || saved.entries.length === 0) {
+    resetLiveStatLog();
+    return;
+  }
+  liveStatLog = saved.entries.map(e => ({
+    ...e,
+    side: e.side === 'own' ? ownSide : oppSide,
+  }));
+  rebuildLiveStatCounts();
 }
 
 // Builds the human-readable log line for one entry AT THE TIME IT WAS
@@ -1537,16 +1577,13 @@ function wireJerseyToggle() {
   });
 }
 
-// Phase 1: OFF/ON display only. Phase 2 will wire real live-scoring
-// behavior to the ON state (see LIVE_STATS_SPEC.md / mockup discussion).
 function wireLiveStatToggle() {
   document.getElementById('gb-livestat-toggle').addEventListener('click', () => {
     liveStatMode = !liveStatMode;
-    // Turning the toggle OFF still clears the log (a deliberate "end this
-    // Live Stat session" action) — this is separate from switching
-    // quarters, which now keeps the log intact (see renderQuarterTabs).
-    // Save Log before switching off if the log should be kept!
-    if (!liveStatMode) resetLiveStatLog();
+    // Turning the toggle OFF only hides the panel/score-circle UI — the log
+    // itself is NOT cleared here. It persists in memory (and stays saved in
+    // Firestore if Save Log was used) so re-activating Live Stat later, or
+    // switching quarters, doesn't lose anything already logged.
     renderGameView();
   });
 }
