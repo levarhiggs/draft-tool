@@ -210,6 +210,41 @@ export async function getAllScheduleGames() {
   }
 }
 
+// ── Live Stat logs ───────────────────────────────────────────────────────────
+// Firestore doc shape for liveStatLogs/{coachName}_{team}_{sheetGameNum}:
+// {
+//   coachName, team, sheetGameNum,
+//   entries: [ { quarter, side: 'own'|'opp', playerId, playerName, jerseyNum,
+//                statKey, favorable, shotValue, made, madeAfter, attemptsAfter,
+//                countAfter }, ... ],   // full log, in entry order
+//   updatedAt: timestamp,
+// }
+// Deterministic doc ID (not addDoc/auto-id) so re-saving the same
+// coach+team+game overwrites in place instead of piling up duplicates.
+function liveStatLogRef(coachName, team, sheetGameNum) {
+  const id = `${coachName}_${team}_${sheetGameNum}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return doc(db, 'liveStatLogs', id);
+}
+
+export async function saveLiveStatLog(coachName, team, sheetGameNum, entries) {
+  const ref = liveStatLogRef(coachName, team, sheetGameNum);
+  await setDoc(ref, {
+    coachName, team, sheetGameNum: String(sheetGameNum),
+    entries,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function getLiveStatLog(coachName, team, sheetGameNum) {
+  try {
+    const snap = await getDoc(liveStatLogRef(coachName, team, sheetGameNum));
+    return snap.exists() ? snap.data() : null;
+  } catch (err) {
+    console.error('getLiveStatLog error:', err);
+    return null;
+  }
+}
+
 export async function saveScheduleGame(gameNum, vScore, hScore, coachName) {
   let winner = null;
   if (vScore != null && hScore != null) {

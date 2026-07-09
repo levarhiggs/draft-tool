@@ -82,14 +82,16 @@
           <div id="gb-gamenum-bar" class="gb-gamenum-bar"></div>
 
           <!-- Matchup row: own team icon + mini-grid, VS., opponent mini-grid
-               + icon. Live Stat mode (phase 1: no functionality yet, just
-               the visual indicator) covers this with the Game Log panel —
+               + icon. Live Stat mode covers this with the Game Log panel —
                see gb-gamelog-panel below and updateLiveStatToggle in
                gameboard.js. -->
           <div class="gb-matchup-wrap">
             <div id="gb-matchup-row" class="gb-matchup-row"></div>
             <div id="gb-gamelog-panel" class="gb-gamelog-panel hidden">
-              <div class="gb-gamelog-title">GAME LOG — QUARTER <span id="gb-gamelog-quarter">1</span></div>
+              <div class="gb-gamelog-title-row">
+                <span>GAME LOG — QUARTER <span id="gb-gamelog-quarter">1</span></span>
+                <button id="gb-gamelog-save" class="gb-gamelog-save-btn" type="button">💾 Save Log</button>
+              </div>
               <div id="gb-gamelog-lines" class="gb-gamelog-lines"></div>
             </div>
           </div>

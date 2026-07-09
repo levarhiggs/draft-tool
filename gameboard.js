@@ -4,7 +4,7 @@ import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_COLORS } from './coaches-config.js';
 import { buildIconIndex, iconUrl, fetchPlayers, buildDriveIndex, photoUrl, COL } from './players-data.js';
 import { fetchSchedule, parseGameDate, COL as SCHED_COL } from './schedule-data.js';
-import { getCompositeRank, getGameConfig, saveGameConfig, getAllScheduleGames, saveJerseyNumber, clearJerseyNumber } from './firebase.js';
+import { getCompositeRank, getGameConfig, saveGameConfig, getAllScheduleGames, saveJerseyNumber, clearJerseyNumber, saveLiveStatLog } from './firebase.js';
 import {
   computePlayerStatus, computeQuarterStatus, computeGameStatus, countPresent,
 } from './rotations-engine.js';
@@ -735,11 +735,12 @@ function renderQuarterTabs() {
   tabs.querySelectorAll('button').forEach(btn => {
     btn.addEventListener('click', () => {
       activeQuarter = parseInt(btn.dataset.quarter, 10);
-      // Quarter-to-quarter log skip-around isn't handled yet (explicitly
-      // out of scope for now) — switching quarters just ends the Live Stat
-      // session cleanly rather than carrying a Q1 log into Q2's view.
+      // The log stays intact across quarter switches now (see
+      // liveStatLog/logLiveStatEntry) — each entry is tagged with the
+      // quarter it was logged under, so switching quarters just changes
+      // which IN/OUT lineup is being edited, same as normal, without
+      // touching the log itself.
       liveStatActivePlayer = null;
-      if (liveStatMode) { liveStatMode = false; resetLiveStatLog(); }
       renderQuarterTabs();
       renderGameView();
     });
@@ -802,12 +803,13 @@ function resetLiveStatLog() {
 // recomputed later), so undo can cleanly roll the counter back by exactly
 // one without needing to replay the whole log. No team-name prefix — the
 // team is conveyed by rendering this text in that team's color instead
-// (see renderGameLogLines), so the line leads straight with jersey # and
-// first name.
+// (see renderGameLogLines). Leads with a "Q1"/"Q2" tag since the log now
+// spans every quarter in one continuous list (see logLiveStatEntry's
+// `quarter` field) rather than resetting per quarter.
 function liveStatLogLineText(entry) {
   const jerseyLabel = entry.jerseyNum == null ? '—' : `#${entry.jerseyNum}`;
   const firstName = (entry.playerName || '?').split(/\s+/)[0] || entry.playerName;
-  const who = `${jerseyLabel} ${firstName}`;
+  const who = `Q${entry.quarter + 1} ${jerseyLabel} ${firstName}`;
 
   if (entry.shotValue != null) {
     const verb = entry.made ? 'scores' : 'misses';
@@ -882,6 +884,7 @@ function logLiveStatEntry(side, player, statKey) {
 
   const entry = {
     side, statKey,
+    quarter: activeQuarter, // 0-3 — the log spans all quarters now, tagged per-entry rather than reset on switch
     playerId: player[COL.ID],
     playerName: player[COL.NAME] || 'Unknown',
     jerseyNum: jerseyNumberFor(player),
@@ -931,7 +934,7 @@ function renderGameLogLines() {
   const el = document.getElementById('gb-gamelog-lines');
   if (!el) return;
   if (liveStatLog.length === 0) {
-    el.innerHTML = '<div class="gb-gamelog-empty">No stats logged yet this quarter.</div>';
+    el.innerHTML = '<div class="gb-gamelog-empty">No stats logged yet.</div>';
     return;
   }
   // Each line is tinted with that entry's own team color (replaces the old
@@ -1016,7 +1019,8 @@ function playerTileHtml(side, id, mirrored, isIn) {
     </div>`;
 }
 
-// Sum of made shots' point values, this side, current quarter's log only.
+// Sum of made shots' point values, this side, across the WHOLE game's log
+// (every quarter logged so far, not just the currently active one).
 function teamPointsFromLog(side) {
   return liveStatLog.reduce((sum, e) => sum + (e.side === side && e.made && e.shotValue ? e.shotValue : 0), 0);
 }
@@ -1049,19 +1053,21 @@ function playerStatTotals(side) {
   return totals;
 }
 
-// Read-only per-player quarter summary (tap a team's score circle while
-// Live Stat is on) — no editable fields, no quickset entry/Go row, just
-// Points/Assists/Fouls for whichever players have logged activity this
-// quarter. Reuses the Lineup Manager's popover styling but a dedicated
-// element (#gb-livestat-summary-popover) since the two are conceptually
-// different popovers that could in principle both have content queued.
+// Read-only per-player CUMULATIVE GAME summary (tap a team's score circle
+// while Live Stat is on) — no editable fields, no quickset entry/Go row,
+// just Points/Assists/Fouls across every quarter logged so far (the log
+// spans the whole game now, not just one quarter — see logLiveStatEntry's
+// `quarter` field). Reuses the Lineup Manager's popover styling but a
+// dedicated element (#gb-livestat-summary-popover) since the two are
+// conceptually different popovers that could in principle both have
+// content queued.
 function showLiveStatSummary(anchorEl, side) {
   const popover = document.getElementById('gb-livestat-summary-popover');
   const totals = playerStatTotals(side);
 
   const playerIds = side.order.filter(id => totals[id]);
   const rows = playerIds.length === 0
-    ? '<div class="sched-popover-hint">No stats logged yet this quarter.</div>'
+    ? '<div class="sched-popover-hint">No stats logged yet.</div>'
     : `
       <div class="gb-livestat-summary-row gb-livestat-summary-header">
         <span></span><span>Points</span><span>Assists</span><span>Fouls</span>
@@ -1081,7 +1087,7 @@ function showLiveStatSummary(anchorEl, side) {
 
   const colorName = TEAM_COLORS[side.team]?.name || side.team;
   popover.innerHTML = `
-    <div class="sched-popover-title">Team ${escHtml(colorName)} (Q${activeQuarter + 1})</div>
+    <div class="sched-popover-title">Team ${escHtml(colorName)}</div>
     ${rows}
   `;
 
@@ -1536,12 +1542,68 @@ function wireJerseyToggle() {
 function wireLiveStatToggle() {
   document.getElementById('gb-livestat-toggle').addEventListener('click', () => {
     liveStatMode = !liveStatMode;
-    // Log is explicitly scoped to "this Live Stat session" for now (no
-    // cross-session/quarter persistence yet, per the user's constraint) —
-    // turning it off clears the slate so turning it back on starts fresh
-    // rather than silently resuming stale counts.
+    // Turning the toggle OFF still clears the log (a deliberate "end this
+    // Live Stat session" action) — this is separate from switching
+    // quarters, which now keeps the log intact (see renderQuarterTabs).
+    // Save Log before switching off if the log should be kept!
     if (!liveStatMode) resetLiveStatLog();
     renderGameView();
+  });
+}
+
+// Saves the current log (spanning every quarter logged so far) to
+// Firestore, keyed by coach + team + this game's sheet Game # — re-saving
+// overwrites in place rather than piling up duplicate docs (see
+// saveLiveStatLog in firebase.js). Requires a logged-in coach; Firestore
+// entries strip the live `side` object reference down to a plain
+// 'own'/'opp' string since side objects aren't serializable.
+async function saveCurrentLiveStatLog() {
+  const coach = getCurrentCoach();
+  const btn = document.getElementById('gb-gamelog-save');
+  if (!coach) {
+    alert('Log in to save this log.');
+    return;
+  }
+  if (activeSheetGameNum == null) return;
+  if (liveStatLog.length === 0) {
+    alert('Nothing logged yet.');
+    return;
+  }
+
+  const entries = liveStatLog.map(e => ({
+    quarter: e.quarter,
+    side: e.side === ownSide ? 'own' : 'opp',
+    team: e.side.team,
+    playerId: e.playerId,
+    playerName: e.playerName,
+    jerseyNum: e.jerseyNum,
+    statKey: e.statKey,
+    favorable: e.favorable,
+    shotValue: e.shotValue,
+    made: e.made,
+    madeAfter: e.madeAfter ?? null,
+    attemptsAfter: e.attemptsAfter ?? null,
+    countAfter: e.countAfter ?? null,
+  }));
+
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await saveLiveStatLog(coach.name, gameTeam, activeSheetGameNum, entries);
+    btn.textContent = 'Saved ✓';
+    setTimeout(() => { btn.textContent = '💾 Save Log'; btn.disabled = false; }, 1500);
+  } catch (err) {
+    console.error('Save Log failed:', err);
+    alert('Save failed — please try again.');
+    btn.textContent = '💾 Save Log';
+    btn.disabled = false;
+  }
+}
+
+function wireSaveLogButton() {
+  document.getElementById('gb-gamelog-save').addEventListener('click', e => {
+    e.stopPropagation();
+    saveCurrentLiveStatLog();
   });
 }
 
@@ -1582,6 +1644,7 @@ async function initGameView() {
   wireSaveGameConfigButton();
   wireJerseyToggle();
   wireLiveStatToggle();
+  wireSaveLogButton();
 
   const { team: linkedTeam, sheetGameNum: linkedSheetGameNum } = deepLinkParams();
   if (linkedTeam) {
