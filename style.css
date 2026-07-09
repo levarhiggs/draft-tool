@@ -964,6 +964,39 @@ main {
   gap: 14px;
 }
 
+/* Board view team stats modal (tap a tile — see showTeamStatsModal in
+   gameboard.js) — same dim-overlay/centered-box pattern as modal-box, just
+   sized to a stat list instead of a form, with a colored dot marking the
+   team ahead of its name in the title. */
+.gb-team-stats-box {
+  padding: 20px 24px;
+  max-width: 360px;
+  gap: 4px;
+}
+
+.gb-team-stats-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.gb-team-stats-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Stat explanation blurb reads noticeably larger here than the shared
+   .sched-popover-hint default — this modal is meant to be read carefully,
+   not skimmed like the smaller anchored popovers elsewhere. */
+.gb-team-stats-box .sched-popover-hint {
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
 .modal-box h2 {
   font-size: 1.2rem;
   font-weight: 700;
@@ -2518,6 +2551,54 @@ main {
   overflow: hidden;
 }
 
+/* Shown when the CURRENTLY ACTIVE quarter has a saved note (see
+   updateGameLogNotesIndicator in gameboard.js) — a quiet hint that
+   double-clicking the panel will open existing notes, not a blank one. */
+.gb-gamelog-notes-indicator {
+  position: absolute;
+  bottom: 6px;
+  right: 10px;
+  font-size: 1rem;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Rudimentary per-quarter notepad — double-click the Game Log panel
+   (outside Undo/Save Log) to open, tap the dimmed backdrop to save + close
+   (see wireGameLogNotesPanel/closeGameLogNotesPanel in gameboard.js). Same
+   dim-overlay/centered-box modal pattern as Board view's team stats modal
+   (.gb-team-stats-box) — everything behind it dims and is inert until closed. */
+.gb-gamelog-notes-box {
+  padding: 20px 24px;
+  max-width: 420px;
+  gap: 10px;
+}
+
+.gb-gamelog-notes-title {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--clr-text);
+}
+
+.gb-gamelog-notes-textarea {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: 6px;
+  color: var(--clr-text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  padding: 10px 12px;
+}
+.gb-gamelog-notes-textarea:focus {
+  outline: none;
+  border-color: var(--clr-accent);
+}
+
 .gb-gamelog-title-row {
   flex-shrink: 0;
   display: flex;
@@ -2527,6 +2608,17 @@ main {
   padding: 10px 12px 4px;
 }
 
+/* Undo (see undoLastLiveStatEntry in gameboard.js) sits in the top-right
+   corner of the Game Log panel alongside Save Log — both always visible,
+   same corner placement the Save Log button originally had on its own. */
+.gb-gamelog-actions-row {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gb-gamelog-undo-btn,
 .gb-gamelog-save-btn {
   background: transparent;
   border: 1px solid var(--clr-border);
@@ -2539,6 +2631,7 @@ main {
   cursor: pointer;
   white-space: nowrap;
 }
+.gb-gamelog-undo-btn:hover,
 .gb-gamelog-save-btn:hover {
   border-color: var(--clr-accent);
   color: var(--clr-accent);
@@ -2571,6 +2664,30 @@ main {
   line-height: 1.3;
   flex-shrink: 0;
   text-align: left;
+}
+
+/* Small team-color dot prefixing each line — an extra, more visually
+   discernible team indicator alongside (not instead of) the line's own
+   team-colored text. */
+.gb-gamelog-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+/* Action verb (SCORES/ASSIST vs. MISSES/FOUL) always renders in a fixed
+   green/red regardless of the line's own team color, so favorable vs.
+   unfavorable reads at a glance independent of which team it belongs to. */
+.gb-gamelog-verb-favorable {
+  color: var(--clr-success);
+  font-weight: 800;
+}
+.gb-gamelog-verb-unfavorable {
+  color: var(--clr-danger);
+  font-weight: 800;
 }
 
 .gb-gamelog-empty {
@@ -2895,11 +3012,97 @@ main {
   letter-spacing: normal;
 }
 
+#gb-livestat-panel-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 6px;
+}
+
 .gb-livestat-panel-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
   gap: 8px;
   flex: 1;
+}
+
+/* ASST "2-for-1" sub-flow: picking who scored, then 2PT/3PT — see
+   renderLiveStatPanelBody/handleLiveStatPanelClick in gameboard.js. */
+.gb-livestat-flow-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--clr-muted);
+  text-align: center;
+}
+
+.gb-livestat-scorer-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.gb-livestat-scorer-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  color: var(--clr-text);
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 8px 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.gb-livestat-scorer-btn:hover {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+}
+
+.gb-livestat-scorer-jersey {
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.gb-livestat-scorer-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.gb-livestat-bypass-btn {
+  background: var(--clr-card);
+  border: 1px dashed var(--clr-border);
+  border-radius: 6px;
+  color: var(--clr-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 14px 8px;
+  cursor: pointer;
+}
+.gb-livestat-bypass-btn:hover {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+}
+
+.gb-livestat-back-btn {
+  background: transparent;
+  border: none;
+  color: var(--clr-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  align-self: center;
+}
+.gb-livestat-back-btn:hover {
+  color: var(--clr-accent);
 }
 
 .gb-livestat-stat-btn {
@@ -2924,50 +3127,21 @@ main {
   color: #fff;
 }
 
-.gb-livestat-undo-btn {
-  align-self: center;
-  background: transparent;
-  border: 1px solid var(--clr-border);
-  border-radius: 6px;
-  color: var(--clr-muted);
-  padding: 6px 16px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  cursor: pointer;
-}
-.gb-livestat-undo-btn:hover {
-  border-color: var(--clr-accent);
-  color: var(--clr-accent);
-}
 
-/* Team color icon now lives just after the IN label (moved out of the
-   matchup row above, which was taking up too much horizontal space) — same
-   squircle treatment as the icon used to have. The whole header row is
-   pushed to the right edge (nearest the center gap between the two
-   side-by-side columns), mirroring the same left/right convention used by
-   the player tiles below, so IN/OUT read as centered on the comparison as
-   a whole rather than each column's own independent left edge. */
+/* Team color icon lives just after the IN label, nearest the center gap
+   between the two side-by-side columns (mirroring the player tiles below,
+   so IN/OUT read as centered on the comparison as a whole). The score
+   circle (see gameLogScoreCircleHtml in gameboard.js) is always present
+   now — a coach wants the running score at a glance regardless of Live
+   Stat mode — so this row always spreads its two children (score circle +
+   IN-label/icon group) to opposite ends via space-between, rather than
+   bunching them together with flex-end/flex-start. */
 .gb-inout-in-header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 10px;
   margin-bottom: 4px;
-}
-
-/* Opponent (right) column: mirror to the left edge instead, so its IN
-   header sits nearest the center gap from the right side. */
-.gb-inout-in-header-left {
-  justify-content: flex-start;
-}
-
-/* Live Stat mode: the score circle (see gameLogScoreCircleHtml in
-   gameboard.js) sits at the row's true outer edge, opposite the IN label +
-   team icon which stay nearest the center gap — space-between spreads the
-   two elements to opposite ends instead of the plain single-group
-   flex-end/flex-start used outside Live Stat mode. */
-.gb-inout-in-header-livestat {
-  justify-content: space-between;
 }
 
 .gb-gamelog-score-circle {

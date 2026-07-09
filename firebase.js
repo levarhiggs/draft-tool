@@ -215,6 +215,8 @@ export async function getAllScheduleGames() {
 // {
 //   coachName, team, sheetGameNum,
 //   entries: [ { quarter, side: 'own'|'opp', playerId, playerName, jerseyNum,
+//                isAnonymous,  // true = credited to the team itself (tapped
+//                              // the team icon), not a specific roster player
 //                statKey, favorable, shotValue, made, madeAfter, attemptsAfter,
 //                countAfter }, ... ],   // full log, in entry order
 //   updatedAt: timestamp,
@@ -241,6 +243,35 @@ export async function getLiveStatLog(coachName, team, sheetGameNum) {
     return snap.exists() ? snap.data() : null;
   } catch (err) {
     console.error('getLiveStatLog error:', err);
+    return null;
+  }
+}
+
+// ── Game Log notes (rudimentary per-quarter notepad) ────────────────────────
+// Firestore doc shape for gameLogNotes/{coachName}_{team}_{sheetGameNum}:
+// { coachName, team, sheetGameNum, notesByQuarter: { "0": "text", "1": "..." }, updatedAt }
+// Same deterministic-ID/overwrite pattern as liveStatLogRef above — one doc
+// per coach+team+game, holding all 4 quarters' notes together.
+function gameLogNotesRef(coachName, team, sheetGameNum) {
+  const id = `${coachName}_${team}_${sheetGameNum}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return doc(db, 'gameLogNotes', id);
+}
+
+export async function saveGameLogNotes(coachName, team, sheetGameNum, notesByQuarter) {
+  const ref = gameLogNotesRef(coachName, team, sheetGameNum);
+  await setDoc(ref, {
+    coachName, team, sheetGameNum: String(sheetGameNum),
+    notesByQuarter,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function getGameLogNotes(coachName, team, sheetGameNum) {
+  try {
+    const snap = await getDoc(gameLogNotesRef(coachName, team, sheetGameNum));
+    return snap.exists() ? snap.data() : null;
+  } catch (err) {
+    console.error('getGameLogNotes error:', err);
     return null;
   }
 }

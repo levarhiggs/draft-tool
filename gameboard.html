@@ -90,9 +90,13 @@
             <div id="gb-gamelog-panel" class="gb-gamelog-panel hidden">
               <div class="gb-gamelog-title-row">
                 <span>GAME LOG — QUARTER <span id="gb-gamelog-quarter">1</span></span>
-                <button id="gb-gamelog-save" class="gb-gamelog-save-btn" type="button">💾 Save Log</button>
+                <div class="gb-gamelog-actions-row">
+                  <button id="gb-gamelog-undo" class="gb-gamelog-undo-btn" type="button">↩ Undo</button>
+                  <button id="gb-gamelog-save" class="gb-gamelog-save-btn" type="button">💾 Save Log</button>
+                </div>
               </div>
               <div id="gb-gamelog-lines" class="gb-gamelog-lines"></div>
+              <span id="gb-gamelog-notes-indicator" class="gb-gamelog-notes-indicator hidden" title="Notes saved for this quarter">📝</span>
             </div>
           </div>
 
@@ -141,8 +145,22 @@
     </div>
   </main>
 
-  <!-- Team stats popover (click/tap a Board tile) -->
-  <div id="gb-team-popover" class="sched-popover hidden"></div>
+  <!-- Team stats modal (click/tap a Board tile) — dims the whole board
+       behind it, tapping anywhere outside the stat box closes it. -->
+  <div id="gb-team-stats-modal" class="modal-overlay hidden">
+    <div id="gb-team-stats-box" class="modal-box gb-team-stats-box"></div>
+  </div>
+
+  <!-- Rudimentary per-quarter notepad — double-click the Game Log panel
+       (outside Undo/Save Log) to open, tap outside the box to save +
+       close. Same dim-overlay/centered-box pattern as the Board view team
+       stats modal above. See wireGameLogNotesPanel in gameboard.js. -->
+  <div id="gb-gamelog-notes-modal" class="modal-overlay hidden">
+    <div class="modal-box gb-gamelog-notes-box">
+      <div id="gb-gamelog-notes-title" class="gb-gamelog-notes-title"></div>
+      <textarea id="gb-gamelog-notes-textarea" class="gb-gamelog-notes-textarea" placeholder="Add a note about this quarter…"></textarea>
+    </div>
+  </div>
 
   <!-- Jersey # picker popover (tap an unset player tile in Jersey # mode) -->
   <div id="gb-jersey-popover" class="sched-popover gb-jersey-popover hidden"></div>

@@ -4,7 +4,7 @@ import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_COLORS } from './coaches-config.js';
 import { buildIconIndex, iconUrl, fetchPlayers, buildDriveIndex, photoUrl, COL } from './players-data.js';
 import { fetchSchedule, parseGameDate, COL as SCHED_COL } from './schedule-data.js';
-import { getCompositeRank, getGameConfig, saveGameConfig, getAllScheduleGames, saveJerseyNumber, clearJerseyNumber, saveLiveStatLog, getLiveStatLog } from './firebase.js';
+import { getCompositeRank, getGameConfig, saveGameConfig, getAllScheduleGames, saveJerseyNumber, clearJerseyNumber, saveLiveStatLog, getLiveStatLog, saveGameLogNotes, getGameLogNotes } from './firebase.js';
 import {
   computePlayerStatus, computeQuarterStatus, computeGameStatus, countPresent,
 } from './rotations-engine.js';
@@ -94,13 +94,20 @@ function tileHtml(team, i) {
   const s = statsFor(team);
   const ratio = scoringRatioFor(team);
   const ratioStr = ratio === Infinity ? '—' : ratio.toFixed(2);
+  // Squircle background is filled with the team's own color underneath the
+  // icon <img> — some phones load these icon images slowly or not at all,
+  // so this shows through immediately as a placeholder and stays visible
+  // behind the image (harmless) once it does load, rather than leaving a
+  // blank space in the meantime.
+  const hex = info?.hex || 'transparent';
+  const idColor = info?.hex ? readableTextColor(info.hex) : 'var(--clr-muted)';
   return `
     <div class="gb-team-tile" data-team="${team}" role="button" tabindex="0">
       <span class="gb-team-tile-color">${colorName.toUpperCase()}</span>
-      <div class="gb-team-tile-icon">
+      <div class="gb-team-tile-icon" style="background:${hex}">
         ${icon
           ? `<img src="${icon}" alt="${colorName}" loading="lazy" />`
-          : `<span class="gb-team-tile-id">${i + 1}</span>`}
+          : `<span class="gb-team-tile-id" style="color:${idColor}">${i + 1}</span>`}
       </div>
       <div class="gb-team-tile-label">
         <span class="gb-team-tile-coach">${team}</span>
@@ -172,10 +179,16 @@ function statDefsFor(team) {
   ];
 }
 
-function showTeamPopover(anchorEl, team) {
-  const popover = document.getElementById('gb-team-popover');
+// Full-board modal (not a floating per-tile popover) — dims the whole
+// Board view grid behind it. Tapping anywhere outside the stat box closes
+// it and re-enables the tiles underneath (see wireBoardTileClicks'
+// dismiss handler); tapping a stat row toggles its blurb without closing.
+function showTeamStatsModal(team) {
+  const overlay = document.getElementById('gb-team-stats-modal');
+  const box = document.getElementById('gb-team-stats-box');
   const info = TEAM_COLORS[team];
   const displayName = info?.shortName || info?.name || '';
+  const hex = info?.hex || '#8890a8';
   const statDefs = statDefsFor(team);
 
   const rows = statDefs.map(stat => stat.blurb
@@ -187,19 +200,21 @@ function showTeamPopover(anchorEl, team) {
       </div>`
   ).join('');
 
-  popover.innerHTML = `
-    <div class="sched-popover-title">${escHtml(displayName.toUpperCase())} — ${escHtml(team)}</div>
+  box.innerHTML = `
+    <div class="sched-popover-title gb-team-stats-title">
+      <span class="gb-team-stats-dot" style="background:${hex}"></span>${escHtml(displayName.toUpperCase())} — ${escHtml(team)}
+    </div>
     ${rows}
     <div id="gb-stat-blurb" class="sched-popover-hint hidden"></div>
   `;
 
-  popover.querySelectorAll('.gb-stat-row').forEach(row => {
+  box.querySelectorAll('.gb-stat-row').forEach(row => {
     row.addEventListener('click', e => {
       e.stopPropagation();
       const stat = statDefs.find(s => s.key === row.dataset.stat);
-      const blurbEl = popover.querySelector('#gb-stat-blurb');
+      const blurbEl = box.querySelector('#gb-stat-blurb');
       const alreadyShowingThis = !blurbEl.classList.contains('hidden') && blurbEl.dataset.stat === stat.key;
-      popover.querySelectorAll('.gb-stat-row').forEach(r => r.classList.remove('gb-stat-row-active'));
+      box.querySelectorAll('.gb-stat-row').forEach(r => r.classList.remove('gb-stat-row-active'));
       if (alreadyShowingThis) {
         blurbEl.classList.add('hidden');
         return;
@@ -211,7 +226,11 @@ function showTeamPopover(anchorEl, team) {
     });
   });
 
-  positionPopover(popover, anchorEl);
+  overlay.classList.remove('hidden');
+}
+
+function closeTeamStatsModal() {
+  document.getElementById('gb-team-stats-modal').classList.add('hidden');
 }
 
 function escHtml(s) {
@@ -226,17 +245,24 @@ function wireBoardTileClicks() {
       container.addEventListener('click', e => {
         const tile = e.target.closest('.gb-team-tile');
         if (!tile) return;
-        showTeamPopover(tile, tile.dataset.team);
+        showTeamStatsModal(tile.dataset.team);
       });
     });
+
+  // Tapping anywhere outside the stat box (the dimmed overlay itself)
+  // closes the modal and re-enables the tiles underneath — clicks inside
+  // the box (including stat rows) never bubble this far since showTeamStats
+  // Modal's own row handler calls stopPropagation.
+  document.getElementById('gb-team-stats-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeTeamStatsModal();
+  });
 }
 
 function wirePopoverDismiss() {
   document.addEventListener('click', e => {
-    const popover = document.getElementById('gb-team-popover');
-    if (!(popover.contains(e.target) || e.target.closest('.gb-team-tile'))) {
-      popover.classList.add('hidden');
-    }
+    // Board view's team stats modal has its own dedicated overlay-click
+    // dismiss handler (see wireBoardTileClicks) since it's a centered
+    // modal, not an anchored popover like the ones below.
     const jerseyPopover = document.getElementById('gb-jersey-popover');
     if (!(jerseyPopover.contains(e.target) || e.target.closest('.gb-inout-tile'))) {
       jerseyPopover.classList.add('hidden');
@@ -250,6 +276,8 @@ function wirePopoverDismiss() {
     // opened/would toggle it (also stops propagation) — so it's genuinely
     // an "outside" tap and should dismiss the panel, per the user's spec.
     if (liveStatActivePlayer) closeLiveStatPanel();
+    // Game Log notes modal has its own dedicated overlay-click dismiss
+    // handler (see wireGameLogNotesPanel), same as the team stats modal.
   });
 }
 
@@ -277,6 +305,12 @@ let oppSide = null;            // same shape, opponent
 let jerseyMode = false;        // Jersey # view toggle — see wireJerseyToggle
 let liveStatMode = false;      // LIVE STAT toggle
 let liveStatActivePlayer = null; // { side, id } of the tapped/highlighted IN player, or null
+// ASST's "2-for-1" sub-flow state: null outside of it, 'pick-scorer' while
+// choosing who scored, or { scorerId } once picked and waiting on 2PT/3PT.
+// Reset to null whenever the panel itself closes/reopens (see
+// closeLiveStatPanel/openLiveStatPanel) so a stale sub-flow never survives
+// into a different player's panel.
+let liveStatAssistFlow = null;
 // Append-only running log for the CURRENT quarter only — cleared whenever
 // Live Stat mode is switched off, or the quarter/game/team changes. No
 // cross-quarter skip-around or persistence yet; this is deliberately
@@ -284,6 +318,13 @@ let liveStatActivePlayer = null; // { side, id } of the tapped/highlighted IN pl
 // off/on" per the user's explicit constraint for this first pass.
 // Entry shape: { side, playerId, statKey, favorable, label }
 let liveStatLog = [];
+// Rudimentary per-quarter notepad on the Game Log panel — { "0": "text",
+// "1": "...", ... }, keyed by quarter index as a string (Firestore map
+// keys are always strings anyway). Same persistence split used throughout
+// this page: Firestore when a coach is logged in (see
+// saveGameLogNotes/getGameLogNotes in firebase.js), sessionStorage draft
+// when not (see saveLocalGameState/applyLocalGameState for the pattern).
+let gameLogNotesByQuarter = {};
 
 function teamColorNameFor(team) {
   return TEAM_COLORS[team]?.name || null;
@@ -523,11 +564,13 @@ async function loadActiveGame() {
       applySavedGameConfig(ownSide, coach.name, gameTeam, sheetGameNum),
       oppSide ? applySavedGameConfig(oppSide, coach.name, oppTeam, sheetGameNum) : Promise.resolve(),
       restoreLiveStatLog(coach.name, gameTeam, sheetGameNum),
+      restoreGameLogNotes(gameTeam, sheetGameNum),
     ]);
   } else {
     applyLocalGameState(ownSide, gameTeam, sheetGameNum);
     if (oppSide) applyLocalGameState(oppSide, oppTeam, sheetGameNum);
     resetLiveStatLog(); // no coach logged in -> no saved log to restore
+    await restoreGameLogNotes(gameTeam, sheetGameNum);
   }
 
   renderGameView();
@@ -603,9 +646,15 @@ async function applySavedGameConfig(side, coachName, team, sheetGameNum) {
 function renderGameView() {
   renderMatchupRow();
   renderQuarterTabs();
+  // Must run BEFORE renderInOutColumns(): it's what decides whether
+  // liveStatMode should auto-turn-off for the newly active quarter (if its
+  // lineup isn't 5-5), and the tile grid below reads liveStatMode while
+  // rendering (OUT tiles disabled, IN tiles open the stat panel, etc.) — if
+  // this ran after, tiles would be built against the PREVIOUS quarter's
+  // stale mode for one render pass.
+  updateLiveStatToggle();
   renderInOutColumns();
   updateSaveButtonVisibility();
-  updateLiveStatToggle();
 }
 
 // # of non-absent players IN for the CURRENTLY ACTIVE quarter on one side —
@@ -628,10 +677,21 @@ function updateLiveStatToggle() {
   document.getElementById('gb-livestat-state').textContent = liveStatMode ? 'ON' : 'OFF';
 
   // Indicator #2: Game Log panel covers the mini-grids entirely while Live
-  // Stat mode is on.
+  // Stat mode is on. Lines are kept in sync regardless of visibility (not
+  // gated on liveStatMode) so the content is never stale from a previous
+  // quarter by the time the panel becomes visible again.
   document.getElementById('gb-gamelog-panel').classList.toggle('hidden', !liveStatMode);
   document.getElementById('gb-gamelog-quarter').textContent = String(activeQuarter + 1);
-  if (liveStatMode) renderGameLogLines();
+  renderGameLogLines();
+  updateGameLogNotesIndicator();
+}
+
+// Shows a small 📝 in the Game Log panel's bottom-right corner when the
+// CURRENTLY ACTIVE quarter has a saved note — a quiet hint that
+// double-clicking will open existing notes (see openGameLogNotesPanel).
+function updateGameLogNotesIndicator() {
+  const hasNote = !!gameLogNotesByQuarter[String(activeQuarter)];
+  document.getElementById('gb-gamelog-notes-indicator').classList.toggle('hidden', !hasNote);
 }
 
 function miniGridDot(side) {
@@ -774,6 +834,8 @@ const LIVE_STAT_BUTTONS = [
   { key: '1pt-miss',  label: '1PT', favorable: false, shotValue: 1, made: false },
   { key: 'asst',      label: 'ASST', favorable: true },
   { key: 'foul',      label: 'FOUL', favorable: false },
+  { key: 'rebound',   label: 'RBND', favorable: true },
+  { key: 'turnover',  label: 'TRNOVR', favorable: false },
 ];
 
 // Makes/attempts counters, per player per shot value, for the CURRENT
@@ -797,6 +859,35 @@ function resetLiveStatLog() {
   liveStatLog = [];
   liveStatShotCounts = {};
   liveStatSimpleCounts = {};
+}
+
+// Highest quarter index (0-3) with any logged activity so far, or null if
+// the log is empty. Used to detect "reopening an old quarter" — if the
+// coach is viewing a quarter LOWER than this, the game has already moved
+// on past it (see openLiveStatPanel's confirm prompt below).
+function highestLoggedQuarter() {
+  if (liveStatLog.length === 0) return null;
+  return liveStatLog.reduce((max, e) => Math.max(max, e.quarter), 0);
+}
+
+// Opens the stat panel for a player (id) or the anonymous team (id: null)
+// on the given side — the single entry point both a tile tap and the team
+// icon tap funnel through, so the "you're about to append to an older
+// quarter" confirmation only needs to live in one place. Only warns when
+// the quarter being appended to ALREADY HAS entries and a later quarter
+// also has entries (i.e. genuinely reopening finished work) — logging
+// fresh into whatever the highest quarter already is never prompts.
+function openLiveStatPanel(side, id) {
+  const highest = highestLoggedQuarter();
+  const hasEntriesThisQuarter = liveStatLog.some(e => e.quarter === activeQuarter);
+  if (highest != null && activeQuarter < highest && hasEntriesThisQuarter) {
+    const label = `Q${activeQuarter + 1}`;
+    const ok = confirm(`${label}'s log is from an earlier point in the game. Continue appending to ${label}'s log anyway?`);
+    if (!ok) return;
+  }
+  liveStatActivePlayer = { side, id };
+  liveStatAssistFlow = null;
+  renderInOutColumns();
 }
 
 // Rebuilds liveStatShotCounts/liveStatSimpleCounts from a full entry list
@@ -838,33 +929,90 @@ async function restoreLiveStatLog(coachName, team, sheetGameNum) {
   rebuildLiveStatCounts();
 }
 
+function gameLogNotesSessionKey(team, sheetGameNum) {
+  return `gameboard_gamelog_notes_${team}_${sheetGameNum}`;
+}
+
+// Restores this coach's Game Log notes for the given team+game (Firestore
+// if logged in, sessionStorage draft if not) — same split as
+// restoreLiveStatLog/applyLocalGameState above.
+async function restoreGameLogNotes(team, sheetGameNum) {
+  const coach = getCurrentCoach();
+  if (coach) {
+    const saved = await getGameLogNotes(coach.name, team, sheetGameNum);
+    gameLogNotesByQuarter = saved?.notesByQuarter || {};
+    return;
+  }
+  try {
+    const raw = sessionStorage.getItem(gameLogNotesSessionKey(team, sheetGameNum));
+    gameLogNotesByQuarter = raw ? JSON.parse(raw) : {};
+  } catch { gameLogNotesByQuarter = {}; }
+}
+
+async function saveGameLogNotesFor(team, sheetGameNum) {
+  const coach = getCurrentCoach();
+  if (coach) {
+    await saveGameLogNotes(coach.name, team, sheetGameNum, gameLogNotesByQuarter);
+  } else {
+    try { sessionStorage.setItem(gameLogNotesSessionKey(team, sheetGameNum), JSON.stringify(gameLogNotesByQuarter)); }
+    catch { /* sessionStorage unavailable/full — silently skip, not critical */ }
+  }
+}
+
 // Builds the human-readable log line for one entry AT THE TIME IT WAS
 // LOGGED — attempts/makes counts are baked into the entry itself (not
 // recomputed later), so undo can cleanly roll the counter back by exactly
-// one without needing to replay the whole log. No team-name prefix — the
-// team is conveyed by rendering this text in that team's color instead
-// (see renderGameLogLines). Leads with a "Q1"/"Q2" tag since the log now
-// spans every quarter in one continuous list (see logLiveStatEntry's
-// `quarter` field) rather than resetting per quarter.
-function liveStatLogLineText(entry) {
-  const jerseyLabel = entry.jerseyNum == null ? '—' : `#${entry.jerseyNum}`;
-  const firstName = (entry.playerName || '?').split(/\s+/)[0] || entry.playerName;
-  const who = `Q${entry.quarter + 1} ${jerseyLabel} ${firstName}`;
+// one without needing to replay the whole log. Returns { before, verb,
+// after } instead of a flat string so renderGameLogLines can wrap `verb`
+// in its own green/red bold-caps span — team identity is conveyed by the
+// leading dot (see renderGameLogLines), not text color, so the rest of the
+// line is plain text. Leads with a "Q1"/"Q2" tag since a coach can reopen
+// an earlier quarter's log later (see confirmOldQuarterAppend) — keeping
+// it as a sanity check even though each quarter's log now displays
+// separately.
+function liveStatLogLineParts(entry) {
+  const who = entry.isAnonymous
+    ? `Q${entry.quarter + 1} ${entry.playerName}`
+    : `Q${entry.quarter + 1} ${entry.jerseyNum == null ? '—' : `#${entry.jerseyNum}`} ${(entry.playerName || '?').split(/\s+/)[0] || entry.playerName}`;
 
   if (entry.shotValue != null) {
-    const verb = entry.made ? 'scores' : 'misses';
-    return `${who} ${verb} ${entry.shotValue}. (${entry.madeAfter}-${entry.attemptsAfter})`;
+    return {
+      before: who,
+      verb: entry.made ? 'SCORES' : 'MISSES',
+      favorable: entry.made,
+      after: `${entry.shotValue}. (${entry.madeAfter}-${entry.attemptsAfter})`,
+    };
   }
-  if (entry.statKey === 'asst') return `${who} records an assist. (${entry.countAfter})`;
-  if (entry.statKey === 'foul') return `${who} commits a foul. (${entry.countAfter})`;
-  return who;
+  if (entry.statKey === 'asst') {
+    // Paired via the 2-for-1 flow: "Levar ASSISTS Nicholas. (1)" — the
+    // scorer's name reads as the object of the verb. Bypassed/standalone:
+    // "Levar ASSIST. (1)", no object to name.
+    return entry.scoredByName
+      ? { before: who, verb: 'ASSISTS', favorable: true, after: `${entry.scoredByName}. (${entry.countAfter})` }
+      : { before: who, verb: 'ASSIST', favorable: true, after: `. (${entry.countAfter})` };
+  }
+  if (entry.statKey === 'foul') return { before: who, verb: 'FOUL', favorable: false, after: `. (${entry.countAfter})` };
+  if (entry.statKey === 'rebound') return { before: who, verb: 'REBOUNDS', favorable: true, after: `the ball (${entry.countAfter})` };
+  if (entry.statKey === 'turnover') return { before: who, verb: 'TURNS OVER', favorable: false, after: `the ball (${entry.countAfter})` };
+  return { before: who, verb: '', favorable: true, after: '' };
 }
 
-// Stat-entry panel: appears when a player is tapped in the IN column while
-// Live Stat mode is on, covering the OPPOSITE side's entire IN container
-// (see LIVE_STATS mockup discussion — tap a White player, panel covers
-// Lime's IN column, not White's own). `liveStatActivePlayer` tracks which
-// player + side triggered it; null means no panel is showing.
+// Synthetic "player" for team-anonymous stat attribution (tap the team
+// icon itself while Live Stat is on, instead of a specific roster player)
+// — lets a coach credit a team when the action happened too fast to catch
+// who actually did it. `id: null` is the sentinel wireSideTileInteractions/
+// liveStatActivePlayer use to recognize this isn't a real roster player.
+function anonymousTeamPlayer(side) {
+  const shortName = teamShortNameFor(side.team).toUpperCase();
+  return { [COL.ID]: null, [COL.NAME]: shortName, _isTeamAnonymous: true };
+}
+
+// Stat-entry panel: appears when a player (or, via the team icon, the team
+// itself anonymously) is tapped in the IN column while Live Stat mode is
+// on, covering the OPPOSITE side's entire IN container (see LIVE_STATS
+// mockup discussion — tap a White player, panel covers Lime's IN column,
+// not White's own). `liveStatActivePlayer` tracks which side + id (null
+// for the anonymous-team case) triggered it; null means no panel showing.
 function renderLiveStatPanel() {
   // Always clear any previously-injected panel first — renderSideContainers
   // already rebuilt both IN containers' innerHTML from scratch this render
@@ -874,7 +1022,7 @@ function renderLiveStatPanel() {
 
   if (!liveStatActivePlayer || !liveStatMode) return;
   const { side, id } = liveStatActivePlayer;
-  const player = side.players[id];
+  const player = id == null ? anonymousTeamPlayer(side) : side.players[id];
   if (!player) return;
 
   // Opposite container: own side's player -> panel covers opponent's IN
@@ -883,51 +1031,150 @@ function renderLiveStatPanel() {
   const target = document.getElementById(targetId);
   if (!target) return;
 
-  const jerseyNum = jerseyNumberFor(player);
-  const jerseyLabel = jerseyNum == null ? '—' : String(jerseyNum);
-
-  const buttonsHtml = LIVE_STAT_BUTTONS.map(b => `
-    <button class="gb-livestat-stat-btn${b.favorable ? '' : ' gb-livestat-stat-unfavorable'}" data-key="${b.key}" type="button">${b.label}</button>
-  `).join('');
+  const jerseyLabel = player._isTeamAnonymous ? '—' : (jerseyNumberFor(player) == null ? '—' : String(jerseyNumberFor(player)));
+  const nameLabel = player._isTeamAnonymous ? player[COL.NAME] : fiveLetterName(player[COL.NAME]);
 
   const panel = document.createElement('div');
   panel.className = 'gb-livestat-panel';
   panel.innerHTML = `
     <div class="gb-livestat-panel-header">
-      <span>Player<br><span class="gb-livestat-panel-name">${escHtml(fiveLetterName(player[COL.NAME]))}</span></span>
+      <span>Player<br><span class="gb-livestat-panel-name">${escHtml(nameLabel)}</span></span>
       <span>Jersey #<br><span class="gb-livestat-panel-name">${escHtml(jerseyLabel)}</span></span>
     </div>
-    <div class="gb-livestat-panel-grid">${buttonsHtml}</div>
-    <button class="gb-livestat-undo-btn" type="button">↩ Undo</button>
+    <div id="gb-livestat-panel-body"></div>
   `;
+
+  renderLiveStatPanelBody(panel, side, player, id);
 
   panel.addEventListener('click', e => {
     e.stopPropagation();
-    const undoBtn = e.target.closest('.gb-livestat-undo-btn');
-    if (undoBtn) {
-      undoLastLiveStatEntry();
-      return;
-    }
-    const statBtn = e.target.closest('.gb-livestat-stat-btn');
-    if (statBtn) {
-      logLiveStatEntry(side, player, statBtn.dataset.key);
-      closeLiveStatPanel();
-    }
+    handleLiveStatPanelClick(e, panel, side, player, id);
   });
 
   target.appendChild(panel);
 }
 
-function logLiveStatEntry(side, player, statKey) {
+// Renders whichever sub-view the panel is currently on into its body slot:
+// the normal 8-button grid, or (mid-ASST-flow) the scorer picker / 2PT-3PT
+// picker. Kept separate from renderLiveStatPanel itself so switching
+// sub-views (see handleLiveStatPanelClick) doesn't have to rebuild the
+// whole panel shell (header/undo button) each time.
+function renderLiveStatPanelBody(panel, side, player, id) {
+  const body = panel.querySelector('#gb-livestat-panel-body');
+
+  if (liveStatAssistFlow === 'pick-scorer') {
+    // Teammates only — an assist can't be credited to an opponent, and a
+    // player can't assist themselves (id == null, the anonymous-team case,
+    // has no "self" to exclude, so every IN player on the team is eligible).
+    const teammateIds = side.order.filter(pid =>
+      !side.absent.has(pid) &&
+      (side.pattern.get(pid) || [])[activeQuarter] &&
+      pid !== id
+    );
+    const namesHtml = teammateIds.map(pid => {
+      const p = side.players[pid];
+      const jerseyNum = jerseyNumberFor(p);
+      const jerseyLabel = jerseyNum == null ? '—' : String(jerseyNum);
+      return `<button class="gb-livestat-scorer-btn" data-scorer-id="${escHtml(pid)}" type="button">
+        <span class="gb-livestat-scorer-jersey">${escHtml(jerseyLabel)}</span>
+        <span class="gb-livestat-scorer-name">${escHtml(fiveLetterName(p?.[COL.NAME]))}</span>
+      </button>`;
+    }).join('');
+    body.innerHTML = `
+      <div class="gb-livestat-flow-title">Select which player scored</div>
+      <div class="gb-livestat-scorer-grid">${namesHtml}</div>
+      <button class="gb-livestat-bypass-btn" type="button">Bypass Score</button>
+    `;
+    return;
+  }
+
+  if (liveStatAssistFlow?.scorerId != null) {
+    const scorer = side.players[liveStatAssistFlow.scorerId];
+    body.innerHTML = `
+      <div class="gb-livestat-flow-title">${escHtml(fiveLetterName(scorer?.[COL.NAME]))} scored how many?</div>
+      <div class="gb-livestat-scorer-grid">
+        <button class="gb-livestat-stat-btn" data-points="2" type="button">2PT</button>
+        <button class="gb-livestat-stat-btn" data-points="3" type="button">3PT</button>
+      </div>
+      <button class="gb-livestat-back-btn" type="button">← Back</button>
+    `;
+    return;
+  }
+
+  const buttonsHtml = LIVE_STAT_BUTTONS.map(b => `
+    <button class="gb-livestat-stat-btn${b.favorable ? '' : ' gb-livestat-stat-unfavorable'}" data-key="${b.key}" type="button">${b.label}</button>
+  `).join('');
+  body.innerHTML = `<div class="gb-livestat-panel-grid">${buttonsHtml}</div>`;
+}
+
+function handleLiveStatPanelClick(e, panel, side, player, id) {
+  const backBtn = e.target.closest('.gb-livestat-back-btn');
+  if (backBtn) {
+    liveStatAssistFlow = liveStatAssistFlow?.scorerId != null ? 'pick-scorer' : null;
+    renderLiveStatPanelBody(panel, side, player, id);
+    return;
+  }
+
+  const bypassBtn = e.target.closest('.gb-livestat-bypass-btn');
+  if (bypassBtn) {
+    logLiveStatEntry(side, player, 'asst');
+    closeLiveStatPanel();
+    return;
+  }
+
+  const scorerBtn = e.target.closest('.gb-livestat-scorer-btn');
+  if (scorerBtn) {
+    liveStatAssistFlow = { scorerId: scorerBtn.dataset.scorerId };
+    renderLiveStatPanelBody(panel, side, player, id);
+    return;
+  }
+
+  const pointsBtn = e.target.closest('.gb-livestat-stat-btn[data-points]');
+  if (pointsBtn && liveStatAssistFlow?.scorerId != null) {
+    const scorer = side.players[liveStatAssistFlow.scorerId];
+    const points = pointsBtn.dataset.points;
+    // Two entries, assist first then the made shot — see logLiveStatEntry's
+    // per-entry quarter/attempt bookkeeping, unaffected by logging two in a
+    // row like this since each call is a self-contained push. The assist
+    // entry carries the scorer's first name (see liveStatLogLineParts).
+    const scorerFirstName = (scorer?.[COL.NAME] || '?').split(/\s+/)[0] || scorer?.[COL.NAME];
+    logLiveStatEntry(side, player, 'asst', scorerFirstName);
+    logLiveStatEntry(side, scorer, `${points}pt-made`);
+    closeLiveStatPanel();
+    return;
+  }
+
+  const statBtn = e.target.closest('.gb-livestat-stat-btn[data-key]');
+  if (statBtn) {
+    if (statBtn.dataset.key === 'asst') {
+      liveStatAssistFlow = 'pick-scorer';
+      renderLiveStatPanelBody(panel, side, player, id);
+      return;
+    }
+    logLiveStatEntry(side, player, statBtn.dataset.key);
+    closeLiveStatPanel();
+  }
+}
+
+function logLiveStatEntry(side, player, statKey, scoredByName) {
   const def = LIVE_STAT_BUTTONS.find(b => b.key === statKey);
   if (!def) return;
 
+  // Anonymous team attribution (tapped the team icon, not a roster player)
+  // uses a synthetic negative-ish id per side so its running shot/simple
+  // counters don't collide with any real playerId, and skips jersey lookup
+  // entirely (there is no real player to look one up for).
+  const isAnonymous = !!player._isTeamAnonymous;
   const entry = {
     side, statKey,
     quarter: activeQuarter, // 0-3 — the log spans all quarters now, tagged per-entry rather than reset on switch
-    playerId: player[COL.ID],
+    playerId: isAnonymous ? `team:${side.team}` : player[COL.ID],
     playerName: player[COL.NAME] || 'Unknown',
-    jerseyNum: jerseyNumberFor(player),
+    jerseyNum: isAnonymous ? null : jerseyNumberFor(player),
+    isAnonymous,
+    // Only set for an ASST entry paired with a scorer via the 2-for-1 flow
+    // (see handleLiveStatPanelClick) — "Bypass Score" assists have none.
+    scoredByName: scoredByName || null,
     favorable: def.favorable,
     shotValue: def.shotValue ?? null,
     made: def.made ?? null,
@@ -950,11 +1197,21 @@ function logLiveStatEntry(side, player, statKey) {
 
   liveStatLog.push(entry);
   renderGameLogLines();
+  scheduleLiveStatAutoSave();
 }
 
+// Removes the most recent entry belonging to the CURRENTLY ACTIVE quarter
+// specifically — not necessarily the last entry in the whole log, since
+// each quarter now behaves as its own independent list (see per-quarter
+// display in renderGameLogLines). Splices that one entry out of the middle
+// of liveStatLog if a later quarter's entries come after it chronologically.
 function undoLastLiveStatEntry() {
-  const entry = liveStatLog.pop();
-  if (!entry) return;
+  let idx = -1;
+  for (let i = liveStatLog.length - 1; i >= 0; i--) {
+    if (liveStatLog[i].quarter === activeQuarter) { idx = i; break; }
+  }
+  if (idx === -1) return;
+  const [entry] = liveStatLog.splice(idx, 1);
   if (entry.shotValue != null) {
     const key = shotCountKey(entry.playerId, entry.shotValue);
     const counts = liveStatShotCounts[key];
@@ -968,25 +1225,85 @@ function undoLastLiveStatEntry() {
   }
   renderGameLogLines();
   updateScoreCircles();
+  scheduleLiveStatAutoSave();
+}
+
+// Only this quarter's entries — each quarter is its own independent log
+// now (numbering restarts at 1, separate from any other quarter's list).
+function entriesForActiveQuarter() {
+  return liveStatLog.filter(e => e.quarter === activeQuarter);
 }
 
 function renderGameLogLines() {
   const el = document.getElementById('gb-gamelog-lines');
   if (!el) return;
-  if (liveStatLog.length === 0) {
-    el.innerHTML = '<div class="gb-gamelog-empty">No stats logged yet.</div>';
+  const entries = entriesForActiveQuarter();
+  if (entries.length === 0) {
+    el.innerHTML = '<div class="gb-gamelog-empty">No stats logged yet this quarter.</div>';
     return;
   }
-  // Each line is tinted with that entry's own team color (replaces the old
-  // "TEAM NAME:" text prefix) and prefixed with its 1-based entry number so
-  // read order is unambiguous once lines start scrolling.
-  el.innerHTML = liveStatLog.map((entry, i) => {
+  // Each line: a small dot in the entry's own team color (in addition to —
+  // not instead of — coloring the line's text that same color), a 1-based
+  // entry number scoped to THIS quarter only, then the line itself with
+  // its action verb (SCORES/MISSES/ASSIST/FOUL) bolded in green (favorable)
+  // or red (unfavorable), all caps.
+  el.innerHTML = entries.map((entry, i) => {
     const hex = TEAM_COLORS[entry.side.team]?.hex || 'inherit';
-    return `<div class="gb-gamelog-line" style="color:${hex}">${i + 1}. ${escHtml(liveStatLogLineText(entry))}</div>`;
+    const parts = liveStatLogLineParts(entry);
+    const verbClass = parts.favorable ? 'gb-gamelog-verb-favorable' : 'gb-gamelog-verb-unfavorable';
+    const verbHtml = parts.verb ? ` <span class="${verbClass}">${escHtml(parts.verb)}</span>` : '';
+    return `<div class="gb-gamelog-line" style="color:${hex}">
+      <span class="gb-gamelog-dot" style="background:${hex}"></span>${i + 1}. ${escHtml(parts.before)}${verbHtml} ${escHtml(parts.after)}
+    </div>`;
   }).join('');
   // Newest entry (last in DOM order) must stay in view as the log grows —
   // scroll the container to its bottom every time a line is added/removed.
   el.scrollTop = el.scrollHeight;
+}
+
+// Opens the notes panel pre-filled with whatever's already saved for the
+// CURRENTLY ACTIVE quarter — double-clicking the Game Log panel anywhere
+// except Undo/Save Log (see wireGameLogNotesPanel) triggers this. Same
+// dim-overlay/centered-modal treatment as Board view's team stats modal —
+// header reads "Notes - Left vs Right (Q1)" using each side's short name.
+function openGameLogNotesPanel() {
+  const ownName = ownSide ? teamShortNameFor(ownSide.team) : '?';
+  const oppName = oppSide ? teamShortNameFor(oppSide.team) : '?';
+  document.getElementById('gb-gamelog-notes-title').textContent =
+    `Notes - ${ownName} vs ${oppName} (Q${activeQuarter + 1})`;
+  const textarea = document.getElementById('gb-gamelog-notes-textarea');
+  textarea.value = gameLogNotesByQuarter[String(activeQuarter)] || '';
+  document.getElementById('gb-gamelog-notes-modal').classList.remove('hidden');
+  textarea.focus();
+}
+
+// Saves whatever's currently in the textarea and closes the modal — tapping
+// the dimmed backdrop outside the box triggers this (see wireGameLogNotesPanel).
+function closeGameLogNotesPanel() {
+  const textarea = document.getElementById('gb-gamelog-notes-textarea');
+  const text = textarea.value.trim();
+  if (text) gameLogNotesByQuarter[String(activeQuarter)] = text;
+  else delete gameLogNotesByQuarter[String(activeQuarter)];
+  document.getElementById('gb-gamelog-notes-modal').classList.add('hidden');
+  updateGameLogNotesIndicator();
+  if (gameTeam && activeSheetGameNum != null) {
+    saveGameLogNotesFor(gameTeam, activeSheetGameNum);
+  }
+}
+
+function wireGameLogNotesPanel() {
+  const panel = document.getElementById('gb-gamelog-panel');
+  panel.addEventListener('dblclick', e => {
+    if (e.target.closest('.gb-gamelog-undo-btn') || e.target.closest('.gb-gamelog-save-btn')) return;
+    e.stopPropagation();
+    openGameLogNotesPanel();
+  });
+  // Tapping the dimmed backdrop (not the box itself) saves + closes — same
+  // "click directly on the overlay" check Board view's team stats modal
+  // uses (see wireBoardTileClicks).
+  document.getElementById('gb-gamelog-notes-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeGameLogNotesPanel();
+  });
 }
 
 // Updates the score circles' displayed value in place, WITHOUT rebuilding
@@ -1004,6 +1321,7 @@ function updateScoreCircles() {
 
 function closeLiveStatPanel() {
   liveStatActivePlayer = null;
+  liveStatAssistFlow = null;
   // Re-renders both the highlighted-tile ring (applied inline at render
   // time in wireSideTileInteractions) and the panel itself — a light touch
   // (skips the matchup row / quarter tabs / toggle bar, all unaffected)
@@ -1065,10 +1383,12 @@ function teamPointsFromLog(side) {
   return liveStatLog.reduce((sum, e) => sum + (e.side === side && e.made && e.shotValue ? e.shotValue : 0), 0);
 }
 
-// Live Stat mode indicator #1: a team-colored circle at the IN header's
-// outer edge, showing this team's running point total for the quarter's
-// log so far. Tapping it opens the per-player stat summary (see
-// showLiveStatSummary).
+// Always-visible team-colored circle at the IN header's outer edge,
+// showing this team's cumulative game point total so far — a coach landing
+// on this page wants the running score at a glance, whether or not Live
+// Stat mode happens to be on right now. Tapping it opens the per-player
+// stat summary (see showLiveStatSummary), or — if nothing's been logged
+// yet — a prompt to turn Live Stat on (see renderSideContainers).
 function gameLogScoreCircleHtml(side) {
   const hex = TEAM_COLORS[side.team]?.hex || '#8890a8';
   const style = `background:${hex};color:${readableTextColor(hex)}`;
@@ -1105,19 +1425,28 @@ function showLiveStatSummary(anchorEl, side) {
   const popover = document.getElementById('gb-livestat-summary-popover');
   const totals = playerStatTotals(side);
 
+  // Anonymous team-credited stats (see anonymousTeamPlayer) get their own
+  // row, keyed by the same "team:{team}" playerId used when logging them —
+  // side.order only has real roster ids, so that pseudo-id needs surfacing
+  // separately rather than being silently dropped by the roster filter.
+  const anonKey = `team:${side.team}`;
   const playerIds = side.order.filter(id => totals[id]);
-  const rows = playerIds.length === 0
+  const rowIds = totals[anonKey] ? [...playerIds, anonKey] : playerIds;
+
+  const rows = rowIds.length === 0
     ? '<div class="sched-popover-hint">No stats logged yet.</div>'
     : `
       <div class="gb-livestat-summary-row gb-livestat-summary-header">
         <span></span><span>Points</span><span>Assists</span><span>Fouls</span>
       </div>
-      ${playerIds.map(id => {
-        const p = side.players[id];
+      ${rowIds.map(id => {
+        const name = id === anonKey
+          ? teamShortNameFor(side.team).toUpperCase()
+          : fiveLetterName(side.players[id]?.[COL.NAME]);
         const t = totals[id];
         return `
           <div class="gb-livestat-summary-row">
-            <span>${escHtml(fiveLetterName(p?.[COL.NAME]))}</span>
+            <span>${escHtml(name)}</span>
             <span>${t.points}</span>
             <span>${t.assists}</span>
             <span>${t.fouls}</span>
@@ -1186,15 +1515,16 @@ function renderSideContainers(side, inId, outId, mirrored) {
   const inHeaderInner = mirrored
     ? `${icon}<div class="gb-inout-header">IN</div>`
     : `<div class="gb-inout-header">IN</div>${icon}`;
-  // Live Stat mode's score circle sits at the row's TRUE outer edge (far
-  // left for the own/left side, far right for the opponent/right side) —
-  // the opposite extreme from the IN label + team icon, which stay put
-  // nearest the center gap.
-  const scoreCircle = liveStatMode ? gameLogScoreCircleHtml(side) : '';
-  const liveStatClass = liveStatMode ? ' gb-inout-in-header-livestat' : '';
+  // Score circle sits at the row's TRUE outer edge (far left for the
+  // own/left side, far right for the opponent/right side) — the opposite
+  // extreme from the IN label + team icon, which stay put nearest the
+  // center gap. Always visible now (not gated on Live Stat mode) — a coach
+  // landing on this page wants the running score at a glance regardless of
+  // whether they're actively logging right now (see gameLogScoreCircleHtml).
+  const scoreCircle = gameLogScoreCircleHtml(side);
   const inHeaderHtml = mirrored
-    ? `<div class="gb-inout-in-header gb-inout-in-header-left${liveStatClass}">${inHeaderInner}${scoreCircle}</div>`
-    : `<div class="gb-inout-in-header${liveStatClass}">${scoreCircle}${inHeaderInner}</div>`;
+    ? `<div class="gb-inout-in-header">${inHeaderInner}${scoreCircle}</div>`
+    : `<div class="gb-inout-in-header">${scoreCircle}${inHeaderInner}</div>`;
   const outHeaderClass = mirrored ? '' : ' gb-inout-header-right';
 
   inEl.innerHTML = `${inHeaderHtml}${inIds.map(id => playerTileHtml(side, id, mirrored, true)).join('')}`;
@@ -1203,18 +1533,40 @@ function renderSideContainers(side, inId, outId, mirrored) {
   wireSideTileInteractions(inEl, side, true);
   wireSideTileInteractions(outEl, side, false);
 
-  const teamIcon = inEl.querySelector('.gb-inout-team-icon-clickable');
+  const teamIcon = inEl.querySelector('.gb-inout-team-icon');
   if (teamIcon) {
-    teamIcon.addEventListener('click', e => {
-      e.stopPropagation();
-      showLineupManager(teamIcon, side);
-    });
+    if (liveStatMode) {
+      // Team-anonymous stat attribution — same panel a real player tap
+      // opens, but credits the team itself (see anonymousTeamPlayer) for
+      // when the play happened too fast to attribute to a specific player.
+      // Same toggle-to-close semantics as a player tile (see
+      // wireSideTileInteractions' liveStatMode branch).
+      const isActive = liveStatActivePlayer?.side === side && liveStatActivePlayer?.id === null;
+      if (isActive) teamIcon.classList.add('gb-inout-tile-livestat-active');
+      teamIcon.addEventListener('click', e => {
+        e.stopPropagation();
+        if (isActive) { liveStatActivePlayer = null; renderInOutColumns(); }
+        else openLiveStatPanel(side, null);
+      });
+    } else {
+      teamIcon.addEventListener('click', e => {
+        e.stopPropagation();
+        showLineupManager(teamIcon, side);
+      });
+    }
   }
 
   const scoreCircleEl = inEl.querySelector('.gb-gamelog-score-circle');
   if (scoreCircleEl) {
     scoreCircleEl.addEventListener('click', e => {
       e.stopPropagation();
+      // Nothing to summarize yet — point at the toggle instead of opening
+      // an empty popover (the circle is always visible now, even before a
+      // coach has ever turned Live Stat on for this game).
+      if (teamPointsFromLog(side) === 0) {
+        alert('Enable Live Stat to begin logging points for this game. 5 players from each team must be assigned as IN to enable this feature.');
+        return;
+      }
       showLiveStatSummary(scoreCircleEl, side);
     });
   }
@@ -1433,8 +1785,8 @@ function wireSideTileInteractions(container, side, isIn) {
       if (isActive) tile.classList.add('gb-inout-tile-livestat-active');
       tile.addEventListener('click', e => {
         e.stopPropagation();
-        liveStatActivePlayer = isActive ? null : { side, id };
-        renderInOutColumns();
+        if (isActive) { liveStatActivePlayer = null; renderInOutColumns(); }
+        else openLiveStatPanel(side, id);
       });
       return;
     }
@@ -1508,7 +1860,11 @@ function wireSideTileInteractions(container, side, isIn) {
 
 function updateSaveButtonVisibility() {
   const btn = document.getElementById('btn-save-game-config');
-  const canSave = !!getCurrentCoach() && activeGameIdx !== -1;
+  // Hidden while Live Stat mode is on — this button saves the LINEUP
+  // (who's IN/OUT per quarter), completely unrelated to the stat log a
+  // coach is looking at in that mode, and sitting right below it read as
+  // if it had something to do with saving the log itself.
+  const canSave = !!getCurrentCoach() && activeGameIdx !== -1 && !liveStatMode;
   btn.classList.toggle('hidden', !canSave);
 }
 
@@ -1593,7 +1949,67 @@ function wireLiveStatToggle() {
 // overwrites in place rather than piling up duplicate docs (see
 // saveLiveStatLog in firebase.js). Requires a logged-in coach; Firestore
 // entries strip the live `side` object reference down to a plain
-// 'own'/'opp' string since side objects aren't serializable.
+// 'own'/'opp' string since side objects aren't serializable. Shared by both
+// the manual Save Log button and the debounced auto-save (see
+// scheduleLiveStatAutoSave) — this is just the Firestore write itself, no
+// button-state/alert UI, so both callers can layer their own feedback on
+// top without duplicating the entry-serialization logic.
+async function persistLiveStatLog() {
+  const coach = getCurrentCoach();
+  if (!coach || activeSheetGameNum == null || liveStatLog.length === 0) return;
+
+  const entries = liveStatLog.map(e => ({
+    quarter: e.quarter,
+    side: e.side === ownSide ? 'own' : 'opp',
+    team: e.side.team,
+    playerId: e.playerId,
+    playerName: e.playerName,
+    jerseyNum: e.jerseyNum,
+    isAnonymous: !!e.isAnonymous,
+    statKey: e.statKey,
+    favorable: e.favorable,
+    shotValue: e.shotValue,
+    made: e.made,
+    madeAfter: e.madeAfter ?? null,
+    attemptsAfter: e.attemptsAfter ?? null,
+    countAfter: e.countAfter ?? null,
+  }));
+
+  await saveLiveStatLog(coach.name, gameTeam, activeSheetGameNum, entries);
+}
+
+// Debounced auto-save: fires ~1.5s after logging/undo activity settles,
+// not on every single tap — a full quarter can be dozens of taps, so
+// writing on every one would be wasteful. Silent on success (small "Saved"
+// flash on the button so a coach glancing at the corner sees confirmation
+// without a popup); silent on failure too (no alert spam mid-game — a
+// dropped auto-save is recoverable via the manual Save Log button, which
+// still fails loudly since that's a coach's explicit request).
+let liveStatAutoSaveTimer = null;
+
+function scheduleLiveStatAutoSave() {
+  if (!getCurrentCoach() || activeSheetGameNum == null) return;
+  if (liveStatAutoSaveTimer) clearTimeout(liveStatAutoSaveTimer);
+  liveStatAutoSaveTimer = setTimeout(async () => {
+    liveStatAutoSaveTimer = null;
+    try {
+      await persistLiveStatLog();
+      flashSaveLogButton('Saved ✓ (auto)');
+    } catch (err) {
+      console.error('Auto-save failed:', err);
+      // Silent by design — see comment above. The manual button remains a
+      // loud, explicit backstop if a coach notices something's off.
+    }
+  }, 1500);
+}
+
+function flashSaveLogButton(text) {
+  const btn = document.getElementById('gb-gamelog-save');
+  const original = '💾 Save Log';
+  btn.textContent = text;
+  setTimeout(() => { btn.textContent = original; }, 1500);
+}
+
 async function saveCurrentLiveStatLog() {
   const coach = getCurrentCoach();
   const btn = document.getElementById('gb-gamelog-save');
@@ -1607,26 +2023,13 @@ async function saveCurrentLiveStatLog() {
     return;
   }
 
-  const entries = liveStatLog.map(e => ({
-    quarter: e.quarter,
-    side: e.side === ownSide ? 'own' : 'opp',
-    team: e.side.team,
-    playerId: e.playerId,
-    playerName: e.playerName,
-    jerseyNum: e.jerseyNum,
-    statKey: e.statKey,
-    favorable: e.favorable,
-    shotValue: e.shotValue,
-    made: e.made,
-    madeAfter: e.madeAfter ?? null,
-    attemptsAfter: e.attemptsAfter ?? null,
-    countAfter: e.countAfter ?? null,
-  }));
+  // A manual save supersedes any pending auto-save — no need to fire both.
+  if (liveStatAutoSaveTimer) { clearTimeout(liveStatAutoSaveTimer); liveStatAutoSaveTimer = null; }
 
   btn.disabled = true;
   btn.textContent = 'Saving…';
   try {
-    await saveLiveStatLog(coach.name, gameTeam, activeSheetGameNum, entries);
+    await persistLiveStatLog();
     btn.textContent = 'Saved ✓';
     setTimeout(() => { btn.textContent = '💾 Save Log'; btn.disabled = false; }, 1500);
   } catch (err) {
@@ -1641,6 +2044,17 @@ function wireSaveLogButton() {
   document.getElementById('gb-gamelog-save').addEventListener('click', e => {
     e.stopPropagation();
     saveCurrentLiveStatLog();
+  });
+}
+
+// Undo now lives in the always-visible Game Log panel (above Save Log)
+// instead of inside the per-tap stat panel — a coach shouldn't have to
+// reopen a specific player's panel just to undo the last thing they
+// logged (see undoLastLiveStatEntry, unchanged — still self-contained).
+function wireUndoLogButton() {
+  document.getElementById('gb-gamelog-undo').addEventListener('click', e => {
+    e.stopPropagation();
+    undoLastLiveStatEntry();
   });
 }
 
@@ -1682,6 +2096,8 @@ async function initGameView() {
   wireJerseyToggle();
   wireLiveStatToggle();
   wireSaveLogButton();
+  wireUndoLogButton();
+  wireGameLogNotesPanel();
 
   const { team: linkedTeam, sheetGameNum: linkedSheetGameNum } = deepLinkParams();
   if (linkedTeam) {
