@@ -4,7 +4,7 @@ import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_COLORS } from './coaches-config.js';
 import { buildIconIndex, iconUrl, fetchPlayers, buildDriveIndex, photoUrl, COL } from './players-data.js';
 import { fetchSchedule, parseGameDate, COL as SCHED_COL } from './schedule-data.js';
-import { getCompositeRank, getGameConfig, saveGameConfig, getAllScheduleGames, saveJerseyNumber, clearJerseyNumber, saveLiveStatLog, getLiveStatLog, saveGameLogNotes, getGameLogNotes } from './firebase.js';
+import { getCompositeRank, getGameConfig, saveGameConfig, getAllScheduleGames, saveJerseyNumber, clearJerseyNumber, saveLiveStatLog, getLiveStatLog, saveGameLogNotes, getGameLogNotes, saveGameboardGhosts, getGameboardGhosts } from './firebase.js';
 import {
   computePlayerStatus, computeQuarterStatus, computeGameStatus, countPresent,
 } from './rotations-engine.js';
@@ -17,13 +17,14 @@ function setView(view) {
 }
 
 // Dev-only switch, not exposed anywhere in the app UI — flip this by hand
-// and push to change the Board view's layout for all coaches. Intended to
-// go from false -> true once every team has played a game (after
-// 2026-07-10) and TEAMS order below is replaced with real stat-ranking
-// order. true = rank 1 alone in its own full-width band, ranks 2-3 sharing
-// a second band, ranks 4-12 in the normal 3-per-row grid. false = plain
-// 3-per-row grid, no bands.
-const USE_PODIUM_LAYOUT = false;
+// and push to change the Board view's layout for all coaches. true = rank 1
+// alone in its own full-width band, ranks 2-3 sharing a second band, ranks
+// 4-12 in the normal 3-per-row grid, all ordered by True Rank (see
+// trueRankFor). false = plain 3-per-row grid, no bands, TEAMS array order.
+// Flipped to true once every team had played a game and True Rank's formula
+// was decided (the league's own official formula, not a Bayesian one — see
+// trueRankFor's comment).
+const USE_PODIUM_LAYOUT = true;
 
 // ── Season stats (Points Made/Allowed, Wins/Losses, Scoring Ratio, etc.) ────
 // Computed client-side from the schedule sheet's V/H columns (which team
@@ -87,6 +88,19 @@ function winLossPctFor(team) {
   return s.gamesPlayed === 0 ? 0 : (s.wins / s.gamesPlayed) * 100;
 }
 
+// True Rank = the league's own official standings formula (used in past
+// seasons, kept as-is rather than a statistically "nicer" alternative so
+// this app's ranking stays in sync with what the league officially
+// reports) — Scoring Ratio divided by the full season's game count (10),
+// plus Win/Loss %. Win/Loss % dominates (0-100 range vs. Scoring Ratio/10's
+// ~0-0.2 range), so this is effectively "rank by win percentage, broken by
+// scoring ratio" — any team with at least one win outranks a winless team
+// regardless of point differential or games played. Not adjusted for
+// strength of schedule or sample size.
+function trueRankFor(team) {
+  return (scoringRatioFor(team) / 10) + winLossPctFor(team);
+}
+
 function tileHtml(team, i) {
   const info = TEAM_COLORS[team];
   const colorName = info?.name || '';
@@ -116,14 +130,14 @@ function tileHtml(team, i) {
     </div>`;
 }
 
-// Board view lists teams by ID number — currently just TEAMS' existing
-// order (Undrafted excluded). Will switch to stat-ranking order once every
-// team has a game played (after 2026-07-10) — not yet implemented.
+// Board view lists teams ranked by True Rank, highest first (Undrafted
+// excluded) — see trueRankFor.
 function renderBoardGrid() {
   const top = document.getElementById('gb-board-top');
   const second = document.getElementById('gb-board-second');
   const grid = document.getElementById('gb-board-grid');
-  const teams = TEAMS.filter(t => t !== 'Undrafted');
+  const teams = TEAMS.filter(t => t !== 'Undrafted')
+    .sort((a, b) => trueRankFor(b) - trueRankFor(a));
 
   if (USE_PODIUM_LAYOUT) {
     top.classList.add('gb-board-top-active');
@@ -142,8 +156,7 @@ function renderBoardGrid() {
 
 // ── Team stats popover (click/tap a Board tile) ─────────────────────────────
 // Stats are computed for real from Schedules' scheduleGames Firestore data
-// (see loadTeamStats above) — only True Rank remains a placeholder, pending
-// a formula decision (see LIVE_STATS_SPEC.md).
+// (see loadTeamStats above), including True Rank (see trueRankFor).
 
 function positionPopover(popoverEl, anchorEl) {
   const rect = anchorEl.getBoundingClientRect();
@@ -160,13 +173,13 @@ function positionPopover(popoverEl, anchorEl) {
 }
 
 // Each stat row is tappable — tapping it shows a short blurb explaining
-// what the stat means and how it's calculated. True Rank's formula is not
-// yet decided (see LIVE_STATS_SPEC.md) so it stays a placeholder '—'.
+// what the stat means and how it's calculated.
 function statDefsFor(team) {
   const s = statsFor(team);
   const ratio = scoringRatioFor(team);
   const ratioStr = ratio === Infinity ? '—' : ratio.toFixed(2);
   const pct = winLossPctFor(team);
+  const trueRank = trueRankFor(team);
   return [
     { key: 'pointsMade',     label: 'Points Made',      value: String(s.pointsMade), blurb: 'Total # of points scored against opponents this entire season; a measure of offensive strength.' },
     { key: 'pointsAllowed',  label: 'Points Allowed',   value: String(s.pointsAllowed), blurb: 'Total # of points scored on this team by opponents this season; a measure of defensive strength.' },
@@ -175,7 +188,7 @@ function statDefsFor(team) {
     { key: 'losses',         label: 'Losses',           value: String(s.losses) }, // self-explanatory, no tap blurb
     { key: 'gamesPlayed',    label: 'Games Played',     value: String(s.gamesPlayed) }, // self-explanatory, no tap blurb
     { key: 'winLossRatio',   label: 'Win/Loss %',       value: `${pct.toFixed(1)}%`, blurb: 'Wins divided by # of games played so far; the higher percentage of wins, the better.' },
-    { key: 'trueRank',       label: 'True Rank',        value: '—', blurb: "Team's score ratio adjusted for actual number of games played so far; ranked highest adjusted score to lowest across all 12 teams; more nuanced than Score Ratio or Win/Loss % ranking alone." },
+    { key: 'trueRank',       label: 'True Rank',        value: trueRank.toFixed(2), blurb: "(Scoring Ratio ÷ 10) + Win/Loss %; the league's official ranking formula, ranked highest to lowest across all 12 teams." },
   ];
 }
 
@@ -452,7 +465,131 @@ async function buildRosterSide(team) {
     order,
     pattern: new Map(order.map(id => [id, [false, false, false, false]])),
     absent: new Set(),
+    // Named "ghost" players (see resolveUnassignedJersey) and not-yet-named
+    // placeholder slots (see the Lineup Manager Go button) both get spliced
+    // into players/order/pattern just like a real roster player once they
+    // exist — this map just tracks which entries in `players` are
+    // synthetic, keyed by jersey #, so the Go button can find/reuse the
+    // same slot instead of creating duplicates. Ghosts are restored from
+    // Firestore/session below; unresolved placeholders are NOT persisted
+    // (session-live only — re-running the 5-digit code recreates them).
+    ghostsByJersey: {}, // { [jerseyNum]: playerId } — playerId is "ghost:N" or "unresolved:N"
   };
+}
+
+// ── Lineup Manager jersey-code precedence (unassigned / absent / ghost) ────
+// A jersey # typed into the 5-digit quick-set is treated as ground truth
+// that a real body wearing that number is on the court right now — see the
+// user's spec: it should never silently fail just because the roster
+// doesn't (yet) know who that is, or thinks they're absent.
+
+function ghostSessionKey(team) {
+  return `gameboard_ghosts_${team}`;
+}
+
+// Restores this coach's NAMED ghosts for the team (Firestore if logged in,
+// sessionStorage draft if not — same split used throughout this page).
+// Unresolved (not-yet-named) placeholders are intentionally NOT restored;
+// they only exist for the live session that created them.
+async function restoreGhostsForSide(side) {
+  const coach = getCurrentCoach();
+  let ghostsByJersey = {};
+  if (coach) {
+    const saved = await getGameboardGhosts(coach.name, side.team);
+    ghostsByJersey = saved?.ghostsByJersey || {};
+  } else {
+    try {
+      const raw = sessionStorage.getItem(ghostSessionKey(side.team));
+      ghostsByJersey = raw ? JSON.parse(raw) : {};
+    } catch { ghostsByJersey = {}; }
+  }
+  Object.entries(ghostsByJersey).forEach(([jerseyNum, name]) => {
+    addGhostToSide(side, parseInt(jerseyNum, 10), name);
+  });
+}
+
+async function persistGhostsForSide(side) {
+  const ghostsByJersey = {};
+  Object.entries(side.ghostsByJersey).forEach(([jerseyNum, id]) => {
+    if (id.startsWith('ghost:')) ghostsByJersey[jerseyNum] = side.players[id][COL.NAME];
+  });
+  const coach = getCurrentCoach();
+  if (coach) {
+    await saveGameboardGhosts(coach.name, side.team, ghostsByJersey);
+  } else {
+    try { sessionStorage.setItem(ghostSessionKey(side.team), JSON.stringify(ghostsByJersey)); }
+    catch { /* sessionStorage unavailable/full — silently skip, not critical */ }
+  }
+}
+
+// Splices a named ghost into the side's roster-like structures so every
+// existing lookup (side.players[id], side.order, side.pattern) treats it
+// exactly like a real player from here on — Live Stat logging, tile
+// rendering, everything. `jerseyNum` is baked into the synthetic player so
+// jerseyNumberFor() can special-case it below (a ghost has no real
+// Firestore player doc to store a jersey number against).
+function addGhostToSide(side, jerseyNum, name) {
+  const id = `ghost:${jerseyNum}`;
+  if (side.players[id]) return id; // already spliced in, don't duplicate
+  side.players[id] = { [COL.ID]: id, [COL.NAME]: name, _isGhost: true, _ghostJerseyNum: jerseyNum };
+  side.order.push(id);
+  side.pattern.set(id, [false, false, false, false]);
+  side.ghostsByJersey[jerseyNum] = id;
+  return id;
+}
+
+// Splices an UNNAMED placeholder in — same mechanics as addGhostToSide, but
+// never persisted (see restoreGhostsForSide) and renders/behaves
+// differently until named (see playerTileHtml / wireSideTileInteractions).
+function addUnresolvedToSide(side, jerseyNum) {
+  const id = `unresolved:${jerseyNum}`;
+  if (side.players[id]) return id;
+  side.players[id] = { [COL.ID]: id, [COL.NAME]: `#${jerseyNum}`, _isUnresolved: true, _ghostJerseyNum: jerseyNum };
+  side.order.push(id);
+  side.pattern.set(id, [false, false, false, false]);
+  side.ghostsByJersey[jerseyNum] = id;
+  return id;
+}
+
+// Promotes an unresolved placeholder to a named ghost in place — same
+// playerId is NOT reused (ghost: vs unresolved: prefixes differ), so this
+// removes the old unresolved entry and splices in a fresh named one,
+// carrying over whatever pattern/absent state had already accumulated
+// under the placeholder (e.g. if it was already marked IN this quarter).
+async function promoteUnresolvedToGhost(side, jerseyNum, name) {
+  const oldId = `unresolved:${jerseyNum}`;
+  const oldPattern = side.pattern.get(oldId);
+  const wasAbsent = side.absent.has(oldId);
+  side.order = side.order.filter(oid => oid !== oldId);
+  side.pattern.delete(oldId);
+  side.absent.delete(oldId);
+  delete side.players[oldId];
+
+  const newId = addGhostToSide(side, jerseyNum, name);
+  if (oldPattern) side.pattern.set(newId, oldPattern);
+  if (wasAbsent) side.absent.add(newId);
+  await persistGhostsForSide(side);
+  return newId;
+}
+
+// Reassigns an unresolved placeholder's jersey # to a REAL roster player
+// instead of naming a ghost — the placeholder disappears entirely and that
+// player's tile takes its place, carrying over the same IN/OUT state.
+async function resolveUnassignedToRealPlayer(side, jerseyNum, realPlayerId) {
+  const oldId = `unresolved:${jerseyNum}`;
+  const oldPattern = side.pattern.get(oldId);
+  const wasAbsent = side.absent.has(oldId);
+  side.order = side.order.filter(oid => oid !== oldId);
+  side.pattern.delete(oldId);
+  side.absent.delete(oldId);
+  delete side.players[oldId];
+  delete side.ghostsByJersey[jerseyNum];
+
+  const player = side.players[realPlayerId];
+  await setJerseyNumberFor(player, jerseyNum);
+  if (oldPattern) side.pattern.set(realPlayerId, oldPattern);
+  side.absent.delete(realPlayerId);
+  if (wasAbsent) { /* the placeholder's absence doesn't carry over to a newly-identified real player — they're being actively placed IN */ }
 }
 
 // ── Jersey # (per-coach, per-player, not tied to any one game) ──────────────
@@ -467,6 +604,9 @@ function sessionJerseyKey(playerId) {
 }
 
 function jerseyNumberFor(player) {
+  // Ghosts/unresolved placeholders carry their number inline — they have no
+  // real Firestore player doc to store a per-coach jersey number against.
+  if (player._ghostJerseyNum != null) return player._ghostJerseyNum;
   const coach = getCurrentCoach();
   if (coach) {
     const n = player._jerseyByCoach?.[coach.name];
@@ -558,6 +698,15 @@ async function loadActiveGame() {
   // coach's most-recently-saved Firestore config (per coach+team+
   // sheetGameNum), or — with no coach logged in — this browser tab's own
   // in-progress session draft, if either exists.
+  // Ghosts must be spliced into side.order BEFORE the saved lineup config
+  // is applied below — that step restores pattern/absent by iterating
+  // side.order, so a ghost that was IN in a previously-saved lineup needs
+  // to already exist as an entry for its saved state to attach to.
+  await Promise.all([
+    restoreGhostsForSide(ownSide),
+    oppSide ? restoreGhostsForSide(oppSide) : Promise.resolve(),
+  ]);
+
   const coach = getCurrentCoach();
   if (coach) {
     await Promise.all([
@@ -1353,7 +1502,23 @@ function playerTileHtml(side, id, mirrored, isIn) {
   const firstName = fullName.split(/\s+/)[0] || fullName;
   const isAbsent = side.absent.has(id);
   let avatarHtml;
-  if (jerseyMode) {
+  // Unresolved placeholders (a jersey # typed via the Lineup Manager that
+  // doesn't match any known player) always render as a numbered thumbnail,
+  // regardless of Jersey # tile-view mode — there's no photo to show, and
+  // the number itself is the whole point until it's resolved. Named ghosts
+  // render the same numbered-thumbnail style too (no real photo exists for
+  // them either), but participate in Jersey mode's own on/off toggle like
+  // a normal player otherwise.
+  if (p?._isUnresolved) {
+    avatarHtml = `<div class="gb-jersey-avatar gb-jersey-unresolved">${jerseyNumberFor(p)}</div>`;
+  } else if (p?._isGhost) {
+    // Named ghosts have no real photo, so they always show as a numbered
+    // thumbnail (same team-colored styling Jersey mode uses) whether or
+    // not Jersey # tile-view mode happens to be on.
+    const hex = TEAM_COLORS[side.team]?.hex || '#000000';
+    const style = `background:${hex};color:${readableTextColor(hex)};border-color:${hex}`;
+    avatarHtml = `<div class="gb-jersey-avatar" style="${style}">${jerseyNumberFor(p)}</div>`;
+  } else if (jerseyMode) {
     const num = jerseyNumberFor(p);
     if (num == null) {
       avatarHtml = `<div class="gb-jersey-avatar gb-jersey-unset">#</div>`;
@@ -1638,6 +1803,79 @@ function showJerseyPicker(anchorEl, player, side) {
   positionPopover(popover, anchorEl);
 }
 
+// Resolve popover for an unresolved jersey placeholder (see
+// addUnresolvedToSide) — a jersey # typed via the Lineup Manager's 5-digit
+// quick-set that didn't match anyone. Lists every real roster player who
+// doesn't have a jersey # yet (their profile photo + name — picking one
+// assigns them this number), plus an always-present custom-name option
+// that promotes this slot to a permanent "ghost" player instead.
+function showUnresolvedJerseyPopover(anchorEl, side, unresolvedId) {
+  const popover = document.getElementById('gb-jersey-popover');
+  const jerseyNum = side.players[unresolvedId]._ghostJerseyNum;
+
+  const unassignedIds = side.order.filter(id =>
+    id !== unresolvedId &&
+    !side.players[id]._isGhost &&
+    !side.players[id]._isUnresolved &&
+    jerseyNumberFor(side.players[id]) == null
+  );
+
+  const playerRows = unassignedIds.map(id => {
+    const p = side.players[id];
+    const photo = photoUrl(p);
+    const avatarHtml = photo
+      ? `<img src="${photo}" alt="${escHtml(p[COL.NAME] || '')}" class="gb-unresolved-pick-avatar-img" />`
+      : `<div class="gb-unresolved-pick-avatar-img gb-unresolved-pick-avatar-placeholder">🏀</div>`;
+    return `
+      <button class="gb-unresolved-pick-row" data-player-id="${escHtml(id)}" type="button">
+        <div class="gb-unresolved-pick-avatar">${avatarHtml}</div>
+        <span>${escHtml(p[COL.NAME] || 'Unknown')}</span>
+      </button>`;
+  }).join('');
+
+  const emptyMsg = unassignedIds.length === 0
+    ? '<div class="sched-popover-hint">Every roster player already has a jersey #.</div>'
+    : '';
+
+  popover.innerHTML = `
+    <div class="sched-popover-title">Who is #${jerseyNum}?</div>
+    <div class="gb-unresolved-pick-list">${playerRows}${emptyMsg}</div>
+    <div class="gb-unresolved-custom-row">
+      <input id="gb-unresolved-custom-input" type="text" maxlength="24" placeholder="Or type a name…" />
+      <button id="gb-unresolved-custom-go" type="button">Set</button>
+    </div>
+  `;
+
+  popover.querySelectorAll('.gb-unresolved-pick-row').forEach(row => {
+    row.addEventListener('click', async e => {
+      e.stopPropagation();
+      await resolveUnassignedToRealPlayer(side, jerseyNum, row.dataset.playerId);
+      popover.classList.add('hidden');
+      renderGameView();
+    });
+  });
+
+  const customInput = popover.querySelector('#gb-unresolved-custom-input');
+  const commitCustomName = async () => {
+    const name = customInput.value.trim();
+    if (!name) return;
+    await promoteUnresolvedToGhost(side, jerseyNum, name);
+    popover.classList.add('hidden');
+    renderGameView();
+  };
+  popover.querySelector('#gb-unresolved-custom-go').addEventListener('click', e => {
+    e.stopPropagation();
+    commitCustomName();
+  });
+  customInput.addEventListener('click', e => e.stopPropagation());
+  customInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') commitCustomName();
+  });
+
+  positionPopover(popover, anchorEl);
+  customInput.focus();
+}
+
 // Roster-wide jersey list (tapping a team's icon in Jersey # mode) — lets a
 // coach see every player's number at once and unassign any one of them,
 // rather than hunting for the specific tile that has a wrong number.
@@ -1652,9 +1890,11 @@ function showJerseyPicker(anchorEl, player, side) {
 // 2. A 5-digit quick-lineup field: enter the jersey #s of the 5 players who
 //    should be IN for the CURRENTLY ACTIVE quarter only, tap Go. Digit
 //    order never matters — IN/OUT box order is always governed by the
-//    existing composite-rank order, never by typing order. Any digit with
-//    no matching jersey #, or matching an absent player, is silently
-//    skipped rather than erroring — the rest of the string still applies.
+//    existing composite-rank order, never by typing order. A digit is
+//    treated as ground truth that someone wearing that number is on the
+//    court: it reactivates an absent player wearing that number, and a
+//    number nobody has yet gets a placeholder tile (see addUnresolvedToSide)
+//    instead of being silently dropped.
 function showLineupManager(anchorEl, side) {
   const popover = document.getElementById('gb-jersey-popover');
 
@@ -1670,7 +1910,11 @@ function showLineupManager(anchorEl, side) {
     .join('');
 
   function renderRows() {
-    const rows = side.order.map(id => {
+    // Ghosts/unresolved placeholders don't belong in the real-roster jersey
+    // list (they're not real players to assign a number to by hand here —
+    // ghosts already have one, unresolved ones get resolved via their own
+    // popover, not this list) — filtered out, real roster only.
+    const rows = side.order.filter(id => !side.players[id]._isGhost && !side.players[id]._isUnresolved).map(id => {
       const p = side.players[id];
       const num = jerseyNumberFor(p);
       const name = p?.[COL.NAME] || 'Unknown';
@@ -1744,10 +1988,23 @@ function showLineupManager(anchorEl, side) {
     document.getElementById('gb-jersey-quickset-go').addEventListener('click', async () => {
       const digits = document.getElementById('gb-jersey-quickset-input').value.replace(/\D/g, '').split('');
       const matchedIds = new Set();
+      // A jersey # typed here is ground truth that a real body wearing it
+      // is on the court right now — see the user's spec. This takes
+      // precedence over both "no jersey # assigned" and "marked absent"
+      // instead of silently skipping those digits like before.
       digits.forEach(d => {
         const num = parseInt(d, 10);
-        const id = side.order.find(oid => !side.absent.has(oid) && jerseyNumberFor(side.players[oid]) === num);
-        if (id) matchedIds.add(id);
+        // 1) A real roster player already wearing this number — ignore
+        //    absence entirely, they're being actively placed IN.
+        let id = side.order.find(oid => jerseyNumberFor(side.players[oid]) === num && !side.players[oid]._isUnresolved);
+        if (id) {
+          side.absent.delete(id); // reactivated — cleared for every quarter, not just this one
+        } else {
+          // 2) No one (real, ghost, or otherwise) has this number yet —
+          //    create/reuse an unresolved placeholder tile for it.
+          id = addUnresolvedToSide(side, num);
+        }
+        matchedIds.add(id);
       });
       side.order.forEach(id => {
         if (side.absent.has(id)) return;
@@ -1769,6 +2026,19 @@ function wireSideTileInteractions(container, side, isIn) {
   container.querySelectorAll('.gb-inout-tile').forEach(tile => {
     const id = tile.dataset.id;
     let lastTap = 0;
+
+    // An unresolved jersey placeholder (see addUnresolvedToSide) MUST be
+    // named before it can take on any other tile behavior — highest
+    // priority, above even Live Stat mode, per the user's spec. Tapping it
+    // opens the resolve popover instead of whatever this tap would
+    // otherwise have done.
+    if (side.players[id]?._isUnresolved) {
+      tile.addEventListener('click', e => {
+        e.stopPropagation();
+        showUnresolvedJerseyPopover(tile, side, id);
+      });
+      return;
+    }
 
     // Live Stat mode takes over tile behavior entirely, whenever it's on
     // (highest priority — overrides Jersey # mode too, which is unlikely to

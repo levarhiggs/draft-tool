@@ -2836,6 +2836,17 @@ main {
   border-color: var(--clr-muted);
 }
 
+/* Unresolved jersey placeholder (a # typed via the Lineup Manager that
+   didn't match anyone yet — see addUnresolvedToSide in gameboard.js). The
+   number itself IS known (unlike .gb-jersey-unset's bare "#"), so this
+   reads as "someone specific, not yet identified" — an amber dashed
+   outline instead of the plain team-color fill a resolved tile gets. */
+.gb-jersey-avatar.gb-jersey-unresolved {
+  background: transparent;
+  color: var(--clr-warning);
+  border: 2px dashed var(--clr-warning);
+}
+
 /* One-tap 1-8 jersey # picker popover (see showJerseyPicker in
    gameboard.js) — a 4x2 grid of number buttons, each topped with a jersey
    emoji, so assigning a number during a live game is a single tap. */
@@ -2848,6 +2859,95 @@ main {
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
   margin-top: 4px;
+}
+
+/* Resolve popover for an unresolved jersey placeholder (see
+   showUnresolvedJerseyPopover in gameboard.js) — a scrollable list of
+   unassigned real players, each a full-width photo+name button, plus an
+   always-present custom-name row underneath. */
+.gb-unresolved-pick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 6px 0;
+}
+
+.gb-unresolved-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  color: var(--clr-text);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.gb-unresolved-pick-row:hover {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+}
+
+.gb-unresolved-pick-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 22%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.gb-unresolved-pick-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  color: transparent;
+  font-size: 0;
+}
+.gb-unresolved-pick-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--clr-surface);
+  font-size: 1.1rem;
+}
+
+.gb-unresolved-custom-row {
+  display: flex;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--clr-border);
+}
+.gb-unresolved-custom-row input {
+  flex: 1;
+  min-width: 0;
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: 6px;
+  color: var(--clr-text);
+  font-family: inherit;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+.gb-unresolved-custom-row input:focus {
+  outline: none;
+  border-color: var(--clr-accent);
+}
+.gb-unresolved-custom-row button {
+  background: var(--clr-accent);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 700;
+  padding: 6px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.gb-unresolved-custom-row button:hover {
+  background: var(--clr-accent-dk);
 }
 
 .gb-jersey-pick-btn {

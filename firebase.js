@@ -276,6 +276,42 @@ export async function getGameLogNotes(coachName, team, sheetGameNum) {
   }
 }
 
+// ── Gameboard "ghost" players ────────────────────────────────────────────────
+// A jersey # typed into the Lineup Manager's 5-digit quick-set that doesn't
+// match any real roster player gets a placeholder tile; naming it via the
+// custom-name option in its resolve-popover promotes it to a permanent
+// "ghost" — not a real roster player/profile, but tracked like one from
+// then on (Live Stat logging, IN/OUT, etc.), scoped to this coach's own
+// view of this team (same rationale as per-coach jersey numbers: coaches
+// don't share a numbering scheme, and a ghost is really just a named
+// placeholder for "whoever is wearing #7"). Lives at the team level, not
+// per-game, since jersey assignments are meant to hold for the whole season.
+// Firestore doc shape for gameboardGhosts/{coachName}_{team}:
+// { coachName, team, ghostsByJersey: { "7": "Sub Kid" }, updatedAt }
+function gameboardGhostsRef(coachName, team) {
+  const id = `${coachName}_${team}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+  return doc(db, 'gameboardGhosts', id);
+}
+
+export async function saveGameboardGhosts(coachName, team, ghostsByJersey) {
+  const ref = gameboardGhostsRef(coachName, team);
+  await setDoc(ref, {
+    coachName, team,
+    ghostsByJersey,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function getGameboardGhosts(coachName, team) {
+  try {
+    const snap = await getDoc(gameboardGhostsRef(coachName, team));
+    return snap.exists() ? snap.data() : null;
+  } catch (err) {
+    console.error('getGameboardGhosts error:', err);
+    return null;
+  }
+}
+
 export async function saveScheduleGame(gameNum, vScore, hScore, coachName) {
   let winner = null;
   if (vScore != null && hScore != null) {
