@@ -2105,6 +2105,10 @@ main {
   width: 55%;
 }
 
+.gb-board-second .gb-team-tile-icon {
+  width: 47%;
+}
+
 .gb-team-tile {
   background: var(--clr-surface);
   border: 1px solid var(--clr-border);
