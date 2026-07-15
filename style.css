@@ -1987,6 +1987,20 @@ main {
   min-width: 200px;
 }
 
+.sched-rankings-link-row {
+  display: flex;
+  justify-content: center;
+}
+
+.sched-rankings-link {
+  color: var(--clr-accent);
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: underline;
+}
+
+.sched-rankings-link:hover { color: var(--clr-accent-dk); }
+
 .sched-cell-muted { color: var(--clr-muted); }
 .sched-last-updated { font-size: 0.8em; font-style: italic; }
 

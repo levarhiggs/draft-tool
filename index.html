@@ -69,6 +69,17 @@
         </div>
       </div>
 
+      <!-- Direct link to Gameboard's Board view (season standings/rankings)
+           — teams have all started playing, so this gives a one-tap path
+           to "who's winning" without needing to log in or find Gameboard
+           in the side menu. ?view=board forces Board view regardless of
+           login state — a logged-in coach visiting gameboard.html plain
+           would otherwise default straight to Game view (see setView in
+           gameboard.js). -->
+      <div class="sched-rankings-link-row">
+        <a href="gameboard.html?view=board" class="sched-rankings-link">Click here for Rankings</a>
+      </div>
+
       <!-- Team filter dots: same filter as the dropdown above, just a
            faster tap target — one dot per team, color-coded, in the same
            1-12 order as the coaches/teams array. Sits above both the

@@ -2415,7 +2415,12 @@ async function initGameView() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  setView(getCurrentCoach() ? 'game' : 'board');
+  // ?view=board (used by Schedules' "Click here for Rankings" link) forces
+  // Board view on load regardless of login state — a logged-in coach would
+  // otherwise default straight to Game view (see the team deep-link comment
+  // above), which defeats the point of a one-tap "see who's winning" link.
+  const forcedView = new URLSearchParams(window.location.search).get('view');
+  setView(forcedView === 'board' ? 'board' : (getCurrentCoach() ? 'game' : 'board'));
   renderBoardGrid();
   buildIconIndex().then(renderBoardGrid);
   loadTeamStats().then(renderBoardGrid);
