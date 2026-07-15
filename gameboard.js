@@ -179,18 +179,20 @@ function positionPopover(popoverEl, anchorEl) {
   });
 }
 
-// Renders a Wins/Losses blurb as a sequential list of opponent team-color
-// swatches + names, in season (schedule) order — e.g. "1. [dot] Forest
-// Green  2. [dot] Purple". Empty list (no wins/losses yet) falls back to
-// plain text rather than an empty blurb box.
-function opponentListHtml(teamNames, emptyText) {
+// Renders a Wins/Losses blurb as a heading line (what the list below it
+// means, e.g. "Teams won against:") followed by a sequential list of
+// opponent team-color swatches + names, in season (schedule) order — e.g.
+// "1. [dot] Forest Green  2. [dot] Purple". Empty list (no wins/losses yet)
+// falls back to plain text instead of a heading over an empty list.
+function opponentListHtml(teamNames, heading, emptyText) {
   if (teamNames.length === 0) return escHtml(emptyText);
-  return teamNames.map((t, i) => {
+  const rows = teamNames.map((t, i) => {
     const info = TEAM_COLORS[t];
     const hex = info?.hex || '#8890a8';
     const name = info?.shortName || info?.name || t;
     return `<div class="gb-oppo-list-row"><span class="gb-oppo-list-num">${i + 1}.</span><span class="gb-team-stats-dot" style="background:${hex}"></span>${escHtml(name)}</div>`;
   }).join('');
+  return escHtml(heading) + rows;
 }
 
 // Each stat row is tappable — tapping it shows a short blurb explaining
@@ -207,8 +209,8 @@ function statDefsFor(team) {
     { key: 'pointsMade',     label: 'Points Made',      value: String(s.pointsMade), blurb: 'Total # of points scored against opponents this entire season; a measure of offensive strength.' },
     { key: 'pointsAllowed',  label: 'Points Allowed',   value: String(s.pointsAllowed), blurb: 'Total # of points scored on this team by opponents this season; a measure of defensive strength.' },
     { key: 'scoringRatio',   label: 'Scoring Ratio',    value: ratioStr, blurb: 'Points Made divided by Points Allowed; the higher the ratio the stronger the performance.' },
-    { key: 'wins',           label: 'Wins',             value: String(s.wins), blurbHtml: opponentListHtml(s.beatenTeams, 'No wins yet this season.') },
-    { key: 'losses',         label: 'Losses',           value: String(s.losses), blurbHtml: opponentListHtml(s.lostToTeams, 'No losses yet this season.') },
+    { key: 'wins',           label: 'Wins',             value: String(s.wins), blurbHtml: opponentListHtml(s.beatenTeams, 'Teams won against:', 'No wins yet this season.') },
+    { key: 'losses',         label: 'Losses',           value: String(s.losses), blurbHtml: opponentListHtml(s.lostToTeams, 'Teams defeated by:', 'No losses yet this season.') },
     { key: 'gamesPlayed',    label: 'Games Played',     value: String(s.gamesPlayed) }, // self-explanatory, no tap blurb
     { key: 'winLossRatio',   label: 'Win/Loss %',       value: `${pct.toFixed(1)}%`, blurb: 'Wins divided by # of games played so far; the higher percentage of wins, the better.' },
     { key: 'trueRank',       label: 'True Rank',        value: trueRank.toFixed(2), blurb: "(Scoring Ratio ÷ 10) + Win/Loss % as a decimal — blends scoring strength with actual games won, a more complete picture than either stat alone." },
