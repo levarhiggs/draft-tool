@@ -211,7 +211,7 @@ function statDefsFor(team) {
     { key: 'losses',         label: 'Losses',           value: String(s.losses), blurbHtml: opponentListHtml(s.lostToTeams, 'No losses yet this season.') },
     { key: 'gamesPlayed',    label: 'Games Played',     value: String(s.gamesPlayed) }, // self-explanatory, no tap blurb
     { key: 'winLossRatio',   label: 'Win/Loss %',       value: `${pct.toFixed(1)}%`, blurb: 'Wins divided by # of games played so far; the higher percentage of wins, the better.' },
-    { key: 'trueRank',       label: 'True Rank',        value: trueRank.toFixed(2), blurb: "(Scoring Ratio ÷ 10) + Win/Loss %; the league's official ranking formula, ranked highest to lowest across all 12 teams." },
+    { key: 'trueRank',       label: 'True Rank',        value: trueRank.toFixed(2), blurb: "(Scoring Ratio ÷ 10) + Win/Loss % as a decimal — blends scoring strength with actual games won, a more complete picture than either stat alone." },
   ];
 }
 
