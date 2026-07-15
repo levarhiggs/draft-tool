@@ -36,7 +36,13 @@ const USE_PODIUM_LAYOUT = true;
 let teamStats = {}; // team (TEAMS entry, e.g. "Team Blue") -> stats object
 
 function emptyTeamStats() {
-  return { pointsMade: 0, pointsAllowed: 0, wins: 0, losses: 0, gamesPlayed: 0 };
+  // beatenTeams/lostToTeams: opponent team names, in schedule (chronological)
+  // order — the schedule sheet's own row order is already date-ordered (see
+  // schedule-data.js), and games.forEach below iterates it in that order, so
+  // simply pushing as each result is found keeps these sequential without
+  // needing a separate sort. Powers the Wins/Losses stat blurbs' "who did
+  // this team beat/lose to, in order" breakdown.
+  return { pointsMade: 0, pointsAllowed: 0, wins: 0, losses: 0, gamesPlayed: 0, beatenTeams: [], lostToTeams: [] };
 }
 
 // Ties are not expected to occur in this league (every game gets a winner
@@ -58,15 +64,15 @@ async function loadTeamStats() {
       stats[vTeam].pointsMade += result.vScore;
       stats[vTeam].pointsAllowed += result.hScore;
       stats[vTeam].gamesPlayed += 1;
-      if (result.winner === 'V') stats[vTeam].wins += 1;
-      else if (result.winner === 'H') stats[vTeam].losses += 1;
+      if (result.winner === 'V') { stats[vTeam].wins += 1; if (hTeam) stats[vTeam].beatenTeams.push(hTeam); }
+      else if (result.winner === 'H') { stats[vTeam].losses += 1; if (hTeam) stats[vTeam].lostToTeams.push(hTeam); }
     }
     if (hTeam && stats[hTeam]) {
       stats[hTeam].pointsMade += result.hScore;
       stats[hTeam].pointsAllowed += result.vScore;
       stats[hTeam].gamesPlayed += 1;
-      if (result.winner === 'H') stats[hTeam].wins += 1;
-      else if (result.winner === 'V') stats[hTeam].losses += 1;
+      if (result.winner === 'H') { stats[hTeam].wins += 1; if (vTeam) stats[hTeam].beatenTeams.push(vTeam); }
+      else if (result.winner === 'V') { stats[hTeam].losses += 1; if (vTeam) stats[hTeam].lostToTeams.push(vTeam); }
     }
   });
 
@@ -173,8 +179,24 @@ function positionPopover(popoverEl, anchorEl) {
   });
 }
 
+// Renders a Wins/Losses blurb as a sequential list of opponent team-color
+// swatches + names, in season (schedule) order — e.g. "1. [dot] Forest
+// Green  2. [dot] Purple". Empty list (no wins/losses yet) falls back to
+// plain text rather than an empty blurb box.
+function opponentListHtml(teamNames, emptyText) {
+  if (teamNames.length === 0) return escHtml(emptyText);
+  return teamNames.map((t, i) => {
+    const info = TEAM_COLORS[t];
+    const hex = info?.hex || '#8890a8';
+    const name = info?.shortName || info?.name || t;
+    return `<div class="gb-oppo-list-row"><span class="gb-oppo-list-num">${i + 1}.</span><span class="gb-team-stats-dot" style="background:${hex}"></span>${escHtml(name)}</div>`;
+  }).join('');
+}
+
 // Each stat row is tappable — tapping it shows a short blurb explaining
-// what the stat means and how it's calculated.
+// what the stat means and how it's calculated. Wins/Losses show a dynamic
+// blurb (blurbHtml, pre-built markup) instead of a static explanation —
+// see opponentListHtml.
 function statDefsFor(team) {
   const s = statsFor(team);
   const ratio = scoringRatioFor(team);
@@ -185,8 +207,8 @@ function statDefsFor(team) {
     { key: 'pointsMade',     label: 'Points Made',      value: String(s.pointsMade), blurb: 'Total # of points scored against opponents this entire season; a measure of offensive strength.' },
     { key: 'pointsAllowed',  label: 'Points Allowed',   value: String(s.pointsAllowed), blurb: 'Total # of points scored on this team by opponents this season; a measure of defensive strength.' },
     { key: 'scoringRatio',   label: 'Scoring Ratio',    value: ratioStr, blurb: 'Points Made divided by Points Allowed; the higher the ratio the stronger the performance.' },
-    { key: 'wins',           label: 'Wins',             value: String(s.wins) }, // self-explanatory, no tap blurb
-    { key: 'losses',         label: 'Losses',           value: String(s.losses) }, // self-explanatory, no tap blurb
+    { key: 'wins',           label: 'Wins',             value: String(s.wins), blurbHtml: opponentListHtml(s.beatenTeams, 'No wins yet this season.') },
+    { key: 'losses',         label: 'Losses',           value: String(s.losses), blurbHtml: opponentListHtml(s.lostToTeams, 'No losses yet this season.') },
     { key: 'gamesPlayed',    label: 'Games Played',     value: String(s.gamesPlayed) }, // self-explanatory, no tap blurb
     { key: 'winLossRatio',   label: 'Win/Loss %',       value: `${pct.toFixed(1)}%`, blurb: 'Wins divided by # of games played so far; the higher percentage of wins, the better.' },
     { key: 'trueRank',       label: 'True Rank',        value: trueRank.toFixed(2), blurb: "(Scoring Ratio ÷ 10) + Win/Loss %; the league's official ranking formula, ranked highest to lowest across all 12 teams." },
@@ -205,7 +227,7 @@ function showTeamStatsModal(team) {
   const hex = info?.hex || '#8890a8';
   const statDefs = statDefsFor(team);
 
-  const rows = statDefs.map(stat => stat.blurb
+  const rows = statDefs.map(stat => (stat.blurb || stat.blurbHtml)
     ? `<div class="sched-popover-row gb-stat-row" data-stat="${stat.key}" role="button" tabindex="0">
         <span>${escHtml(stat.label)}</span><span>${escHtml(stat.value)}</span>
       </div>`
@@ -233,7 +255,8 @@ function showTeamStatsModal(team) {
         blurbEl.classList.add('hidden');
         return;
       }
-      blurbEl.innerHTML = `<span class="gb-stat-blurb-icon" aria-hidden="true">**</span>${escHtml(stat.blurb)}`;
+      const blurbBody = stat.blurbHtml || escHtml(stat.blurb);
+      blurbEl.innerHTML = `<span class="gb-stat-blurb-icon" aria-hidden="true">**</span>${blurbBody}`;
       blurbEl.dataset.stat = stat.key;
       blurbEl.classList.remove('hidden');
       row.classList.add('gb-stat-row-active');

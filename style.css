@@ -997,6 +997,21 @@ main {
   line-height: 1.4;
 }
 
+/* Wins/Losses dynamic blurb: sequential list of opponent team-color dots +
+   names (see opponentListHtml in gameboard.js), season-schedule order. */
+.gb-oppo-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.gb-oppo-list-num {
+  color: var(--clr-muted);
+  font-size: 0.85em;
+  min-width: 1.4em;
+}
+
 .modal-box h2 {
   font-size: 1.2rem;
   font-weight: 700;
