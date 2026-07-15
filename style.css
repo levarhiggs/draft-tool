@@ -2005,12 +2005,15 @@ main {
 .sched-rankings-link-row {
   display: flex;
   justify-content: center;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
 .sched-rankings-link {
   color: var(--clr-accent);
   font-weight: 700;
   font-size: 0.95rem;
+  line-height: 1;
   text-decoration: underline;
 }
 
