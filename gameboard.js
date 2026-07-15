@@ -92,13 +92,14 @@ function winLossPctFor(team) {
 // seasons, kept as-is rather than a statistically "nicer" alternative so
 // this app's ranking stays in sync with what the league officially
 // reports) — Scoring Ratio divided by the full season's game count (10),
-// plus Win/Loss %. Win/Loss % dominates (0-100 range vs. Scoring Ratio/10's
-// ~0-0.2 range), so this is effectively "rank by win percentage, broken by
-// scoring ratio" — any team with at least one win outranks a winless team
-// regardless of point differential or games played. Not adjusted for
+// plus Win/Loss % as a decimal fraction (0-1, e.g. .75 not 75 — winLossPctFor
+// returns the 0-100 display form used elsewhere, so it's divided back down
+// here rather than changed at the source). Both terms land in a similar
+// ~0-2 range this way, so Scoring Ratio meaningfully influences rank instead
+// of only breaking ties between equal win percentages. Not adjusted for
 // strength of schedule or sample size.
 function trueRankFor(team) {
-  return (scoringRatioFor(team) / 10) + winLossPctFor(team);
+  return (scoringRatioFor(team) / 10) + (winLossPctFor(team) / 100);
 }
 
 function tileHtml(team, i) {
