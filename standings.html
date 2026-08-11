@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CSBC 2026 SJV Summer Directory</title>
-  <meta property="og:title" content="CSBC 2026 SJV Summer Directory" />
-  <meta property="og:description" content="Player directory and rankings for CSBC SJV Summer 2026 draft." />
-  <meta name="description" content="Player directory and rankings for CSBC SJV Summer 2026 draft." />
+  <title>Standings — CSBC 2026 SJV Summer Directory</title>
+  <meta property="og:title" content="Standings — CSBC 2026 SJV Summer Directory" />
+  <meta property="og:description" content="Head-to-head standings matrix for CSBC SJV Summer 2026 teams." />
+  <meta name="description" content="Head-to-head standings matrix for CSBC SJV Summer 2026 teams." />
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="favicon.png" type="image/png" />
   <link rel="manifest" href="manifest.json" />
@@ -24,7 +24,7 @@
         <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Open menu" aria-expanded="false">
           <span></span><span></span><span></span>
         </button>
-        <h1>CSBC SJV Player Directory - Summer 2026</h1>
+        <h1>Standings</h1>
       </div>
       <div class="header-controls">
         <div id="coach-badge" class="coach-badge hidden">
@@ -32,45 +32,6 @@
           <button id="btn-logout" class="btn-sm">Log Out</button>
         </div>
         <button id="btn-login" class="btn-primary">Coach Login</button>
-        <button id="btn-drawer-toggle" class="btn-drawer-toggle" aria-label="Toggle filters">
-          <span id="drawer-toggle-icon">▾ Filters</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Collapsible drawer: sort + search + filters -->
-    <div id="header-drawer" class="header-drawer">
-      <!-- Sort bar -->
-      <div class="sort-bar">
-        <span class="bar-label">Sort:</span>
-        <button class="sort-btn" data-sort="alpha">A – Z</button>
-        <button class="sort-btn active" data-sort="id">ID #</button>
-        <button class="sort-btn" data-sort="birthday">Age</button>
-        <button class="sort-btn" data-sort="team">Team</button>
-        <button class="sort-btn" data-sort="rank">Rank</button>
-      </div>
-
-      <!-- Search bar -->
-      <div class="search-bar">
-        <input id="player-search" type="search" placeholder="Search players…" autocomplete="off" />
-      </div>
-
-      <!-- Filter bar -->
-      <div class="filter-bar">
-        <div class="filter-row">
-          <span class="bar-label">Filter:</span>
-          <button class="filter-chip filter-fav" id="filter-favorites">♥ Favorites</button>
-          <button class="filter-chip filter-noshow hidden" id="filter-noshows">✕ No Shows</button>
-          <div id="filter-grades" class="filter-group"></div>
-        </div>
-        <div class="filter-row">
-          <span class="bar-label">Seed:</span>
-          <div id="filter-seeds" class="filter-group"></div>
-        </div>
-        <div class="filter-row">
-          <span class="bar-label">Team:</span>
-          <div id="filter-teams" class="filter-group"></div>
-        </div>
       </div>
     </div>
   </header>
@@ -85,14 +46,35 @@
     <a href="index.html" class="side-menu-link">📅 Schedules</a>
     <a href="gameboard.html" class="side-menu-link">🎯 Gameboard</a>
     <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
-    <a href="directory.html" class="side-menu-link active">🏀 Player Directory</a>
+    <a href="directory.html" class="side-menu-link">🏀 Player Directory</a>
     <a href="draft-results.html" class="side-menu-link">🏆 Draft Results</a>
-    <a href="standings.html" class="side-menu-link">📊 Standings</a>
+    <a href="standings.html" class="side-menu-link active">📊 Standings</a>
   </nav>
 
   <main>
-    <div id="player-grid" class="player-grid">
-      <div class="loading">Loading players…</div>
+    <div class="stand-page">
+
+      <!-- Mirrors Schedules' "Click here for Rankings" link — a one-tap
+           path to Gameboard's Board view (the "podium rankings"). -->
+      <div class="sched-rankings-link-row">
+        <a href="gameboard.html?view=board" class="sched-rankings-link">Click here for Podium Rankings</a>
+      </div>
+
+      <h2 class="stand-title">Head-to-Head Matrix</h2>
+      <p class="stand-desc">Rows are ordered best record (top) to worst (bottom). Columns run the reverse — worst record (left) to best (right) — so results above a team's own row skew green and results below skew red, without ranking anyone in the labels themselves.</p>
+
+      <div class="stand-caveat">
+        Record only — not a prediction. Standings don't account for injuries, absences, illness, or a team's current form, and they shift after every game.
+      </div>
+
+      <p id="stand-snapshot" class="stand-snapshot"></p>
+
+      <div id="stand-empty-state" class="loading">Loading standings…</div>
+
+      <div id="stand-matrix-wrap" class="stand-matrix-wrap hidden">
+        <table id="stand-matrix" class="stand-matrix"></table>
+      </div>
+
     </div>
   </main>
 
@@ -116,7 +98,7 @@
     </div>
   </div>
 
-  <script type="module" src="app.js"></script>
+  <script type="module" src="standings.js"></script>
   <script type="module" src="coach-login.js"></script>
   <script type="module" src="side-menu.js"></script>
   <script>

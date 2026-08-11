@@ -2006,7 +2006,12 @@ main {
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: 8px;
   margin-bottom: 16px;
+}
+
+.sched-rankings-link-sep {
+  color: var(--clr-muted);
 }
 
 .sched-rankings-link {
@@ -3489,4 +3494,122 @@ main {
 
 .gb-save-btn {
   align-self: center;
+}
+
+/* ── Standings (head-to-head matrix) ── */
+.stand-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 12px 40px;
+}
+
+.stand-title {
+  font-size: 1.15rem;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.stand-desc {
+  color: var(--clr-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.stand-caveat {
+  background: var(--clr-surface);
+  border-left: 3px solid var(--clr-accent);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: var(--clr-text);
+  margin-bottom: 8px;
+}
+
+.stand-snapshot {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--clr-muted);
+  margin-bottom: 18px;
+}
+
+.stand-matrix-wrap {
+  overflow-x: auto;
+}
+
+.stand-matrix {
+  border-collapse: collapse;
+  margin: 0 auto;
+}
+
+.stand-col-head, .stand-row-head {
+  padding: 4px 6px;
+  font-weight: 600;
+  font-size: 0.68rem;
+  color: var(--clr-text);
+  background: var(--clr-surface);
+}
+
+.stand-row-head {
+  min-width: 150px;
+  text-align: left;
+  padding-left: 10px;
+}
+
+.stand-col-head-inner, .stand-row-head-inner {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  justify-content: center;
+}
+
+.stand-row-head-inner {
+  justify-content: flex-start;
+}
+
+.stand-col-swatch-icon, .stand-row-swatch-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.stand-col-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+  border: 1px solid var(--clr-border);
+}
+
+.stand-cell {
+  width: 40px;
+  height: 36px;
+  min-width: 40px;
+  text-align: center;
+  border: 1px solid var(--clr-bg);
+}
+
+.stand-cell-self {
+  background: var(--clr-surface);
+  border: 1px solid rgba(255,255,255,0.55);
+  color: var(--clr-muted);
+}
+
+.stand-cell-win {
+  background: color-mix(in srgb, var(--clr-success) calc(var(--cell-alpha) * 100%), var(--clr-surface));
+}
+
+.stand-cell-loss {
+  background: color-mix(in srgb, var(--clr-danger) calc(var(--cell-alpha) * 100%), var(--clr-surface));
+}
+
+.stand-cell-pending, .stand-cell-never {
+  background: var(--clr-card);
+}
+
+.stand-wl-letter {
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.75;
 }
