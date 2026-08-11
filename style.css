@@ -3662,16 +3662,6 @@ main {
   .pg-masthead-sub { font-size: 0.9rem; }
 }
 
-.pg-caveat {
-  text-align: center;
-  color: var(--clr-muted);
-  font-size: 0.78rem;
-  font-style: italic;
-  max-width: 560px;
-  margin: 0 auto 26px;
-  line-height: 1.5;
-}
-
 /* ── Shared: team chip (icon or color-swatch fallback, Standings-pattern) ── */
 .pg-chip {
   width: 20px; height: 20px;
@@ -3734,14 +3724,41 @@ main {
 }
 .pg-card-r2 { box-shadow: 0 0 0 1px var(--clr-border); }
 
+/* CSS-drawn arrow (line + triangular head) instead of a Unicode glyph, so
+   thickness can scale independently of length/size — a font glyph's stroke
+   weight is fixed by the font and doesn't get thicker just by bumping
+   font-size. */
 .pg-arrow {
-  font-size: 1.4rem;
-  font-weight: 700;
+  display: flex;
+  align-items: center;
   flex-shrink: 0;
-  opacity: 0.85;
-  color: var(--clr-accent);
+  width: 34px;
 }
-.pg-arrow-b { color: #d693e0; }
+.pg-arrow-stem {
+  height: 4px;
+  flex: 1;
+  background: var(--clr-accent);
+  opacity: 0.9;
+}
+.pg-arrow-head {
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  flex-shrink: 0;
+}
+.pg-arrow-right .pg-arrow-head {
+  border-left: 11px solid var(--clr-accent);
+}
+.pg-arrow-left {
+  flex-direction: row-reverse;
+}
+.pg-arrow-left .pg-arrow-head {
+  border-right: 11px solid var(--clr-accent);
+}
+.pg-arrow-b .pg-arrow-stem { background: #d693e0; }
+.pg-arrow-b.pg-arrow-right .pg-arrow-head { border-left-color: #d693e0; }
+.pg-arrow-b.pg-arrow-left .pg-arrow-head { border-right-color: #d693e0; }
 
 .pg-card-when {
   display: flex;

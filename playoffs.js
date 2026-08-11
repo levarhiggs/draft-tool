@@ -131,6 +131,12 @@ function semiCardHtml(gameId) {
     </div>`;
 }
 
+function arrowHtml(bracket, direction) {
+  const bracketClass = bracket === 'B' ? 'pg-arrow-b' : '';
+  const dirClass = direction === 'left' ? 'pg-arrow-left' : 'pg-arrow-right';
+  return `<div class="pg-arrow ${bracketClass} ${dirClass}"><div class="pg-arrow-stem"></div><div class="pg-arrow-head"></div></div>`;
+}
+
 function renderDesktopBracket() {
   const el = document.getElementById('pg-desktop-bracket');
   el.innerHTML = `
@@ -140,12 +146,12 @@ function renderDesktopBracket() {
           <div class="pg-bracket-label">Playoff A Bracket</div>
           <div class="pg-round-row">
             ${towerCardHtml('r1_9v8')}
-            <div class="pg-arrow pg-arrow-a">&#8594;</div>
+            ${arrowHtml('A', 'right')}
             ${towerCardHtml('r2_1')}
           </div>
           <div class="pg-round-row">
             ${towerCardHtml('r1_12v5')}
-            <div class="pg-arrow pg-arrow-a">&#8594;</div>
+            ${arrowHtml('A', 'right')}
             ${towerCardHtml('r2_4')}
           </div>
         </div>
@@ -160,14 +166,14 @@ function renderDesktopBracket() {
         <div class="pg-tower pg-tower-right">
           <div class="pg-bracket-label">Playoff B Bracket</div>
           <div class="pg-round-row">
-            ${towerCardHtml('r2_3')}
-            <div class="pg-arrow pg-arrow-b">&#8592;</div>
             ${towerCardHtml('r1_11v6')}
+            ${arrowHtml('B', 'left')}
+            ${towerCardHtml('r2_3')}
           </div>
           <div class="pg-round-row">
-            ${towerCardHtml('r2_2')}
-            <div class="pg-arrow pg-arrow-b">&#8592;</div>
             ${towerCardHtml('r1_10v7')}
+            ${arrowHtml('B', 'left')}
+            ${towerCardHtml('r2_2')}
           </div>
         </div>
       </div>
