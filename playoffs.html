@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Standings — CSBC 2026 SJV Summer Directory</title>
-  <meta property="og:title" content="Standings — CSBC 2026 SJV Summer Directory" />
-  <meta property="og:description" content="Head-to-head standings matrix for CSBC SJV Summer 2026 teams." />
-  <meta name="description" content="Head-to-head standings matrix for CSBC SJV Summer 2026 teams." />
+  <title>Playoffs — CSBC 2026 SJV Summer Directory</title>
+  <meta property="og:title" content="Playoffs — CSBC 2026 SJV Summer Directory" />
+  <meta property="og:description" content="Playoff bracket for the CSBC JVB League 2026 Summer Tournament." />
+  <meta name="description" content="Playoff bracket for the CSBC JVB League 2026 Summer Tournament." />
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="favicon.png" type="image/png" />
   <link rel="manifest" href="manifest.json" />
@@ -24,7 +24,7 @@
         <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Open menu" aria-expanded="false">
           <span></span><span></span><span></span>
         </button>
-        <h1>Standings</h1>
+        <h1>Playoffs</h1>
       </div>
       <div class="header-controls">
         <div id="coach-badge" class="coach-badge hidden">
@@ -48,33 +48,25 @@
     <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
     <a href="directory.html" class="side-menu-link">🏀 Player Directory</a>
     <a href="draft-results.html" class="side-menu-link">🏆 Draft Results</a>
-    <a href="standings.html" class="side-menu-link active">📊 Standings</a>
-    <a href="playoffs.html" class="side-menu-link">🥇 Playoffs</a>
+    <a href="standings.html" class="side-menu-link">📊 Standings</a>
+    <a href="playoffs.html" class="side-menu-link active">🥇 Playoffs</a>
   </nav>
 
   <main>
-    <div class="stand-page">
+    <div class="pg-page">
 
-      <!-- Mirrors Schedules' "Click here for Rankings" link — a one-tap
-           path to Gameboard's Board view (the "podium rankings"). -->
-      <div class="sched-rankings-link-row">
-        <a href="gameboard.html?view=board" class="sched-rankings-link">Click here for Podium Rankings</a>
+      <div class="pg-masthead">
+        <div class="pg-masthead-league">CSBC JVB LEAGUE</div>
+        <div class="pg-masthead-sub">2026 Summer</div>
+        <div class="pg-masthead-tournament">TOURNAMENT</div>
       </div>
 
-      <h2 class="stand-title">Head-to-Head Matrix</h2>
-      <p class="stand-desc">Rows are ordered best record (top) to worst (bottom). Columns run the reverse — worst record (left) to best (right) — so results above a team's own row skew green and results below skew red, without ranking anyone in the labels themselves.</p>
+      <p class="pg-caveat">
+        Static bracket, current as of tonight's tip-off (Tue Aug 11) — results are updated by hand after each game, not pulled live yet.
+      </p>
 
-      <div class="stand-caveat">
-        Record only — not a prediction. Standings don't account for injuries, absences, illness, or a team's current form, and they shift after every game.
-      </div>
-
-      <p id="stand-snapshot" class="stand-snapshot"></p>
-
-      <div id="stand-empty-state" class="loading">Loading standings…</div>
-
-      <div id="stand-matrix-wrap" class="stand-matrix-wrap hidden">
-        <table id="stand-matrix" class="stand-matrix"></table>
-      </div>
+      <div id="pg-desktop-bracket" class="pg-desktop-bracket"></div>
+      <div id="pg-mobile-ladder" class="pg-mobile-ladder"></div>
 
     </div>
   </main>
@@ -99,7 +91,7 @@
     </div>
   </div>
 
-  <script type="module" src="standings.js"></script>
+  <script type="module" src="playoffs.js"></script>
   <script type="module" src="coach-login.js"></script>
   <script type="module" src="side-menu.js"></script>
   <script>
