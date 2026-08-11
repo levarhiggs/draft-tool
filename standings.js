@@ -110,7 +110,7 @@ function renderMatrix(stats, h2h, scheduledPairs) {
     rowHead.innerHTML = `
       <div class="stand-row-head-inner">
         ${rIcon ? `<img src="${rIcon}" alt="" class="stand-row-swatch-icon" />` : `<span class="stand-col-swatch" style="background:${rInfo?.hex || '#888'}"></span>`}
-        <span class="stand-row-name">${initials(rowTeam)}</span>
+        <span class="stand-row-name">${rInfo?.shortName || rInfo?.name || ''}</span>
       </div>`;
     tr.appendChild(rowHead);
 
