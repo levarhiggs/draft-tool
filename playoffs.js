@@ -30,23 +30,23 @@ function teamColorEntry(colorName) {
 // game's winner) — never both. `result: { winnerSeed, scoreA, scoreB }` is
 // null until manually filled in after a game is played.
 const PLAYOFF_GAMES = {
-  // Round 1 — Tue Aug 11
-  r1_9v8:   { round: 1, bracket: 'A', seedA: 9,  seedB: 8,  when: 'Tue Aug 11', time: '6:00 PM',  location: 'Gym East', result: null },
-  r1_12v5:  { round: 1, bracket: 'A', seedA: 12, seedB: 5,  when: 'Tue Aug 11', time: '6:50 PM',  location: 'Gym East', result: null },
-  r1_11v6:  { round: 1, bracket: 'B', seedA: 11, seedB: 6,  when: 'Tue Aug 11', time: '7:40 PM',  location: 'Gym East', result: null },
-  r1_10v7:  { round: 1, bracket: 'B', seedA: 10, seedB: 7,  when: 'Tue Aug 11', time: '8:30 PM',  location: 'Gym East', result: null },
+  // Round 1 — Tue Aug 11 (final results — winners only, no scores shown per request)
+  r1_9v8:   { round: 1, bracket: 'A', seedA: 9,  seedB: 8,  when: 'Tue Aug 11', time: '6:00 PM',  location: 'Gym East', result: { winnerSeed: 8 } },
+  r1_12v5:  { round: 1, bracket: 'A', seedA: 12, seedB: 5,  when: 'Tue Aug 11', time: '6:50 PM',  location: 'Gym East', result: { winnerSeed: 12 } },
+  r1_11v6:  { round: 1, bracket: 'B', seedA: 11, seedB: 6,  when: 'Tue Aug 11', time: '7:40 PM',  location: 'Gym East', result: { winnerSeed: 6 } },
+  r1_10v7:  { round: 1, bracket: 'B', seedA: 10, seedB: 7,  when: 'Tue Aug 11', time: '8:30 PM',  location: 'Gym East', result: { winnerSeed: 7 } },
 
-  // Round 2 — Fri Aug 14 (seeds 1-4 enter)
-  r2_1:     { round: 2, bracket: 'A', seedA: 1, feederB: 'r1_9v8',  when: 'Fri Aug 14', time: '6:00 PM', location: 'Gym West',   result: null },
-  r2_4:     { round: 2, bracket: 'A', seedA: 4, feederB: 'r1_12v5', when: 'Fri Aug 14', time: '6:50 PM', location: 'Gym West',   result: null },
-  r2_3:     { round: 2, bracket: 'B', seedA: 3, feederB: 'r1_11v6', when: 'Fri Aug 14', time: '6:00 PM', location: 'Gym Middle', result: null },
-  r2_2:     { round: 2, bracket: 'B', seedA: 2, feederB: 'r1_10v7', when: 'Fri Aug 14', time: '6:50 PM', location: 'Gym Middle', result: null },
+  // Round 2 — Fri Aug 14 (seeds 1-4 enter) — final results
+  r2_1:     { round: 2, bracket: 'A', seedA: 1, feederB: 'r1_9v8',  when: 'Fri Aug 14', time: '6:00 PM', location: 'Gym West',   result: { winnerSeed: 1 } },
+  r2_4:     { round: 2, bracket: 'A', seedA: 4, feederB: 'r1_12v5', when: 'Fri Aug 14', time: '6:50 PM', location: 'Gym West',   result: { winnerSeed: 4 } },
+  r2_3:     { round: 2, bracket: 'B', seedA: 3, feederB: 'r1_11v6', when: 'Fri Aug 14', time: '6:00 PM', location: 'Gym Middle', result: { winnerSeed: 3 } },
+  r2_2:     { round: 2, bracket: 'B', seedA: 2, feederB: 'r1_10v7', when: 'Fri Aug 14', time: '6:50 PM', location: 'Gym Middle', result: { winnerSeed: 2 } },
 
-  // Semifinals — Thu Sep 3
-  semiA:    { round: 3, bracket: 'A', feederA: 'r2_1', feederB: 'r2_4', when: 'Thu Sep 3', time: '6:00 PM', location: 'Gym East', result: null },
-  semiB:    { round: 3, bracket: 'B', feederA: 'r2_3', feederB: 'r2_2', when: 'Thu Sep 3', time: '6:50 PM', location: 'Gym West', result: null },
+  // Semifinals — Thu Sep 3 — final results
+  semiA:    { round: 3, bracket: 'A', feederA: 'r2_1', feederB: 'r2_4', when: 'Thu Sep 3', time: '6:00 PM', location: 'Gym East', result: { winnerSeed: 4 } },
+  semiB:    { round: 3, bracket: 'B', feederA: 'r2_3', feederB: 'r2_2', when: 'Thu Sep 3', time: '6:50 PM', location: 'Gym West', result: { winnerSeed: 3 } },
 
-  // Championship — Wed Sep 9
+  // Championship — Wed Sep 9 — not yet played
   champ:    { round: 4, bracket: null, feederA: 'semiA', feederB: 'semiB', when: 'Wed Sep 9', time: '6:30 PM', location: 'Gym Middle', result: null },
 };
 
@@ -105,10 +105,11 @@ function sideRowHtml(game, side, gameId) {
 
   const isWinner = result.winnerSeed === resolved.seed;
   const score = side === 'A' ? result.scoreA : result.scoreB;
+  const scoreHtml = score != null ? `<span class="pg-score">${score}</span>` : '';
   if (isWinner) {
-    return `<div class="pg-team-row pg-win">${teamChipHtml(teamName)}${label}<span class="pg-score">${score}</span></div>`;
+    return `<div class="pg-team-row pg-win">${teamChipHtml(teamName)}${label}${scoreHtml}</div>`;
   }
-  return `<div class="pg-team-row pg-lose">${teamChipHtml(teamName)}${label}<span class="pg-score">${score}</span></div>`;
+  return `<div class="pg-team-row pg-lose">${teamChipHtml(teamName)}${label}${scoreHtml}</div>`;
 }
 
 function towerCardHtml(gameId) {
@@ -184,6 +185,10 @@ function renderDesktopBracket() {
           <div class="pg-champ-trophy">&#127942;</div>
           <div class="pg-champ-label">Championship</div>
           <div class="pg-champ-when">Wed, Sep 9 · 6:30 PM · Gym Middle</div>
+          <div class="pg-champ-matchup">
+            ${sideRowHtml(PLAYOFF_GAMES.champ, 'A', 'champ')}
+            ${sideRowHtml(PLAYOFF_GAMES.champ, 'B', 'champ')}
+          </div>
         </div>
       </div>
     </div>`;
@@ -229,13 +234,7 @@ function renderMobileLadder() {
     </div>
     <div class="pg-ladder-round pg-ladder-round-last">
       <div class="pg-ladder-round-title"><span class="pg-round-num">4</span><div><h3>Championship</h3><div class="pg-round-sub">Wednesday, September 9</div></div></div>
-      <div class="pg-champ-strip">
-        <div class="pg-champ-strip-trophy">&#127942;</div>
-        <div class="pg-champ-strip-txt">
-          <div class="pg-champ-strip-lbl">Championship Game</div>
-          <div class="pg-champ-strip-val">6:30 PM · Gym Middle</div>
-        </div>
-      </div>
+      ${ladderGameCardHtml('champ', 'CHAMPIONSHIP')}
     </div>`;
 }
 

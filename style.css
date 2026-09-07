@@ -3862,6 +3862,16 @@ main {
   font-weight: 800;
 }
 .pg-champ-when { font-size: 0.7rem; color: var(--clr-muted); font-weight: 600; text-align: center; }
+.pg-champ-matchup {
+  width: 100%;
+  max-width: 220px;
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.pg-champ-matchup .pg-team-row,
+.pg-champ-matchup .pg-label-slot { background: var(--clr-surface); }
 
 /* ── Mobile fallback (<900px): Scoreboard Ladder ── */
 @media (max-width: 900px) {
