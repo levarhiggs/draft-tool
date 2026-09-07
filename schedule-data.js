@@ -62,11 +62,26 @@ function splitCSVLine(line) {
 // ── Date helpers ───────────────────────────────────────────────────────────────
 
 // Turns "07/07 - Tue" + "6:30 PM" into a real JS Date. No year is present in
-// the sheet, so we assume the current year, unless that would place the game
-// more than ~60 days in the past relative to today (a season schedule
-// shouldn't render as "already over" months ago) — in that case we roll to
-// next year. This keeps the helper correct whether the app is opened before,
-// during, or shortly after the season without hardcoding a year.
+// the sheet, so we assume the current calendar year.
+//
+// A previous version of this function auto-rolled to "next year" whenever a
+// parsed date landed more than ~60 days in the past, intended to keep a
+// schedule published BEFORE a season started from misreading early dates as
+// "last year." In practice this backfired once the season itself ran long
+// past that 60-day window: by ~60 days after the season started, EVERY game
+// (including ones already played) started reading as more than 60 days in
+// the past and got silently bumped a full year forward (e.g. discovered
+// 2026-09-07: a season that ran 07/07-08/10/2026 was rendering as July 2027
+// on the calendar). The heuristic had no way to distinguish "this sheet is
+// for next year" from "this season is just over now" — it's being removed
+// rather than patched with a wider window, since any fixed window will
+// eventually hit the same failure mode again as more time passes.
+//
+// Once the multi-season work lands (see _local/PRODUCT_SPEC.md's
+// "Multi-Season Architecture"), each season's schedule will carry its own
+// explicit year/season code instead of asking this function to guess it —
+// this plain current-year assumption is the correct interim behavior until
+// then, not a permanent design.
 export function parseGameDate(dateStr, timeStr) {
   if (!dateStr) return null;
 
@@ -87,16 +102,6 @@ export function parseGameDate(dateStr, timeStr) {
     }
   }
 
-  const now = new Date();
-  let year = now.getFullYear();
-  let candidate = new Date(year, month - 1, day, hours, minutes);
-
-  const MS_PER_DAY = 24 * 60 * 60 * 1000;
-  const daysInPast = (now - candidate) / MS_PER_DAY;
-  if (daysInPast > 60) {
-    year += 1;
-    candidate = new Date(year, month - 1, day, hours, minutes);
-  }
-
-  return candidate;
+  const year = new Date().getFullYear();
+  return new Date(year, month - 1, day, hours, minutes);
 }

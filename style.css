@@ -3615,6 +3615,26 @@ main {
   opacity: 0.75;
 }
 
+.stand-cell[data-tooltip] { cursor: help; }
+
+/* Shared cell tooltip — fixed-positioned to the pointer (see wireCellTooltip
+   in standings.js) rather than a per-cell CSS-only tooltip, so it can escape
+   the matrix's own horizontal scroll container without being clipped. */
+.stand-tooltip {
+  position: fixed;
+  z-index: 500;
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--clr-text);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    Playoffs page — static single-elimination bracket ("Path to Glory")
    for desktop/tablet, Scoreboard Ladder fallback below 900px. Card/chip
@@ -3879,7 +3899,7 @@ main {
   gap: 5px;
   padding: 15px 18px 12px;
 }
-.pg-semi-icon { font-size: 1.7rem; line-height: 1; }
+.pg-semi-icon { font-size: 2.05rem; line-height: 1; }
 .pg-semi-title {
   font-size: 0.62rem;
   text-transform: uppercase;

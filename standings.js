@@ -20,7 +20,7 @@ function emptyStats() {
   return { wins: 0, losses: 0, gamesPlayed: 0 };
 }
 
-// h2h[team][opponent] = { played: bool, win: bool, margin: number } | undefined (never scheduled)
+// h2h[team][opponent] = { played, win, margin, ownScore, oppScore, winnerColorName } | undefined (never scheduled)
 async function loadStandingsData() {
   const [games, scheduleGames] = await Promise.all([fetchSchedule(), getAllScheduleGames()]);
 
@@ -30,8 +30,10 @@ async function loadStandingsData() {
   ALL_TEAMS.forEach(t => { stats[t] = emptyStats(); h2h[t] = {}; });
 
   games.forEach(game => {
-    const vTeam = teamNameForColor(game[SCHED_COL.V]);
-    const hTeam = teamNameForColor(game[SCHED_COL.H]);
+    const vColorName = game[SCHED_COL.V];
+    const hColorName = game[SCHED_COL.H];
+    const vTeam = teamNameForColor(vColorName);
+    const hTeam = teamNameForColor(hColorName);
     if (!vTeam || !hTeam || !stats[vTeam] || !stats[hTeam]) return;
 
     scheduledPairs.add(vTeam + '|' + hTeam);
@@ -43,6 +45,7 @@ async function loadStandingsData() {
     const margin = Math.abs(result.vScore - result.hScore);
     const vWin = result.winner === 'V';
     const hWin = result.winner === 'H';
+    const winnerColorName = vWin ? vColorName : (hWin ? hColorName : null);
 
     stats[vTeam].gamesPlayed += 1;
     stats[hTeam].gamesPlayed += 1;
@@ -50,8 +53,8 @@ async function loadStandingsData() {
     else if (hWin) { stats[hTeam].wins += 1; stats[vTeam].losses += 1; }
 
     if (vWin || hWin) {
-      h2h[vTeam][hTeam] = { played: true, win: vWin, margin };
-      h2h[hTeam][vTeam] = { played: true, win: hWin, margin };
+      h2h[vTeam][hTeam] = { played: true, win: vWin, margin, ownScore: result.vScore, oppScore: result.hScore, winnerColorName };
+      h2h[hTeam][vTeam] = { played: true, win: hWin, margin, ownScore: result.hScore, oppScore: result.vScore, winnerColorName };
     }
   });
 
@@ -125,6 +128,7 @@ function renderMatrix(stats, h2h, scheduledPairs) {
         td.className = 'stand-cell ' + (r.win ? 'stand-cell-win' : 'stand-cell-loss');
         td.style.setProperty('--cell-alpha', alpha.toFixed(2));
         td.innerHTML = `<span class="stand-wl-letter">${r.win ? 'W' : 'L'}</span>`;
+        td.dataset.tooltip = `Final Score: ${r.ownScore}-${r.oppScore} › ${r.winnerColorName}`;
       } else if (scheduledPairs.has(rowTeam + '|' + colTeam)) {
         td.className = 'stand-cell stand-cell-pending';
         td.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="var(--clr-accent)"/></svg>';
@@ -140,6 +144,51 @@ function renderMatrix(stats, h2h, scheduledPairs) {
   table.appendChild(tbody);
 }
 
+// Delegated on the table itself (cells are torn down/rebuilt on every
+// render, so binding per-cell would leak listeners) — one shared tooltip
+// element, fixed-positioned to the pointer so the table's own overflow
+// scroll container never clips it.
+function wireCellTooltip() {
+  const table = document.getElementById('stand-matrix');
+  const tooltip = document.getElementById('stand-tooltip');
+  if (!table || !tooltip) return;
+
+  function positionTooltip(x, y) {
+    // Offset from the cursor, then nudge back on-screen if it would
+    // overflow the right/bottom edge (the matrix runs edge-to-edge on
+    // narrow phones, so this matters more here than on a typical layout).
+    const OFFSET = 14;
+    tooltip.style.left = '0px';
+    tooltip.style.top = '0px';
+    const w = tooltip.offsetWidth;
+    const h = tooltip.offsetHeight;
+    let left = x + OFFSET;
+    let top = y + OFFSET;
+    if (left + w > window.innerWidth - 8) left = x - w - OFFSET;
+    if (top + h > window.innerHeight - 8) top = y - h - OFFSET;
+    tooltip.style.left = `${Math.max(8, left)}px`;
+    tooltip.style.top = `${Math.max(8, top)}px`;
+  }
+
+  table.addEventListener('mouseover', e => {
+    const td = e.target.closest('td[data-tooltip]');
+    if (!td) return;
+    tooltip.textContent = td.dataset.tooltip;
+    tooltip.classList.remove('hidden');
+  });
+  table.addEventListener('mousemove', e => {
+    const td = e.target.closest('td[data-tooltip]');
+    if (!td) { tooltip.classList.add('hidden'); return; }
+    positionTooltip(e.clientX, e.clientY);
+  });
+  table.addEventListener('mouseout', e => {
+    // Only hide when actually leaving a tooltip cell, not when moving
+    // between child nodes inside the same cell.
+    const td = e.target.closest('td[data-tooltip]');
+    if (td && !td.contains(e.relatedTarget)) tooltip.classList.add('hidden');
+  });
+}
+
 async function init() {
   await buildIconIndex();
   const { stats, h2h, scheduledPairs } = await loadStandingsData();
@@ -149,6 +198,7 @@ async function init() {
     `Standings as of ${new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}, through ${gamesPlayed} game${gamesPlayed === 1 ? '' : 's'}.`;
 
   renderMatrix(stats, h2h, scheduledPairs);
+  wireCellTooltip();
 
   document.getElementById('stand-empty-state').classList.add('hidden');
   document.getElementById('stand-matrix-wrap').classList.remove('hidden');
