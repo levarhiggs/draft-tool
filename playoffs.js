@@ -16,6 +16,16 @@ import { buildIconIndex, buildDriveIndex, iconUrl, photoUrl, fetchPlayers, COL a
 import { fetchSchedule, COL as SCHED_COL } from './schedule-data.js';
 import { getAllScheduleGames, getCompositeRank } from './firebase.js';
 
+// Referenced from an inline onerror= attribute (see rosterListHtml) — a
+// broken/unreachable Drive image would otherwise leave the browser's default
+// broken-image icon on screen instead of falling back to the placeholder.
+window.__pgSwapAvatarPlaceholder = function (img) {
+  const placeholder = document.createElement('div');
+  placeholder.className = 'pg-roster-avatar-img pg-roster-avatar-placeholder';
+  placeholder.innerHTML = '&#127936;';
+  img.replaceWith(placeholder);
+};
+
 // Seed (1-12, per the official playoff rankings image) -> team color name,
 // which is the canonical key into TEAM_COLORS/iconUrl throughout the app.
 const SEED_TEAM = {
@@ -130,8 +140,12 @@ function rosterListHtml(coachTeam) {
   const tiles = roster.map(p => {
     const first = firstNameOf(p[PLAYER_COL.NAME]);
     const photo = photoUrl(p);
+    // If the image genuinely fails to load (Drive unreachable/rate-limited —
+    // an observed real scenario, not hypothetical), swap it for the same
+    // placeholder a player with no known photo gets, instead of leaving the
+    // browser's broken-image icon on screen.
     const avatar = photo
-      ? `<img src="${photo}" alt="" class="pg-roster-avatar-img" loading="lazy" />`
+      ? `<img src="${photo}" alt="" class="pg-roster-avatar-img" loading="lazy" onerror="window.__pgSwapAvatarPlaceholder(this)" />`
       : `<div class="pg-roster-avatar-img pg-roster-avatar-placeholder">&#127936;</div>`;
     return `
       <div class="pg-roster-tile">
@@ -334,7 +348,6 @@ function champTeamHtml(side) {
       </div>
       ${coach ? `<div class="pg-champ-team-coach">${coach}</div>` : ''}
       ${stats ? `<div class="pg-champ-team-stats">${stats}</div>` : ''}
-      <div class="pg-roster-header" style="color:${hex}">${teamName.toUpperCase()}</div>
       ${rosterListHtml(coach)}
     </div>`;
 }
@@ -425,7 +438,6 @@ function renderDesktopBracket() {
           <div class="pg-champ-when">${PLAYOFF_GAMES.champ.when} · ${PLAYOFF_GAMES.champ.time} · ${PLAYOFF_GAMES.champ.location}</div>
           <div class="pg-champ-matchup">
             ${champTeamHtml('A')}
-            <div class="pg-champ-vs">vs</div>
             ${champTeamHtml('B')}
           </div>
         </div>

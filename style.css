@@ -3998,15 +3998,6 @@ main {
   font-variant-numeric: tabular-nums;
   margin-top: -4px;
 }
-.pg-champ-vs {
-  display: flex;
-  align-items: center;
-  font-size: 0.78rem;
-  font-weight: 800;
-  color: var(--clr-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
 .pg-champ-team-win .pg-champ-team-color::after {
   content: '\2713';
   display: inline-flex;
@@ -4031,28 +4022,25 @@ main {
 /* Roster list under each Championship contender: alphabetical (by first
    name) photo+name tiles, matching the Gameboard IN/OUT tile look but with
    the team colour in place of an "OUT" header, per explicit request. */
-.pg-roster-header {
-  font-size: 0.64rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-top: 6px;
-  padding-top: 10px;
-  border-top: 1px solid var(--clr-border);
-  width: 100%;
-}
 .pg-roster-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  gap: 14px;
   width: 100%;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--clr-border);
 }
 .pg-roster-tile {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
-.pg-roster-avatar { width: 28px; height: 28px; flex-shrink: 0; }
+/* 75% of the Championship logo tile's 116px, per explicit request, centered
+   under it (a column, not the old inline photo+name row). */
+.pg-roster-avatar { width: 87px; height: 87px; flex-shrink: 0; }
 .pg-roster-avatar-img {
   width: 100%;
   height: 100%;
@@ -4064,10 +4052,10 @@ main {
   align-items: center;
   justify-content: center;
   background: var(--clr-surface);
-  font-size: 0.85rem;
+  font-size: 2rem;
 }
 .pg-roster-name {
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--clr-text);
 }
