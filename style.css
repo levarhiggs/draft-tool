@@ -3615,8 +3615,6 @@ main {
   opacity: 0.75;
 }
 
-.stand-cell[data-tooltip] { cursor: help; }
-
 /* Shared cell tooltip — fixed-positioned to the pointer (see wireCellTooltip
    in standings.js) rather than a per-cell CSS-only tooltip, so it can escape
    the matrix's own horizontal scroll container without being clipped. */

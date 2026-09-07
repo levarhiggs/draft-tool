@@ -170,6 +170,13 @@ function wireCellTooltip() {
     tooltip.style.top = `${Math.max(8, top)}px`;
   }
 
+  // Hover and tap are tracked separately rather than sharing one "open"
+  // flag: a touch tap can synthesize a `mouseover` immediately before its
+  // `click` fires, and if both paths wrote to the same state, the click's
+  // own toggle-off branch would immediately re-close the tooltip the hover
+  // had just opened — the tooltip would flash and vanish on the very first
+  // tap. Keeping them independent means each path only ever undoes its own
+  // work.
   table.addEventListener('mouseover', e => {
     const td = e.target.closest('td[data-tooltip]');
     if (!td) return;
@@ -186,6 +193,34 @@ function wireCellTooltip() {
     // between child nodes inside the same cell.
     const td = e.target.closest('td[data-tooltip]');
     if (td && !td.contains(e.relatedTarget)) tooltip.classList.add('hidden');
+  });
+
+  // Tap support (mobile has no hover): tapping a cell toggles the tooltip at
+  // that cell's position; tapping the same cell again, a different cell, or
+  // anywhere else on the page dismisses it. `click` covers touch here (a tap
+  // fires a synthetic click) as well as mouse users who prefer clicking over
+  // hovering, so this doesn't need a separate touchstart/touchend handler.
+  let tapOpenCell = null;
+  table.addEventListener('click', e => {
+    const td = e.target.closest('td[data-tooltip]');
+    if (!td) return;
+    e.stopPropagation();
+    if (tapOpenCell === td) {
+      tooltip.classList.add('hidden');
+      tapOpenCell = null;
+      return;
+    }
+    const box = td.getBoundingClientRect();
+    tooltip.textContent = td.dataset.tooltip;
+    tooltip.classList.remove('hidden');
+    positionTooltip(box.left + box.width / 2, box.top + box.height / 2);
+    tapOpenCell = td;
+  });
+  document.addEventListener('click', () => {
+    if (tapOpenCell) {
+      tooltip.classList.add('hidden');
+      tapOpenCell = null;
+    }
   });
 }
 
