@@ -3907,9 +3907,11 @@ main {
 }
 .pg-semi-when { font-size: 0.66rem; color: var(--clr-muted); font-weight: 600; }
 .pg-semi-matchup { border-top: 1px solid var(--clr-border); }
-.pg-semi-matchup .pg-team-row { padding: 12px 18px; font-size: 1.02rem; }
-.pg-semi-matchup .pg-chip { width: 30px; height: 30px; border-radius: 7px; }
-.pg-semi-matchup .pg-chip > span { font-size: 0.85rem; }
+.pg-semi-matchup .pg-team-row { padding: 12px 18px; font-size: 1.02rem; gap: 14px; }
+/* ~half the Championship logo tile's 116px, per explicit user feedback that
+   the semi logos still read too small next to it. */
+.pg-semi-matchup .pg-chip { width: 58px; height: 58px; border-radius: 13px; }
+.pg-semi-matchup .pg-chip > span { font-size: 1.5rem; }
 .pg-semi-matchup .pg-team-row.pg-win::after { width: 20px; height: 20px; font-size: 0.78rem; }
 
 .pg-champ-drop { display: flex; flex-direction: column; align-items: center; padding-top: 26px; }
