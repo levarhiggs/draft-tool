@@ -12,9 +12,9 @@
 // seeds 2,3,6,7,10,11) converge at the Semifinals (Thu Sep 3), which feed the
 // Championship (Wed Sep 9).
 import { TEAM_COLORS, TEAMS } from './coaches-config.js';
-import { buildIconIndex, iconUrl } from './players-data.js';
+import { buildIconIndex, buildDriveIndex, iconUrl, photoUrl, fetchPlayers, COL as PLAYER_COL } from './players-data.js';
 import { fetchSchedule, COL as SCHED_COL } from './schedule-data.js';
-import { getAllScheduleGames } from './firebase.js';
+import { getAllScheduleGames, getCompositeRank } from './firebase.js';
 
 // Seed (1-12, per the official playoff rankings image) -> team color name,
 // which is the canonical key into TEAM_COLORS/iconUrl throughout the app.
@@ -84,6 +84,62 @@ async function loadSeasonStats() {
     console.error('loadSeasonStats error:', err);
     seasonStats = {};
   }
+}
+
+// ── Team rosters, for the "who's on each Championship team" list ───────────
+// Same source-of-truth resolution Gameboard's buildRosterSide() uses: a
+// player's ACTUAL team is Firestore's players/{id}.team if set (post-draft
+// admin assignment), falling back to the sheet's own TEAM column — never the
+// sheet column alone, since team assignment happens in-app after the draft.
+let teamRosters = {};
+
+async function loadTeamRosters() {
+  try {
+    const players = await fetchPlayers();
+    const withTeam = await Promise.all(players.map(async p => {
+      const data = await getCompositeRank(p[PLAYER_COL.ID]);
+      return { ...p, _teamFB: data.team || '' };
+    }));
+
+    const rosters = {};
+    TEAMS.filter(t => t !== 'Undrafted').forEach(t => { rosters[t] = []; });
+    withTeam.forEach(p => {
+      const team = p._teamFB || p[PLAYER_COL.TEAM] || '';
+      if (rosters[team]) rosters[team].push(p);
+    });
+    Object.values(rosters).forEach(roster => {
+      roster.sort((a, b) => firstNameOf(a[PLAYER_COL.NAME]).localeCompare(firstNameOf(b[PLAYER_COL.NAME])));
+    });
+    teamRosters = rosters;
+  } catch (err) {
+    // Same "supporting context, not the point of the page" rationale as
+    // loadSeasonStats — the bracket/championship card still render fine
+    // without a roster list if the sheet/Firestore is unreachable.
+    console.error('loadTeamRosters error:', err);
+    teamRosters = {};
+  }
+}
+
+function firstNameOf(fullName) {
+  return (fullName || '').trim().split(/\s+/)[0] || fullName || '';
+}
+
+function rosterListHtml(coachTeam) {
+  const roster = teamRosters[coachTeam];
+  if (!roster || roster.length === 0) return '';
+  const tiles = roster.map(p => {
+    const first = firstNameOf(p[PLAYER_COL.NAME]);
+    const photo = photoUrl(p);
+    const avatar = photo
+      ? `<img src="${photo}" alt="" class="pg-roster-avatar-img" loading="lazy" />`
+      : `<div class="pg-roster-avatar-img pg-roster-avatar-placeholder">&#127936;</div>`;
+    return `
+      <div class="pg-roster-tile">
+        <div class="pg-roster-avatar">${avatar}</div>
+        <span class="pg-roster-name">${first}</span>
+      </div>`;
+  }).join('');
+  return `<div class="pg-roster-list">${tiles}</div>`;
 }
 
 function seasonStatLine(team) {
@@ -278,6 +334,8 @@ function champTeamHtml(side) {
       </div>
       ${coach ? `<div class="pg-champ-team-coach">${coach}</div>` : ''}
       ${stats ? `<div class="pg-champ-team-stats">${stats}</div>` : ''}
+      <div class="pg-roster-header" style="color:${hex}">${teamName.toUpperCase()}</div>
+      ${rosterListHtml(coach)}
     </div>`;
 }
 
@@ -422,7 +480,7 @@ function renderMobileLadder() {
 }
 
 async function init() {
-  await Promise.all([buildIconIndex(), loadSeasonStats()]);
+  await Promise.all([buildIconIndex(), buildDriveIndex(), loadSeasonStats(), loadTeamRosters()]);
   renderDesktopBracket();
   renderMobileLadder();
 }

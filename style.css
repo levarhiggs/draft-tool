@@ -4028,6 +4028,50 @@ main {
   text-decoration-thickness: 1.5px;
 }
 
+/* Roster list under each Championship contender: alphabetical (by first
+   name) photo+name tiles, matching the Gameboard IN/OUT tile look but with
+   the team colour in place of an "OUT" header, per explicit request. */
+.pg-roster-header {
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--clr-border);
+  width: 100%;
+}
+.pg-roster-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.pg-roster-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pg-roster-avatar { width: 28px; height: 28px; flex-shrink: 0; }
+.pg-roster-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.pg-roster-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--clr-surface);
+  font-size: 0.85rem;
+}
+.pg-roster-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--clr-text);
+}
+
 /* ── Mobile fallback (<900px): Scoreboard Ladder ── */
 @media (max-width: 900px) {
   .pg-desktop-bracket { display: none; }
