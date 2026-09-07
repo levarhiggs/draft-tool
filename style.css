@@ -3623,6 +3623,8 @@ main {
    ══════════════════════════════════════════════════════════════════════ */
 
 .pg-page {
+  /* Playoff B's accent. Playoff A reuses the app's --clr-accent. */
+  --pg-bracket-b: #c264e0;
   max-width: 1160px;
   margin: 0 auto;
   padding: 0 12px 40px;
@@ -3662,7 +3664,8 @@ main {
   .pg-masthead-sub { font-size: 0.9rem; }
 }
 
-/* ── Shared: team chip (icon or color-swatch fallback, Standings-pattern) ── */
+/* ── Shared: team chip. The element itself carries the team colour; inside is
+   either the team's letter (Round 1/2) or its PNG logo (Semis onward). ── */
 .pg-chip {
   width: 20px; height: 20px;
   border-radius: 5px;
@@ -3671,35 +3674,56 @@ main {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
 }
-.pg-chip-lg { width: 26px; height: 26px; border-radius: 6px; }
-.pg-chip-icon { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
-.pg-chip-swatch {
-  width: 100%; height: 100%;
-  border-radius: inherit;
-  display: inline-block;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18);
+.pg-chip { position: relative; }
+.pg-chip > span {
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
 }
+/* The letter sits underneath and the logo covers it once loaded, so a failed
+   Drive request falls back to the letter instead of a broken-image icon. */
+.pg-chip-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pg-chip-icon { position: relative; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 
 /* ── Desktop/tablet bracket (>=900px) ── */
 .pg-desktop-bracket { display: block; }
 .pg-mobile-ladder { display: none; }
 
+/* Fixed 820px so the wire overlay's viewBox coordinates map 1:1 to real
+   pixels — the lanes are positioned against that exact width. */
 .pg-stage {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  width: 820px;
+  max-width: 100%;
+  margin: 0 auto;
 }
-.pg-towers-row {
+
+/* Round 1 + Round 2, two brackets side by side. The centre gap is wide enough
+   to hold all four R2->Semi wire lanes outside the cards — see the overlay
+   comment in playoffs.js for the coordinate math. */
+.pg-prelim-tier {
   display: grid;
-  grid-template-columns: max-content max-content max-content;
-  gap: 30px;
-  align-items: start;
-  width: fit-content;
+  grid-template-columns: 1fr 1fr;
+  gap: 150px;
+  position: relative;
 }
-.pg-tower { display: flex; flex-direction: column; gap: 16px; }
-.pg-tower-left { align-items: flex-end; }
-.pg-tower-right { align-items: flex-start; }
+.pg-bracket-block { display: flex; flex-direction: column; gap: 14px; }
+
+.pg-elbow-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.pg-elbow-overlay svg { width: 100%; height: 100%; display: block; overflow: visible; }
+/* Reserves the vertical space the wires travel through; the overlay itself is
+   absolutely positioned and takes no layout room of its own. */
+.pg-elbow-spacer { height: 64px; }
 
 .pg-bracket-label {
   font-size: 0.68rem;
@@ -3709,18 +3733,20 @@ main {
   color: var(--clr-accent);
   margin-bottom: 2px;
 }
-.pg-tower-right .pg-bracket-label { color: #d693e0; }
+.pg-block-b .pg-bracket-label { color: var(--pg-bracket-b); text-align: right; }
 
-.pg-round-row { display: flex; align-items: center; gap: 12px; width: 100%; }
-.pg-tower-right .pg-round-row { flex-direction: row-reverse; }
+/* [R1 card][arrow gutter][R2 card]. Bracket B is flipped so it reads
+   right-to-left, putting its R2 column on the inner side facing the centre. */
+.pg-round-row { display: grid; grid-template-columns: 1fr 30px 1fr; align-items: center; }
+.pg-block-b .pg-round-row { direction: rtl; }
+.pg-block-b .pg-round-row > * { direction: ltr; }
 
 .pg-card {
   background: var(--clr-card);
   border: 1px solid var(--clr-border);
   border-radius: var(--radius);
-  width: 208px;
   overflow: hidden;
-  flex-shrink: 0;
+  min-width: 0;
 }
 .pg-card-r2 { box-shadow: 0 0 0 1px var(--clr-border); }
 
@@ -3731,11 +3757,12 @@ main {
 .pg-arrow {
   display: flex;
   align-items: center;
+  justify-self: center;
   flex-shrink: 0;
-  width: 34px;
+  width: 26px;
 }
 .pg-arrow-stem {
-  height: 4px;
+  height: 3px;
   flex: 1;
   background: var(--clr-accent);
   opacity: 0.9;
@@ -3756,9 +3783,9 @@ main {
 .pg-arrow-left .pg-arrow-head {
   border-right: 11px solid var(--clr-accent);
 }
-.pg-arrow-b .pg-arrow-stem { background: #d693e0; }
-.pg-arrow-b.pg-arrow-right .pg-arrow-head { border-left-color: #d693e0; }
-.pg-arrow-b.pg-arrow-left .pg-arrow-head { border-right-color: #d693e0; }
+.pg-arrow-b .pg-arrow-stem { background: var(--pg-bracket-b); }
+.pg-arrow-b.pg-arrow-right .pg-arrow-head { border-left-color: var(--pg-bracket-b); }
+.pg-arrow-b.pg-arrow-left .pg-arrow-head { border-right-color: var(--pg-bracket-b); }
 
 .pg-card-when {
   display: flex;
@@ -3782,6 +3809,9 @@ main {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--clr-muted);
+  /* Names stay on one line; cards are sized for the longest ("Carolina
+     Blue", "Grey Concrete"). */
+  white-space: nowrap;
 }
 .pg-team-row + .pg-team-row { border-top: 1px solid var(--clr-border); }
 .pg-team-row .pg-score {
@@ -3793,7 +3823,30 @@ main {
 }
 .pg-team-row.pg-win { color: var(--clr-text); font-weight: 700; }
 .pg-team-row.pg-win .pg-score { color: var(--clr-success); }
-.pg-team-row.pg-lose { opacity: 0.6; }
+/* Green tick after every winner. Sits after the score when there is one. */
+.pg-team-row.pg-win::after {
+  content: '\2713';
+  margin-left: auto;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--clr-success);
+  color: var(--clr-bg);
+  font-size: 0.6rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+/* Eliminated: struck through, with the line cancelled on the chip so it
+   doesn't run across the colour block or logo. */
+.pg-team-row.pg-lose {
+  opacity: 0.55;
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+.pg-team-row.pg-lose .pg-chip { text-decoration: none; }
 
 .pg-label-slot {
   padding: 9px 10px;
@@ -3808,32 +3861,41 @@ main {
 }
 .pg-winner-of b { color: var(--clr-muted); font-style: normal; font-weight: 800; }
 
-.pg-center-cell {
+/* ── Semifinals: own row, sized between Round 2 and the Championship ── */
+.pg-semis-tier { display: flex; justify-content: center; gap: 24px; margin-top: 4px; }
+.pg-semi-card {
+  width: 372px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--pg-semi-color) 12%, transparent), var(--clr-card));
+  border: 1.5px solid var(--pg-semi-color);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.pg-semi-a { --pg-semi-color: var(--clr-accent); }
+.pg-semi-b { --pg-semi-color: var(--pg-bracket-b); }
+.pg-semi-header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding-top: 46px;
+  gap: 5px;
+  padding: 15px 18px 12px;
 }
-.pg-semis-row { display: flex; gap: 22px; align-items: flex-start; }
-.pg-semi-card {
-  width: 176px;
-  background: var(--clr-card);
-  border: 1px solid var(--clr-border);
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-.pg-semi-label {
-  font-size: 0.6rem;
-  color: var(--clr-muted);
+.pg-semi-icon { font-size: 1.7rem; line-height: 1; }
+.pg-semi-title {
+  font-size: 0.62rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  text-align: center;
-  margin-top: 4px;
+  letter-spacing: 0.09em;
+  color: var(--pg-semi-color);
+  font-weight: 800;
 }
+.pg-semi-when { font-size: 0.66rem; color: var(--clr-muted); font-weight: 600; }
+.pg-semi-matchup { border-top: 1px solid var(--clr-border); }
+.pg-semi-matchup .pg-team-row { padding: 12px 18px; font-size: 1.02rem; }
+.pg-semi-matchup .pg-chip { width: 30px; height: 30px; border-radius: 7px; }
+.pg-semi-matchup .pg-chip > span { font-size: 0.85rem; }
+.pg-semi-matchup .pg-team-row.pg-win::after { width: 20px; height: 20px; font-size: 0.78rem; }
 
-.pg-below-grid { display: flex; flex-direction: column; align-items: center; padding-top: 26px; }
+.pg-champ-drop { display: flex; flex-direction: column; align-items: center; padding-top: 26px; }
+.pg-champ-row { display: flex; justify-content: center; }
 .pg-drop { display: flex; flex-direction: column; align-items: center; padding: 0 0 6px; }
 .pg-drop-stem { width: 3px; height: 34px; background: linear-gradient(var(--clr-border), var(--clr-warning)); }
 .pg-drop-arrowhead {
@@ -3843,35 +3905,108 @@ main {
   border-top: 12px solid var(--clr-warning);
   margin-top: -1px;
 }
+/* ── Championship: the main event, biggest card on the page ── */
 .pg-champ {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px 26px;
+  gap: 10px;
+  padding: 24px 36px 28px;
   background: linear-gradient(155deg, color-mix(in srgb, var(--clr-warning) 14%, transparent), var(--clr-card));
-  border: 1.5px solid var(--clr-warning);
-  border-radius: 12px;
+  border: 2px solid var(--clr-warning);
+  border-radius: 16px;
+  width: 520px;
+  max-width: 100%;
 }
-.pg-champ-trophy { font-size: 1.9rem; }
+.pg-champ-trophy { font-size: 2.4rem; line-height: 1; }
 .pg-champ-label {
-  font-size: 0.66rem;
+  font-size: 1.15rem;
   text-transform: uppercase;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.14em;
   color: var(--clr-warning);
   font-weight: 800;
 }
-.pg-champ-when { font-size: 0.7rem; color: var(--clr-muted); font-weight: 600; text-align: center; }
+.pg-champ-when { font-size: 0.78rem; color: var(--clr-muted); font-weight: 600; text-align: center; }
+
+/* Contenders as podium-style tiles, mirroring the Gameboard Board view's
+   2nd/3rd place cards: uppercase colour name, large logo tile, coach and
+   season record underneath. */
 .pg-champ-matchup {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 18px;
   width: 100%;
-  max-width: 220px;
-  border: 1px solid var(--clr-border);
-  border-radius: 8px;
-  overflow: hidden;
-  margin-top: 4px;
+  margin-top: 10px;
 }
-.pg-champ-matchup .pg-team-row,
-.pg-champ-matchup .pg-label-slot { background: var(--clr-surface); }
+.pg-champ-team {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  min-width: 0;
+}
+.pg-champ-team-color { font-size: 1rem; font-weight: 700; letter-spacing: 0.02em; color: var(--clr-text); }
+.pg-champ-team-tile {
+  width: 116px;
+  aspect-ratio: 1 / 1;
+  border-radius: 22%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
+}
+.pg-champ-team-tile { position: relative; }
+.pg-champ-team-tile img { position: relative; width: 112%; height: 112%; object-fit: cover; border-radius: 22%; }
+.pg-champ-team-tile > span { font-size: 2.2rem; font-weight: 800; text-shadow: 0 2px 5px rgba(0,0,0,0.55); }
+.pg-champ-team-tile-empty {
+  background: var(--clr-surface);
+  border: 1px dashed var(--clr-border);
+  box-shadow: none;
+  color: var(--clr-muted);
+  font-size: 2.2rem;
+  font-weight: 800;
+}
+.pg-champ-team-coach { font-size: 0.78rem; font-weight: 400; color: var(--clr-muted); }
+.pg-champ-team-stats {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--clr-muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: -4px;
+}
+.pg-champ-vs {
+  display: flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--clr-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.pg-champ-team-win .pg-champ-team-color::after {
+  content: '\2713';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 7px;
+  vertical-align: -4px;
+  border-radius: 50%;
+  background: var(--clr-success);
+  color: var(--clr-bg);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+.pg-champ-team-lose { opacity: 0.55; }
+.pg-champ-team-lose .pg-champ-team-color {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
 
 /* ── Mobile fallback (<900px): Scoreboard Ladder ── */
 @media (max-width: 900px) {

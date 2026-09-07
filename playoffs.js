@@ -11,8 +11,10 @@
 // winner. Two parallel brackets (Playoff A: seeds 1,4,5,8,9,12 / Playoff B:
 // seeds 2,3,6,7,10,11) converge at the Semifinals (Thu Sep 3), which feed the
 // Championship (Wed Sep 9).
-import { TEAM_COLORS } from './coaches-config.js';
+import { TEAM_COLORS, TEAMS } from './coaches-config.js';
 import { buildIconIndex, iconUrl } from './players-data.js';
+import { fetchSchedule, COL as SCHED_COL } from './schedule-data.js';
+import { getAllScheduleGames } from './firebase.js';
 
 // Seed (1-12, per the official playoff rankings image) -> team color name,
 // which is the canonical key into TEAM_COLORS/iconUrl throughout the app.
@@ -24,6 +26,74 @@ const SEED_TEAM = {
 
 function teamColorEntry(colorName) {
   return Object.values(TEAM_COLORS).find(v => v.name === colorName) || null;
+}
+
+// "Forest Green" -> "Team Andre". TEAM_COLORS is keyed by team name, so this
+// is the reverse lookup.
+function coachForColor(colorName) {
+  const entry = Object.entries(TEAM_COLORS).find(([, v]) => v.name === colorName);
+  return entry ? entry[0] : null;
+}
+
+// Semis read better as "Semi A" than "Round 3" — there's no calendar-facing
+// "Round 3" the way Round 1/2 are named elsewhere on the page.
+function feederLabel(feederId, feederRound) {
+  if (feederId === 'semiA') return 'Semi A';
+  if (feederId === 'semiB') return 'Semi B';
+  return `Round ${feederRound}`;
+}
+
+// ── Regular-season records, shown under the Championship contenders ─────────
+// Same computation the Gameboard's Board view runs (see loadTeamStats there):
+// walk the schedule sheet, pair each row with its scheduleGames result, and
+// tally W/L plus points for/against. Kept local rather than imported so the
+// Playoffs page doesn't pull in the whole Gameboard module.
+let seasonStats = {};
+
+async function loadSeasonStats() {
+  try {
+    const [games, results] = await Promise.all([fetchSchedule(), getAllScheduleGames()]);
+    const stats = {};
+    TEAMS.filter(t => t !== 'Undrafted').forEach(t => {
+      stats[t] = { pointsMade: 0, pointsAllowed: 0, wins: 0, losses: 0 };
+    });
+
+    games.forEach(game => {
+      const result = results[game[SCHED_COL.GAME]];
+      if (!result || result.vScore == null || result.hScore == null) return;
+      const vTeam = coachForColor(game[SCHED_COL.V]);
+      const hTeam = coachForColor(game[SCHED_COL.H]);
+      if (vTeam && stats[vTeam]) {
+        stats[vTeam].pointsMade += result.vScore;
+        stats[vTeam].pointsAllowed += result.hScore;
+        if (result.winner === 'V') stats[vTeam].wins += 1;
+        else if (result.winner === 'H') stats[vTeam].losses += 1;
+      }
+      if (hTeam && stats[hTeam]) {
+        stats[hTeam].pointsMade += result.hScore;
+        stats[hTeam].pointsAllowed += result.vScore;
+        if (result.winner === 'H') stats[hTeam].wins += 1;
+        else if (result.winner === 'V') stats[hTeam].losses += 1;
+      }
+    });
+    seasonStats = stats;
+  } catch (err) {
+    // Stats are supporting context, not the point of the page — if the sheet
+    // or Firestore is unreachable the bracket still renders, just without
+    // the record line.
+    console.error('loadSeasonStats error:', err);
+    seasonStats = {};
+  }
+}
+
+function seasonStatLine(team) {
+  const s = seasonStats[team];
+  if (!s) return null;
+  const ratio = s.pointsAllowed === 0
+    ? (s.pointsMade === 0 ? 0 : Infinity)
+    : s.pointsMade / s.pointsAllowed;
+  const ratioStr = ratio === Infinity ? '—' : ratio.toFixed(2);
+  return `W: ${s.wins} - L:${s.losses} - R:${ratioStr}`;
 }
 
 // Each game: seedA/seedB (fixed matchup) OR feederA/feederB (references another
@@ -68,48 +138,78 @@ function resolveSide(game, side) {
   return { known: false, feederId, feederRound: feeder?.round };
 }
 
-function teamChipHtml(team, opts = {}) {
+// Round 1/2 chips are deliberately a letter on the team's colour — compact and
+// instant, no image load. The Semifinals and Championship use the real team
+// PNG (see teamLogoHtml) so the later rounds carry the actual artwork.
+function teamChipHtml(team) {
   const info = teamColorEntry(team);
-  const icon = iconUrl(team);
-  const sizeClass = opts.size === 'lg' ? 'pg-chip-lg' : '';
+  const hex = info?.hex || '#888';
+  const letter = (info?.shortName || team || '?').trim().charAt(0).toUpperCase();
   return `
-    <span class="pg-chip ${sizeClass}">
-      ${icon
-        ? `<img src="${icon}" alt="" class="pg-chip-icon" />`
-        : `<span class="pg-chip-swatch" style="background:${info?.hex || '#888'}"></span>`}
+    <span class="pg-chip" style="background:${hex}">
+      <span style="color:${readableTextColor(hex)}">${letter}</span>
     </span>`;
+}
+
+// Semifinal / Championship chip: the team's PNG logo, with the colour block
+// underneath so something is visible while the image loads (or if Drive is
+// unreachable) — same rationale as the Gameboard's podium tiles.
+function teamLogoHtml(team, extraClass = '') {
+  const info = teamColorEntry(team);
+  const hex = info?.hex || '#888';
+  const icon = iconUrl(team);
+  const letter = (info?.shortName || team || '?').trim().charAt(0).toUpperCase();
+  return `
+    <span class="pg-chip ${extraClass}" style="background:${hex}">
+      <span class="pg-chip-fallback" style="color:${readableTextColor(hex)}">${letter}</span>
+      ${icon ? `<img src="${icon}" alt="" class="pg-chip-icon" loading="lazy" />` : ''}
+    </span>`;
+}
+
+// White/Neon Yellow etc. need dark text on their chips; everything else light.
+function readableTextColor(hex) {
+  const h = String(hex).replace('#', '');
+  if (h.length !== 6) return 'rgba(255,255,255,0.95)';
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? '#1a1d27' : 'rgba(255,255,255,0.95)';
 }
 
 function cardWhenHtml(game) {
   return `<div class="pg-card-when"><span class="pg-day">${game.when}</span> · ${game.time}</div>`;
 }
 
-function sideRowHtml(game, side, gameId) {
+// `useLogo` switches the chip from the letter-on-colour block (Round 1/2) to
+// the real team PNG (Semifinals onward).
+function sideRowHtml(game, side, gameId, useLogo = false) {
   const resolved = resolveSide(game, side);
   const result = game.result;
 
   if (!resolved.known) {
     return `
       <div class="pg-label-slot">
-        <div class="pg-winner-of">Winner of <b>Round ${resolved.feederRound}</b></div>
+        <div class="pg-winner-of">Winner of <b>${feederLabel(resolved.feederId, resolved.feederRound)}</b></div>
       </div>`;
   }
 
   const teamName = resolved.team;
   const info = teamColorEntry(teamName);
   const label = info?.shortName || teamName;
+  const chip = useLogo ? teamLogoHtml(teamName) : teamChipHtml(teamName);
 
   if (!result) {
-    return `<div class="pg-team-row pg-upcoming">${teamChipHtml(teamName)}${label}</div>`;
+    return `<div class="pg-team-row pg-upcoming">${chip}${label}</div>`;
   }
 
   const isWinner = result.winnerSeed === resolved.seed;
   const score = side === 'A' ? result.scoreA : result.scoreB;
   const scoreHtml = score != null ? `<span class="pg-score">${score}</span>` : '';
   if (isWinner) {
-    return `<div class="pg-team-row pg-win">${teamChipHtml(teamName)}${label}${scoreHtml}</div>`;
+    return `<div class="pg-team-row pg-win">${chip}${label}${scoreHtml}</div>`;
   }
-  return `<div class="pg-team-row pg-lose">${teamChipHtml(teamName)}${label}${scoreHtml}</div>`;
+  return `<div class="pg-team-row pg-lose">${chip}${label}${scoreHtml}</div>`;
 }
 
 function towerCardHtml(gameId) {
@@ -122,13 +222,62 @@ function towerCardHtml(gameId) {
     </div>`;
 }
 
-function semiCardHtml(gameId) {
+// Semifinal card: basketball icon + title header (mirroring the Championship
+// card's structure), then the matchup using the real team logos.
+function semiCardHtml(gameId, title, bracketClass) {
   const game = PLAYOFF_GAMES[gameId];
   return `
-    <div class="pg-semi-card">
-      ${cardWhenHtml(game)}
-      ${sideRowHtml(game, 'A', gameId)}
-      ${sideRowHtml(game, 'B', gameId)}
+    <div class="pg-semi-card ${bracketClass}">
+      <div class="pg-semi-header">
+        <div class="pg-semi-icon">&#127936;</div>
+        <div class="pg-semi-title">${title}</div>
+        <div class="pg-semi-when">${game.when} · ${game.time} · ${game.location}</div>
+      </div>
+      <div class="pg-semi-matchup">
+        ${sideRowHtml(game, 'A', gameId, true)}
+        ${sideRowHtml(game, 'B', gameId, true)}
+      </div>
+    </div>`;
+}
+
+// Championship contender: podium-style tile matching the Gameboard Board
+// view's 2nd/3rd place cards — uppercase colour name, large logo tile, coach
+// name and regular-season record underneath.
+function champTeamHtml(side) {
+  const game = PLAYOFF_GAMES.champ;
+  const resolved = resolveSide(game, side);
+
+  if (!resolved.known) {
+    return `
+      <div class="pg-champ-team pg-champ-team-tbd">
+        <div class="pg-champ-team-color">TBD</div>
+        <div class="pg-champ-team-tile pg-champ-team-tile-empty">?</div>
+        <div class="pg-champ-team-coach">Winner of ${feederLabel(resolved.feederId, resolved.feederRound)}</div>
+      </div>`;
+  }
+
+  const teamName = resolved.team;
+  const info = teamColorEntry(teamName);
+  const hex = info?.hex || '#888';
+  const icon = iconUrl(teamName);
+  const coach = coachForColor(teamName);
+  const stats = seasonStatLine(coach);
+  const letter = teamName.trim().charAt(0).toUpperCase();
+
+  let stateClass = '';
+  if (game.result) {
+    stateClass = game.result.winnerSeed === resolved.seed ? 'pg-champ-team-win' : 'pg-champ-team-lose';
+  }
+
+  return `
+    <div class="pg-champ-team ${stateClass}">
+      <div class="pg-champ-team-color">${teamName.toUpperCase()}</div>
+      <div class="pg-champ-team-tile" style="background:${hex}">
+        <span class="pg-chip-fallback" style="color:${readableTextColor(hex)}">${letter}</span>
+        ${icon ? `<img src="${icon}" alt="" loading="lazy" />` : ''}
+      </div>
+      ${coach ? `<div class="pg-champ-team-coach">${coach}</div>` : ''}
+      ${stats ? `<div class="pg-champ-team-stats">${stats}</div>` : ''}
     </div>`;
 }
 
@@ -138,12 +287,40 @@ function arrowHtml(bracket, direction) {
   return `<div class="pg-arrow ${bracketClass} ${dirClass}"><div class="pg-arrow-stem"></div><div class="pg-arrow-head"></div></div>`;
 }
 
+// Round 2 -> Semifinal wires. Each is a simple L: it exits the OUTER edge of
+// its Round 2 card horizontally (right for bracket A, left for B — away from
+// the R1->R2 arrows in the inner gutter), turns once, then drops straight
+// into the semi below. The top row's horizontal run is longer than the bottom
+// row's, so the two vertical lanes never share an x and never cross.
+//
+// Coordinate space (viewBox 820x290, stretched to the tier's real size):
+// block A x:0-335, centre gap x:335-485, block B x:485-820. All four lanes
+// live inside that centre gap, clear of every card face.
+function wireOverlayHtml() {
+  return `
+    <div class="pg-elbow-overlay" aria-hidden="true">
+      <svg viewBox="0 0 820 290" preserveAspectRatio="none">
+        <path d="M 335 75 L 390 75 L 390 290" stroke="var(--clr-accent)" stroke-width="3" fill="none" />
+        <polygon points="384,290 390,302 396,290" fill="var(--clr-accent)" />
+        <path d="M 335 171 L 360 171 L 360 290" stroke="var(--clr-accent)" stroke-width="3" fill="none" />
+        <polygon points="354,290 360,302 366,290" fill="var(--clr-accent)" />
+
+        <path d="M 485 75 L 430 75 L 430 290" stroke="var(--pg-bracket-b)" stroke-width="3" fill="none" />
+        <polygon points="424,290 430,302 436,290" fill="var(--pg-bracket-b)" />
+        <path d="M 485 171 L 460 171 L 460 290" stroke="var(--pg-bracket-b)" stroke-width="3" fill="none" />
+        <polygon points="454,290 460,302 466,290" fill="var(--pg-bracket-b)" />
+      </svg>
+    </div>`;
+}
+
 function renderDesktopBracket() {
   const el = document.getElementById('pg-desktop-bracket');
   el.innerHTML = `
     <div class="pg-stage">
-      <div class="pg-towers-row">
-        <div class="pg-tower pg-tower-left">
+      <div class="pg-prelim-tier">
+        ${wireOverlayHtml()}
+
+        <div class="pg-bracket-block pg-block-a">
           <div class="pg-bracket-label">Playoff A Bracket</div>
           <div class="pg-round-row">
             ${towerCardHtml('r1_9v8')}
@@ -155,16 +332,10 @@ function renderDesktopBracket() {
             ${arrowHtml('A', 'right')}
             ${towerCardHtml('r2_4')}
           </div>
+          <div class="pg-elbow-spacer"></div>
         </div>
 
-        <div class="pg-center-cell">
-          <div class="pg-semis-row">
-            <div>${semiCardHtml('semiA')}<div class="pg-semi-label">Semi A</div></div>
-            <div>${semiCardHtml('semiB')}<div class="pg-semi-label">Semi B</div></div>
-          </div>
-        </div>
-
-        <div class="pg-tower pg-tower-right">
+        <div class="pg-bracket-block pg-block-b">
           <div class="pg-bracket-label">Playoff B Bracket</div>
           <div class="pg-round-row">
             ${towerCardHtml('r1_11v6')}
@@ -176,18 +347,28 @@ function renderDesktopBracket() {
             ${arrowHtml('B', 'left')}
             ${towerCardHtml('r2_2')}
           </div>
+          <div class="pg-elbow-spacer"></div>
         </div>
       </div>
 
-      <div class="pg-below-grid">
-        <div class="pg-drop"><div class="pg-drop-stem"></div><div class="pg-drop-arrowhead"></div></div>
+      <div class="pg-semis-tier">
+        ${semiCardHtml('semiA', 'Semi A', 'pg-semi-a')}
+        ${semiCardHtml('semiB', 'Semi B', 'pg-semi-b')}
+      </div>
+
+      <div class="pg-champ-drop">
+        <div class="pg-drop-stem"></div>
+        <div class="pg-drop-arrowhead"></div>
+      </div>
+      <div class="pg-champ-row">
         <div class="pg-champ">
           <div class="pg-champ-trophy">&#127942;</div>
           <div class="pg-champ-label">Championship</div>
-          <div class="pg-champ-when">Wed, Sep 9 · 6:30 PM · Gym Middle</div>
+          <div class="pg-champ-when">${PLAYOFF_GAMES.champ.when} · ${PLAYOFF_GAMES.champ.time} · ${PLAYOFF_GAMES.champ.location}</div>
           <div class="pg-champ-matchup">
-            ${sideRowHtml(PLAYOFF_GAMES.champ, 'A', 'champ')}
-            ${sideRowHtml(PLAYOFF_GAMES.champ, 'B', 'champ')}
+            ${champTeamHtml('A')}
+            <div class="pg-champ-vs">vs</div>
+            ${champTeamHtml('B')}
           </div>
         </div>
       </div>
@@ -198,15 +379,17 @@ function ladderGameCardHtml(gameId, label) {
   const game = PLAYOFF_GAMES[gameId];
   const hasResult = !!game.result;
   const railClass = hasResult ? 'pg-rail-done' : 'pg-rail-tbd';
+  // Semis and the Championship use the real logos here too, matching desktop.
+  const useLogo = game.round >= 3;
   return `
-    <div class="pg-ladder-card">
+    <div class="pg-ladder-card ${useLogo ? 'pg-ladder-card-late' : ''}">
       <div class="pg-rail ${railClass}"></div>
       <div class="pg-ladder-top">
         <span class="pg-ladder-tag">${label}</span>
         <span class="pg-ladder-when">${game.when} · ${game.time}</span>
       </div>
-      ${sideRowHtml(game, 'A', gameId)}
-      ${sideRowHtml(game, 'B', gameId)}
+      ${sideRowHtml(game, 'A', gameId, useLogo)}
+      ${sideRowHtml(game, 'B', gameId, useLogo)}
     </div>`;
 }
 
@@ -239,7 +422,7 @@ function renderMobileLadder() {
 }
 
 async function init() {
-  await buildIconIndex();
+  await Promise.all([buildIconIndex(), loadSeasonStats()]);
   renderDesktopBracket();
   renderMobileLadder();
 }
