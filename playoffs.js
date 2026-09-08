@@ -168,7 +168,6 @@ function rosterCardHtml(side) {
   const info = teamColorEntry(teamName);
   const hex = info?.hex || '#888';
   const borderColor = teamName === 'Black' ? '#FFFFFF' : hex;
-  const icon = iconUrl(teamName);
   const coach = coachForColor(teamName);
   const letter = teamName.trim().charAt(0).toUpperCase();
   const roster = teamRosters[coach];
@@ -181,7 +180,6 @@ function rosterCardHtml(side) {
       <div class="pg-roster-card-header">
         <div class="pg-roster-card-icon" style="background:${hex}">
           <span style="color:${readableTextColor(hex)}">${letter}</span>
-          ${icon ? `<img src="${icon}" alt="" loading="lazy" onerror="this.remove()" />` : ''}
         </div>
         <div class="pg-roster-card-name" style="color:${borderColor}">${teamName.toUpperCase()}</div>
       </div>
