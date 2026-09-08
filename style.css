@@ -4019,18 +4019,58 @@ main {
   text-decoration-thickness: 1.5px;
 }
 
-/* Roster list under each Championship contender: alphabetical (by first
-   name) photo+name tiles, matching the Gameboard IN/OUT tile look but with
-   the team colour in place of an "OUT" header, per explicit request. */
-.pg-roster-list {
+/* Championship rosters: two fully separate cards (not one shared card, not
+   folded back into the team tile above) sitting immediately below the
+   Championship card — no connector arrow between them, per explicit
+   request. Each card borders in its own team colour; Black is the one
+   exception (see rosterCardHtml in playoffs.js — its literal hex #0A0A0A is
+   nearly invisible against this page's near-black background, so it
+   borders in white, the visually "inverse" colour, instead). */
+.pg-roster-cards-row {
+  display: flex;
+  gap: 18px;
+  width: 520px;
+  max-width: 100%;
+  margin: 22px auto 0;
+}
+.pg-roster-card {
+  flex: 1;
+  min-width: 0;
+  background: var(--clr-card);
+  border: 1.5px solid var(--clr-border);
+  border-radius: 16px;
+  padding: 18px 14px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.pg-roster-card-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.pg-roster-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 22%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14);
+  position: relative;
+}
+.pg-roster-card-icon > span { position: relative; font-size: 1rem; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+.pg-roster-card-icon img { position: relative; width: 112%; height: 112%; object-fit: cover; border-radius: 22%; }
+.pg-roster-card-name { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em; }
+.pg-roster-card-players {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
   width: 100%;
-  margin-top: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--clr-border);
 }
 .pg-roster-tile {
   display: flex;
@@ -4038,9 +4078,7 @@ main {
   align-items: center;
   gap: 6px;
 }
-/* 75% of the Championship logo tile's 116px, per explicit request, centered
-   under it (a column, not the old inline photo+name row). */
-.pg-roster-avatar { width: 87px; height: 87px; flex-shrink: 0; }
+.pg-roster-avatar { width: 58px; height: 58px; flex-shrink: 0; }
 .pg-roster-avatar-img {
   width: 100%;
   height: 100%;
@@ -4052,10 +4090,10 @@ main {
   align-items: center;
   justify-content: center;
   background: var(--clr-surface);
-  font-size: 2rem;
+  font-size: 1.5rem;
 }
 .pg-roster-name {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--clr-text);
 }

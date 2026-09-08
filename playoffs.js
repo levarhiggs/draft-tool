@@ -16,9 +16,10 @@ import { buildIconIndex, buildDriveIndex, iconUrl, photoUrl, fetchPlayers, COL a
 import { fetchSchedule, COL as SCHED_COL } from './schedule-data.js';
 import { getAllScheduleGames, getCompositeRank } from './firebase.js';
 
-// Referenced from an inline onerror= attribute (see rosterListHtml) — a
-// broken/unreachable Drive image would otherwise leave the browser's default
-// broken-image icon on screen instead of falling back to the placeholder.
+// Referenced from an inline onerror= attribute (see rosterPlayerTileHtml) —
+// a broken/unreachable Drive image would otherwise leave the browser's
+// default broken-image icon on screen instead of falling back to the
+// placeholder.
 window.__pgSwapAvatarPlaceholder = function (img) {
   const placeholder = document.createElement('div');
   placeholder.className = 'pg-roster-avatar-img pg-roster-avatar-placeholder';
@@ -134,26 +135,58 @@ function firstNameOf(fullName) {
   return (fullName || '').trim().split(/\s+/)[0] || fullName || '';
 }
 
-function rosterListHtml(coachTeam) {
-  const roster = teamRosters[coachTeam];
+function rosterPlayerTileHtml(p) {
+  const first = firstNameOf(p[PLAYER_COL.NAME]);
+  const photo = photoUrl(p);
+  // If the image genuinely fails to load (Drive unreachable/rate-limited —
+  // an observed real scenario, not hypothetical), swap it for the same
+  // placeholder a player with no known photo gets, instead of leaving the
+  // browser's broken-image icon on screen.
+  const avatar = photo
+    ? `<img src="${photo}" alt="" class="pg-roster-avatar-img" loading="lazy" onerror="window.__pgSwapAvatarPlaceholder(this)" />`
+    : `<div class="pg-roster-avatar-img pg-roster-avatar-placeholder">&#127936;</div>`;
+  return `
+    <div class="pg-roster-tile">
+      <div class="pg-roster-avatar">${avatar}</div>
+      <span class="pg-roster-name">${first}</span>
+    </div>`;
+}
+
+// Standalone roster card for a Championship contender — sits below the
+// Championship tile as its own separate object (Variant B, chosen over a
+// single shared two-column card), bordered in the team's own colour. Black
+// is the one exception: its hex (#0A0A0A) is nearly invisible as a border on
+// this page's near-black card background, so it borders in white instead —
+// the visually "inverse" colour, per explicit request — rather than the
+// team's literal hex like every other team gets.
+function rosterCardHtml(side) {
+  const game = PLAYOFF_GAMES.champ;
+  const resolved = resolveSide(game, side);
+  if (!resolved.known) return '';
+
+  const teamName = resolved.team;
+  const info = teamColorEntry(teamName);
+  const hex = info?.hex || '#888';
+  const borderColor = teamName === 'Black' ? '#FFFFFF' : hex;
+  const icon = iconUrl(teamName);
+  const coach = coachForColor(teamName);
+  const letter = teamName.trim().charAt(0).toUpperCase();
+  const roster = teamRosters[coach];
   if (!roster || roster.length === 0) return '';
-  const tiles = roster.map(p => {
-    const first = firstNameOf(p[PLAYER_COL.NAME]);
-    const photo = photoUrl(p);
-    // If the image genuinely fails to load (Drive unreachable/rate-limited —
-    // an observed real scenario, not hypothetical), swap it for the same
-    // placeholder a player with no known photo gets, instead of leaving the
-    // browser's broken-image icon on screen.
-    const avatar = photo
-      ? `<img src="${photo}" alt="" class="pg-roster-avatar-img" loading="lazy" onerror="window.__pgSwapAvatarPlaceholder(this)" />`
-      : `<div class="pg-roster-avatar-img pg-roster-avatar-placeholder">&#127936;</div>`;
-    return `
-      <div class="pg-roster-tile">
-        <div class="pg-roster-avatar">${avatar}</div>
-        <span class="pg-roster-name">${first}</span>
-      </div>`;
-  }).join('');
-  return `<div class="pg-roster-list">${tiles}</div>`;
+
+  const players = roster.map(rosterPlayerTileHtml).join('');
+
+  return `
+    <div class="pg-roster-card" style="border-color:${borderColor}">
+      <div class="pg-roster-card-header">
+        <div class="pg-roster-card-icon" style="background:${hex}">
+          <span style="color:${readableTextColor(hex)}">${letter}</span>
+          ${icon ? `<img src="${icon}" alt="" loading="lazy" onerror="this.remove()" />` : ''}
+        </div>
+        <div class="pg-roster-card-name" style="color:${borderColor}">${teamName.toUpperCase()}</div>
+      </div>
+      <div class="pg-roster-card-players">${players}</div>
+    </div>`;
 }
 
 function seasonStatLine(team) {
@@ -348,7 +381,6 @@ function champTeamHtml(side) {
       </div>
       ${coach ? `<div class="pg-champ-team-coach">${coach}</div>` : ''}
       ${stats ? `<div class="pg-champ-team-stats">${stats}</div>` : ''}
-      ${rosterListHtml(coach)}
     </div>`;
 }
 
@@ -441,6 +473,11 @@ function renderDesktopBracket() {
             ${champTeamHtml('B')}
           </div>
         </div>
+      </div>
+
+      <div class="pg-roster-cards-row">
+        ${rosterCardHtml('A')}
+        ${rosterCardHtml('B')}
       </div>
     </div>`;
 }
