@@ -148,6 +148,17 @@ h1{
 }
 .side-menu-link:hover{background:var(--card)}
 .side-menu-link.active{color:#4f8ef7;font-weight:600}
+
+/* "To be announced" state — shown between seasons, before a draft is held */
+.tba-panel{grid-column:1/-1;max-width:560px;margin:64px auto;padding:40px 32px;
+  text-align:center;background:#171a23;border:1px solid #262b38;border-radius:16px}
+.tba-icon{font-size:3rem;line-height:1;margin-bottom:14px;opacity:.85}
+.tba-panel h2{margin:0 0 14px;font-size:1.45rem;color:#e8eaf0;font-weight:700}
+.tba-panel p{margin:0 0 10px;color:#98a0b4;font-size:.97rem;line-height:1.55}
+.tba-meanwhile{margin-top:18px !important;font-size:.92rem}
+.tba-panel a{color:#4f8ef7;text-decoration:none;font-weight:600}
+.tba-panel a:hover{text-decoration:underline}
+@media(max-width:600px){.tba-panel{margin:36px 14px;padding:30px 20px}}
 </style>
 </head>
 <body>
@@ -157,8 +168,8 @@ h1{
     <span></span><span></span><span></span>
   </button>
   <div class="top-header-titles">
-    <h1>CSBC 2026 SJV Summer League</h1>
-    <p class="subtitle">Draft Results &nbsp;·&nbsp; 12 Teams &nbsp;·&nbsp; 96 Players</p>
+    <h1>CSBC 2026 SJV Fall League</h1>
+    <p class="subtitle">Draft Results &nbsp;·&nbsp; To Be Announced</p>
   </div>
 </header>
 
@@ -179,7 +190,7 @@ h1{
 </nav>
 
 <div id="teams-grid" class="teams-grid">
-  <div class="loading-msg" style="grid-column:1/-1">Loading photos…</div>
+  <!-- populated by the inline script below -->
 </div>
 
 <div id="lightbox">
@@ -188,6 +199,33 @@ h1{
 </div>
 
 <script>
+/*  FALL 2026 — DRAFT NOT YET HELD  ------------------------------------------
+    The Summer 2026 (26.2) draft results that used to render here are preserved
+    verbatim in the block below. The draft for Fall 2026 (26.3) has not happened
+    yet — tryouts are 2026-09-13 — so the page shows a "to be announced" state.
+
+    TO RESTORE THIS PAGE FOR FALL:
+      1. Replace the TEAMS array in the archived block with the Fall results
+         (each team: coach, num, color, players[{id, name, pick}])
+      2. Update PHOTOS_FOLDER_ID to the Fall photos folder — the id below is
+         Summer's, and Fall player ids are DIFFERENT (season-scoped), so the
+         Summer folder would resolve the wrong faces. Fall photos folder id
+         lives in season-config.js.
+      3. Un-comment the archived block, delete the placeholder render below,
+         and update the subtitle in the header.
+--------------------------------------------------------------------------- */
+
+document.getElementById('teams-grid').innerHTML = `
+  <div class="tba-panel">
+    <div class="tba-icon">🏀</div>
+    <h2>Draft Results To Be Announced</h2>
+    <p>The Fall 2026 draft has not been held yet. Team rosters will be posted
+       here once the draft is complete.</p>
+    <p class="tba-meanwhile">In the meantime, browse this season's players in the
+       <a href="directory.html">Player Directory</a>.</p>
+  </div>`;
+
+/*  ── ARCHIVED: Summer 2026 (26.2) draft results ───────────────────────────
 const PHOTOS_FOLDER_ID = '1oJCTtCalNQTcQbMsZaOAa4VyAnJr35EV';
 const DRIVE_API_KEY    = 'AIzaSyAoIlK4ncTUeJjPeOYJLXuj2GoWnMge3X8';
 
@@ -420,6 +458,7 @@ document.getElementById('lightbox').addEventListener('click', () => {
 });
 
 init();
+    ── end archived Summer 2026 draft results ──────────────────────────── */
 </script>
 <script type="module" src="side-menu.js"></script>
 </body>

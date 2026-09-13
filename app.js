@@ -3,7 +3,7 @@ import { getCompositeRank, saveFavorites, getFavorites } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import {
   COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID, SEASON_CODE,
-  fetchPlayers, buildDriveIndex, photoUrl, videoUrl,
+  fetchPlayers, buildDriveIndex, photoUrl, videoUrl, ageDisplay,
 } from './players-data.js';
 import { priorSeasons } from './player-identity.js';
 import { getSeason } from './season-config.js';
@@ -216,7 +216,8 @@ function renderGrid() {
 function playerCardHTML(p, isLoggedIn) {
   const name      = p[COL.NAME] || 'Unknown';
   const grade     = p[COL.GRADE] || '—';
-  const age       = p[COL.AGE]   || '—';
+  // AGE column holds a birth date; coaches want the age.
+  const age       = ageDisplay(p[COL.AGE]);
   const id        = p[COL.ID]    || '';
   const photo     = photoUrl(p);
   const team      = p._teamFB || p[COL.TEAM] || '';
@@ -257,7 +258,7 @@ function playerCardHTML(p, isLoggedIn) {
         ${imgHtml}
         <div class="player-card-info">
           <div class="player-card-name">${escHtml(id)} · ${escHtml(name)}</div>
-          <div class="player-card-meta">Grade ${escHtml(grade)} · ${escHtml(age)}</div>
+          <div class="player-card-meta">Grade ${escHtml(grade)} · Age ${escHtml(age)}</div>
           ${priorHtml}
           ${scoreHtml}
           ${teamHtml}

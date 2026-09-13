@@ -1,5 +1,7 @@
 // player.js — profile page: renders player data, coach panel, ranking modal
 import { photoUrl, videoUrl, escHtml, COL, SHEET_CSV_URL } from './app.js';
+import { ageDisplay } from './players-data.js';
+import { cacheKey } from './season-config.js';
 import { subscribePlayer, getCompositeRank, saveRanking, saveNote, saveTeam, saveNoShow, deleteNote, decodeRanking, saveFavorites, getFavorites } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import { TEAMS, TEAM_ADMINS } from './coaches-config.js';
@@ -61,7 +63,9 @@ async function init() {
 
 async function fetchPlayer(id) {
   let players;
-  const cached = sessionStorage.getItem('playerSheet');
+  // Must use the same season-scoped key as players-data.js — an unscoped
+  // 'playerSheet' would serve the previous season's roster from cache.
+  const cached = sessionStorage.getItem(cacheKey('playerSheet'));
   if (cached) {
     players = JSON.parse(cached);
   } else {
@@ -69,7 +73,7 @@ async function fetchPlayer(id) {
     if (!res.ok) throw new Error(`Sheet fetch failed: ${res.status}`);
     const text = await res.text();
     players = parseCSV(text);
-    sessionStorage.setItem('playerSheet', JSON.stringify(players));
+    sessionStorage.setItem(cacheKey('playerSheet'), JSON.stringify(players));
   }
   return players.find(p => String(p[COL.ID]).trim() === String(id).trim()) || null;
 }
@@ -162,7 +166,7 @@ function renderShell() {
         ${photoTileHtml}
         <div class="stat-box stat-box-photo-wrap">
           <div class="stat-label">Age</div>
-          <div class="stat-value">${escHtml(p[COL.AGE] || '—')}</div>
+          <div class="stat-value">${escHtml(ageDisplay(p[COL.AGE]))}</div>
           <div class="stat-sublabel">Grade ${escHtml(p[COL.GRADE] || '—')}</div>
           ${isTeamAdmin ? `<button class="noshow-btn" id="noshow-btn" title="Mark as No Show">✕</button>` : ''}
         </div>
@@ -469,7 +473,7 @@ function renderCoachPanel() {
 }
 
 async function wirePlayerNav() {
-  const cached = sessionStorage.getItem('playerSheet');
+  const cached = sessionStorage.getItem(cacheKey('playerSheet'));
   if (!cached) return;
   const all = JSON.parse(cached);
 

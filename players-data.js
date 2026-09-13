@@ -35,6 +35,47 @@ export const COL = {
 };
 // ──────────────────────────────────────────────────────────────────────────────
 
+// ── Age ───────────────────────────────────────────────────────────────────────
+// The roster sheet's AGE column actually holds a BIRTH DATE (e.g. "1/21/2013"),
+// which is what the league's registration export provides. Coaches evaluating
+// players want the age, not the birthday, so every display path runs it through
+// ageFromBirthdate(). Kept here (not per-page) so the directory card, the
+// profile tile, and any future page all compute it the same way.
+
+/**
+ * Whole years from a M/D/YYYY birth date to today.
+ * Returns null for empty/unparseable input so callers can fall back to a dash.
+ */
+export function ageFromBirthdate(value, today = new Date()) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  let y, m, d;
+  const slash = raw.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);   // M/D/YYYY
+  const iso   = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);            // YYYY-MM-DD
+  if (slash)    { m = +slash[1]; d = +slash[2]; y = +slash[3]; }
+  else if (iso) { y = +iso[1];   m = +iso[2];   d = +iso[3];   }
+  else {
+    const parsed = new Date(raw);
+    if (isNaN(parsed)) return null;
+    y = parsed.getFullYear(); m = parsed.getMonth() + 1; d = parsed.getDate();
+  }
+  if (!y || !m || !d || m > 12 || d > 31) return null;
+
+  let age = today.getFullYear() - y;
+  // Not had this year's birthday yet? Then they're a year younger.
+  const monthDiff = (today.getMonth() + 1) - m;
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d)) age -= 1;
+
+  return age >= 0 && age < 120 ? age : null;
+}
+
+/** Display form: "13" (no birth date leaked to the UI), or a dash. */
+export function ageDisplay(value) {
+  const a = ageFromBirthdate(value);
+  return a === null ? '—' : String(a);
+}
+
 const driveIndex = {};
 const iconIndex = {};
 
