@@ -20,7 +20,8 @@ const activeFilters = {
   seeds:     new Set(),   // floor integers 1–8
   teams:     new Set(),   // team name strings
   favorites: false,       // boolean toggle
-  noShows:   false,       // boolean toggle
+  noShows:   false,       // boolean toggle (admin-marked no-show flag)
+  noTryout:  false,       // TEMPORARY (Fall 2026 draft): missed tryouts
 };
 
 // Favorites: Set of player ID strings
@@ -165,8 +166,13 @@ function applyFilters(players) {
     // Favorites filter
     if (activeFilters.favorites && !favorites.has(String(p[COL.ID]))) return false;
 
-    // No-show filter
+    // No-show filter (admin-marked)
     if (activeFilters.noShows && !p._noShow) return false;
+
+    // TEMPORARY (Fall 2026 draft): missed-tryout filter. Distinct from the
+    // admin no-show flag above -- this is attendance, derived from whether a
+    // tryout photo was captured. Remove with the chip after the draft.
+    if (activeFilters.noTryout && !MISSED_TRYOUT.has(String(p[COL.ID]))) return false;
 
     // Grade filter
     if (activeFilters.grades.size > 0) {
@@ -321,6 +327,14 @@ function setupControls() {
   document.getElementById('filter-favorites')?.addEventListener('click', e => {
     activeFilters.favorites = !activeFilters.favorites;
     e.currentTarget.classList.toggle('active', activeFilters.favorites);
+    renderGrid();
+  });
+
+  // TEMPORARY (Fall 2026 draft): missed-tryout toggle. Public -- no login
+  // gate, unlike the admin no-shows chip. Remove after the draft.
+  document.getElementById('filter-notryout')?.addEventListener('click', e => {
+    activeFilters.noTryout = !activeFilters.noTryout;
+    e.currentTarget.classList.toggle('active', activeFilters.noTryout);
     renderGrid();
   });
 

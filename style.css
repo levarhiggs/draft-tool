@@ -668,6 +668,13 @@ main {
 .filter-noshow { color: var(--clr-muted); }
 .filter-noshow.active { background: var(--clr-danger); border-color: var(--clr-danger); color: #fff; }
 
+/* TEMPORARY (Fall 2026 draft): "No Tryout" filter chip. Matches the
+   missed-tryout card badge colour rather than the admin no-show red, so the
+   two filters don't read as the same thing. Remove after the draft --
+   see directory.html and app.js for the other two pieces. */
+.filter-notryout { color: var(--clr-muted); }
+.filter-notryout.active { background: #b5544b; border-color: #b5544b; color: #fff; }
+
 .stat-photo-img {
   width: 100%;
   height: 100%;

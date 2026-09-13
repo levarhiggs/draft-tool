@@ -59,6 +59,11 @@
       <div class="filter-bar">
         <div class="filter-row">
           <span class="bar-label">Filter:</span>
+          <!-- TEMPORARY (Fall 2026 draft only): filters to players who missed
+               tryouts. Public, unlike the admin "No Shows" chip below it.
+               Remove this button, its handler in app.js, and the
+               .filter-notryout CSS once the draft is done. -->
+          <button class="filter-chip filter-notryout" id="filter-notryout">✕ No Tryout</button>
           <button class="filter-chip filter-fav" id="filter-favorites">♥ Favorites</button>
           <button class="filter-chip filter-noshow hidden" id="filter-noshows">✕ No Shows</button>
           <div id="filter-grades" class="filter-group"></div>
