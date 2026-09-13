@@ -4164,20 +4164,43 @@ main {
 .pg-champ-strip-val { font-size: 0.92rem; color: var(--clr-muted); font-weight: 700; margin-top: 2px; }
 }
 
-/* ── Returning-player badge (Player Directory) ──────────────────────────────
-   Player IDs are season-scoped and get reassigned every season, so this is
-   driven by the cross-season identity link in player-identity.js, not by ID.
+/* ── Player card badge row (Player Directory) ───────────────────────────────
+   Returning / Prev. Rank / Missed Tryout. Player IDs are season-scoped and get
+   reassigned every season, so "returning" is driven by the cross-season
+   identity link in player-identity.js, not by ID.
    See PRODUCT_SPEC.md "Multi-Season Architecture". */
-.player-card-returning {
+.player-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  margin: 3px 0 2px;
+}
+.player-card-returning,
+.player-card-prevrank,
+.player-card-missed {
   display: inline-block;
-  margin: 2px 0 1px;
   padding: 1px 7px;
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.player-card-returning {
   color: #8fd6a8;
   background: rgba(80, 190, 120, 0.13);
   border: 1px solid rgba(120, 210, 150, 0.34);
-  border-radius: 999px;
-  white-space: nowrap;
+}
+/* Prior-season composite seed. Sits beside Returning on the same line. */
+.player-card-prevrank {
+  color: #9fc4ef;
+  background: rgba(79, 142, 247, 0.14);
+  border: 1px solid rgba(110, 160, 240, 0.36);
+}
+/* Did not attend this season's tryouts. */
+.player-card-missed {
+  color: #e9a9a2;
+  background: rgba(200, 80, 70, 0.14);
+  border: 1px solid rgba(215, 110, 100, 0.36);
 }

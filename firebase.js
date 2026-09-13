@@ -75,6 +75,30 @@ export async function getCompositeRank(playerId) {
   }
 }
 
+/**
+ * Composite rank for a player in a PRIOR season, addressed by that season's
+ * own id (ids are season-scoped and change every season - see
+ * player-identity.js for the mapping).
+ *
+ * Deliberately separate from getCompositeRank(), which resolves ids through
+ * sid() against the CURRENT season and so cannot reach another season's docs.
+ * Read-only by design: prior seasons are complete and must not be written.
+ */
+export async function getPriorComposite(seasonCode, priorId) {
+  try {
+    const docId = seasonCode === LEGACY_SEASON
+      ? String(priorId)
+      : `${seasonCode}__${priorId}`;
+    const snap = await getDoc(doc(db, 'players', docId));
+    if (!snap.exists()) return null;
+    const { composite, count } = buildComposite(snap.data());
+    return composite == null ? null : { composite, count, season: seasonCode };
+  } catch (err) {
+    console.error('getPriorComposite error:', err);
+    return null;
+  }
+}
+
 export function subscribePlayer(playerId, callback) {
   return onSnapshot(playerRef(playerId), snap => {
     callback(snap.exists() ? buildComposite(snap.data()) : emptyData());

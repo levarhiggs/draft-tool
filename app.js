@@ -1,5 +1,5 @@
 // app.js — player directory: data loading, rendering, sort, filter, favorites
-import { getCompositeRank, saveFavorites, getFavorites } from './firebase.js';
+import { getCompositeRank, getPriorComposite, saveFavorites, getFavorites } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import {
   COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID, SEASON_CODE,
@@ -7,6 +7,9 @@ import {
 } from './players-data.js';
 import { priorSeasons } from './player-identity.js';
 import { getSeason } from './season-config.js';
+import { missedTryout } from './tryout-attendance.js';
+
+const MISSED_TRYOUT = missedTryout(SEASON_CODE);
 
 let allPlayers  = [];
 let currentSort = 'id';
@@ -101,6 +104,16 @@ async function enrichWithFirebase(players) {
     p._rankings  = data.rankings;
     p._teamFB    = data.team   || '';
     p._noShow    = data.noShow || false;
+
+    // Prior-season composite for returning players. Ids are season-scoped, so
+    // this has to go through the identity link to find last season's id.
+    // Shown in front of the login gate this season: coach pins aren't
+    // distributed yet, and coaches need this to evaluate immediately.
+    const prev = priorSeasons(p[COL.NAME], SEASON_CODE);
+    if (prev.length) {
+      const last = prev[prev.length - 1];
+      p._priorRank = await getPriorComposite(last.season, last.id);
+    }
   }));
 }
 
@@ -239,14 +252,32 @@ function playerCardHTML(p, isLoggedIn) {
   const teamHtml = team
     ? `<div class="player-card-team">${escHtml(team)}</div>` : '';
 
-  // Returning-player badge. Player IDs are season-scoped and change every
-  // season, so "has this kid played before" comes from the cross-season
-  // identity link (player-identity.js), never from the ID itself.
+  // Badge row. All of this sits IN FRONT of the login gate this season --
+  // coach pins aren't distributed yet, so coaches need to evaluate from the
+  // public link. Move it back behind getCurrentCoach() once pins go out.
+  //
+  // Returning-player badge: ids are season-scoped and change every season, so
+  // "has this kid played before" comes from the cross-season identity link
+  // (player-identity.js), never from the id itself.
   const prior = priorSeasons(name, SEASON_CODE);
-  const priorHtml = prior.length
-    ? `<span class="player-card-returning" title="Played in ${
-        prior.map(e => escHtml(getSeason(e.season).name)).join(', ')}">↩ Returning</span>`
-    : '';
+  const badges = [];
+  if (prior.length) {
+    const seasons = prior.map(e => escHtml(getSeason(e.season).name)).join(', ');
+    badges.push(`<span class="player-card-returning" title="Played in ${seasons}">↩ Returning</span>`);
+    const pr = p._priorRank;
+    if (pr && pr.composite != null) {
+      badges.push(`<span class="player-card-prevrank" title="${
+        escHtml(getSeason(pr.season).name)} composite seed from ${pr.count} coach${
+        pr.count === 1 ? '' : 'es'}">Prev. Rank: ${pr.composite.toFixed(1)}</span>`);
+    }
+  }
+  // Missed-tryout badge: no Fall photo was taken, which is how attendance was
+  // determined (see _local/PENDING_ROSTER_CHANGES.md).
+  if (MISSED_TRYOUT.has(String(id))) {
+    badges.push('<span class="player-card-missed" title="Did not attend Fall 2026 tryouts">✕ Missed Tryout</span>');
+  }
+  const priorHtml = badges.length
+    ? `<div class="player-card-badges">${badges.join('')}</div>` : '';
 
   const imgHtml = photo
     ? `<img src="${photo}" alt="${escHtml(name)}" loading="lazy" />`
