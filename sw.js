@@ -1,4 +1,4 @@
-const CACHE = 'csbc-draft-v8';
+const CACHE = 'csbc-draft-v9';
 const SHELL = [
   '/draft-tool/',
   '/draft-tool/index.html',
@@ -32,6 +32,7 @@ const SHELL = [
   '/draft-tool/icon-192.png',
   '/draft-tool/icon-512.png',
   '/draft-tool/favicon.png',
+  '/draft-tool/assets/26.2-champions.jpg',
 ];
 
 self.addEventListener('install', e => {

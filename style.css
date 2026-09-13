@@ -4217,3 +4217,42 @@ main {
   background: rgba(200, 80, 70, 0.14);
   border: 1px solid rgba(215, 110, 100, 0.36);
 }
+
+
+/* ── Playoffs: champions photo ──────────────────────────────────────────────
+   Sits below the bracket. Image lives in the repo (assets/), not Drive --
+   small enough to commit, and it avoids Drive's image rate limits. */
+.pg-champions {
+  margin: 40px auto 8px;
+  max-width: 820px;          /* matches .pg-stage's fixed width */
+  padding: 0 14px;
+  text-align: center;
+}
+.pg-champions-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: #f5c451;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+.pg-champions img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  /* Team Black -- white border, same rule the bracket cards use so a black
+     team doesn't vanish against the dark page background. */
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.45);
+}
+.pg-champions figcaption {
+  margin-top: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e8eaf0;
+}
+@media (max-width: 900px) {
+  .pg-champions { margin-top: 28px; }
+  .pg-champions-title { font-size: 0.76rem; }
+}

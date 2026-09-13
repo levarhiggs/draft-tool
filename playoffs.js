@@ -217,8 +217,9 @@ const PLAYOFF_GAMES = {
   semiA:    { round: 3, bracket: 'A', feederA: 'r2_1', feederB: 'r2_4', when: 'Thu Sep 3', time: '6:00 PM', location: 'Gym East', result: { winnerSeed: 4 } },
   semiB:    { round: 3, bracket: 'B', feederA: 'r2_3', feederB: 'r2_2', when: 'Thu Sep 3', time: '6:50 PM', location: 'Gym West', result: { winnerSeed: 3 } },
 
-  // Championship — Wed Sep 9 — not yet played
-  champ:    { round: 4, bracket: null, feederA: 'semiA', feederB: 'semiB', when: 'Wed Sep 9', time: '6:30 PM', location: 'Gym Middle', result: null },
+  // Championship — Wed Sep 9 — Black (seed 3) def. Gold (seed 4).
+  // Winner-only, no score, matching every other game this season.
+  champ:    { round: 4, bracket: null, feederA: 'semiA', feederB: 'semiB', when: 'Wed Sep 9', time: '6:30 PM', location: 'Gym Middle', result: { winnerSeed: 3 } },
 };
 
 // Resolves a game slot's "side" (a fixed seed, or the winner of a feeder game,
