@@ -110,5 +110,15 @@ export function isReadOnly(code) {
  * previous season's roster from cache until they close the tab.
  */
 export function cacheKey(base, code = CURRENT_SEASON) {
-  return `${base}:${code}`;
+  return `${base}:${code}:${CACHE_EPOCH}`;
 }
+
+/**
+ * Bump to invalidate every cached sessionStorage index for all clients.
+ *
+ * Needed when a bug could have written a BAD cache that would otherwise
+ * persist for a viewer's whole session. v2: buildDriveIndex used to cache a
+ * failed photo fetch as an authoritative empty index, which made photos
+ * silently vanish until the tab was closed.
+ */
+const CACHE_EPOCH = 'v2';

@@ -141,16 +141,23 @@ export async function buildDriveIndex() {
     listDriveFolder(PHOTOS_FOLDER_ID),
     listDriveFolder(VIDEOS_FOLDER_ID),
   ]);
-  // A failed/rate-limited Drive call resolves to [] (see listDriveFolder's
-  // catch) — skip caching in that case so a transient failure can't get
-  // permanently "stuck" as an empty index for the rest of the session.
-  if (photos.length === 0 && videos.length === 0) return;
+
+  // listDriveFolder returns null on failure, [] for an empty folder. Only
+  // cache when the PHOTOS fetch actually succeeded: caching a failed photo
+  // fetch pins a broken index for the whole session, and every affected
+  // player silently shows no photo until the tab is closed. An empty VIDEOS
+  // folder is legitimate (videos lag photos during intake), so it must not
+  // block caching on its own.
+  if (photos === null) {
+    console.warn('Drive photo listing failed — not caching index this load.');
+    return;
+  }
   photos.forEach(({ name, id }) => {
     const pid = stripExtension(name);
     if (!driveIndex[pid]) driveIndex[pid] = {};
     driveIndex[pid].photoId = id;
   });
-  videos.forEach(({ name, id }) => {
+  (videos || []).forEach(({ name, id }) => {
     const pid = stripExtension(name);
     if (!driveIndex[pid]) driveIndex[pid] = {};
     driveIndex[pid].videoId = id;
@@ -166,7 +173,10 @@ export async function buildIconIndex() {
   if (cached) { Object.assign(iconIndex, JSON.parse(cached)); return; }
 
   const icons = await listDriveFolder(ICONS_FOLDER_ID);
-  if (icons.length === 0) return; // don't cache a failed/empty fetch
+  // null = fetch failed (see listDriveFolder). Don't cache a failure, and
+  // don't cache an empty result either -- there is no legitimate reason for
+  // the icons folder to be empty, so empty means something went wrong.
+  if (icons === null || icons.length === 0) return;
   icons.forEach(({ name, id }) => {
     iconIndex[stripExtension(name)] = id;
   });
@@ -178,14 +188,37 @@ export function iconUrl(colorName) {
   return fileId ? driveFileUrl(fileId, 'img') : null;
 }
 
+/**
+ * Every file in a Drive folder.
+ *
+ * Returns null on FAILURE and [] for a genuinely empty folder -- the caller has
+ * to tell those apart, because caching a failed fetch as an empty index makes
+ * photos silently vanish for the rest of the session.
+ *
+ * Pages explicitly: Drive's default page size is 100, so a folder that grows
+ * past that would otherwise be silently truncated.
+ */
 async function listDriveFolder(folderId) {
-  const apiUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${folderId}' in parents`)}&fields=files(id,name)&key=${DRIVE_API_KEY}`;
+  if (!folderId) return [];
+  const out = [];
+  let token = '';
   try {
-    const res = await fetch(apiUrl);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.files || [];
-  } catch { return []; }
+    do {
+      const url = `https://www.googleapis.com/drive/v3/files`
+        + `?q=${encodeURIComponent(`'${folderId}' in parents`)}`
+        + `&fields=files(id,name),nextPageToken&pageSize=1000`
+        + `&key=${DRIVE_API_KEY}`
+        + (token ? `&pageToken=${token}` : '');
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const data = await res.json();
+      out.push(...(data.files || []));
+      token = data.nextPageToken || '';
+    } while (token);
+    return out;
+  } catch {
+    return null;
+  }
 }
 
 function stripExtension(f) { return f.replace(/\.[^/.]+$/, '').trim(); }
