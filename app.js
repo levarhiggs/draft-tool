@@ -2,9 +2,11 @@
 import { getCompositeRank, saveFavorites, getFavorites } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import {
-  COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID,
+  COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID, SEASON_CODE,
   fetchPlayers, buildDriveIndex, photoUrl, videoUrl,
 } from './players-data.js';
+import { priorSeasons } from './player-identity.js';
+import { getSeason } from './season-config.js';
 
 let allPlayers  = [];
 let currentSort = 'id';
@@ -236,6 +238,15 @@ function playerCardHTML(p, isLoggedIn) {
   const teamHtml = team
     ? `<div class="player-card-team">${escHtml(team)}</div>` : '';
 
+  // Returning-player badge. Player IDs are season-scoped and change every
+  // season, so "has this kid played before" comes from the cross-season
+  // identity link (player-identity.js), never from the ID itself.
+  const prior = priorSeasons(name, SEASON_CODE);
+  const priorHtml = prior.length
+    ? `<span class="player-card-returning" title="Played in ${
+        prior.map(e => escHtml(getSeason(e.season).name)).join(', ')}">↩ Returning</span>`
+    : '';
+
   const imgHtml = photo
     ? `<img src="${photo}" alt="${escHtml(name)}" loading="lazy" />`
     : `<div class="player-card-img-placeholder">🏀</div>`;
@@ -247,6 +258,7 @@ function playerCardHTML(p, isLoggedIn) {
         <div class="player-card-info">
           <div class="player-card-name">${escHtml(id)} · ${escHtml(name)}</div>
           <div class="player-card-meta">Grade ${escHtml(grade)} · ${escHtml(age)}</div>
+          ${priorHtml}
           ${scoreHtml}
           ${teamHtml}
         </div>

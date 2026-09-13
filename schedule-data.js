@@ -2,7 +2,18 @@
 // Mirrors players-data.js's CSV fetch pattern but is a standalone module —
 // players-data.js is left untouched.
 
-export const SCHEDULE_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTCOk033NnCmR_lgFCWNLkMSdqNSAHbQ7PtldyAsf1qvh9YQdVP6gxntlYRoapaIMfumz0jRoXBeT-1/pub?output=csv';
+// The schedule season is deliberately SEPARATE from the roster season: during
+// tryouts/draft the roster has already flipped to the new season, but that
+// season has no schedule yet (released ~1 week before games). Until then these
+// pages keep showing the previous season's completed games.
+// See SCHEDULE_SEASON in season-config.js for how to flip this over.
+import { scheduleSeason, cacheKey } from './season-config.js';
+
+const SEASON = scheduleSeason();
+
+export const SCHEDULE_SEASON_CODE = SEASON.code;
+export const SCHEDULE_SEASON_NAME = SEASON.name;
+export const SCHEDULE_CSV_URL     = SEASON.scheduleCsvUrl;
 
 export const COL = {
   GAME:        'Game #',
@@ -25,13 +36,14 @@ export const COL = {
 // ── Sheet fetch ───────────────────────────────────────────────────────────────
 
 export async function fetchSchedule() {
-  const cached = sessionStorage.getItem('scheduleSheet');
+  const CK = cacheKey('scheduleSheet', SEASON.code);
+  const cached = sessionStorage.getItem(CK);
   if (cached) return JSON.parse(cached);
   const res = await fetch(SCHEDULE_CSV_URL);
   if (!res.ok) throw new Error(`Schedule sheet fetch failed: ${res.status}`);
   const text = await res.text();
   const games = parseCSV(text);
-  sessionStorage.setItem('scheduleSheet', JSON.stringify(games));
+  sessionStorage.setItem(CK, JSON.stringify(games));
   return games;
 }
 

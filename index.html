@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CSBC SJV Summer 2026 Draft Tool</title>
+  <title>CSBC SJV Fall 2026 Draft Tool</title>
 
   <!--
     This file is intentionally page-agnostic — it is ONLY a redirect to
@@ -14,15 +14,15 @@
     match) and push. That's the only edit needed — every other page's own
     filename/content/nav links are untouched by this.
 
-    Current default: Playoffs (set 2026-09-07, during the Summer 2026
-    playoffs). Past/likely-next defaults for reference:
+    Current default: Directory (set 2026-09-13, Fall 2026 tryouts day).
+    Past/likely-next defaults for reference:
       - schedules.html   — before a season starts / during the regular season
-      - directory.html   — during tryouts/draft season
-      - playoffs.html     — during playoffs (current)
+      - directory.html   — during tryouts/draft season (current)
+      - playoffs.html     — during playoffs
       - standings.html    — end of regular season, before playoffs
     Pick whichever page is most relevant to what's happening right now.
   -->
-  <meta http-equiv="refresh" content="0; url=playoffs.html" />
+  <meta http-equiv="refresh" content="0; url=directory.html" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0f1117" />
 </head>
@@ -30,8 +30,8 @@
   <script>
     // Primary redirect (meta-refresh above is the no-JS fallback — the two
     // must be kept in sync if this URL ever changes).
-    window.location.replace('playoffs.html');
+    window.location.replace('directory.html');
   </script>
-  <p>Redirecting to the app… if nothing happens, <a href="playoffs.html" style="color:#4f8ef7;">click here</a>.</p>
+  <p>Redirecting to the app… if nothing happens, <a href="directory.html" style="color:#4f8ef7;">click here</a>.</p>
 </body>
 </html>

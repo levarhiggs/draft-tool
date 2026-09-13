@@ -4163,3 +4163,21 @@ main {
 .pg-champ-strip-lbl { font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--clr-warning); font-weight: 700; }
 .pg-champ-strip-val { font-size: 0.92rem; color: var(--clr-muted); font-weight: 700; margin-top: 2px; }
 }
+
+/* ── Returning-player badge (Player Directory) ──────────────────────────────
+   Player IDs are season-scoped and get reassigned every season, so this is
+   driven by the cross-season identity link in player-identity.js, not by ID.
+   See PRODUCT_SPEC.md "Multi-Season Architecture". */
+.player-card-returning {
+  display: inline-block;
+  margin: 2px 0 1px;
+  padding: 1px 7px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #8fd6a8;
+  background: rgba(80, 190, 120, 0.13);
+  border: 1px solid rgba(120, 210, 150, 0.34);
+  border-radius: 999px;
+  white-space: nowrap;
+}

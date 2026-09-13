@@ -1,9 +1,52 @@
 // firebase.js — read/write rankings, notes, team assignments, favorites
 import { db } from './firebase-config.js';
+import { resolveSeason, isReadOnly, scheduleSeason } from './season-config.js';
 import {
   doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField, serverTimestamp, arrayUnion,
   collection, getDocs, query, where, addDoc, deleteDoc,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ── SEASON SCOPING ───────────────────────────────────────────────────────────
+// Every collection used to be flat and single-season: players/{id},
+// coaches/{name}, scheduleGames/{num}, etc. Player IDs are season-scoped and
+// get REUSED across seasons by design, so a second season writing to those
+// flat paths would silently merge two different children's rankings into one
+// document. Every ref below is therefore namespaced by season code.
+//
+// Scheme: season code becomes a doc-id prefix, e.g. players/26.3__12.
+// Chosen over a `seasons/{code}/...` subcollection path because the existing
+// wide-open Firestore rules (`allow read, write: if true` per collection,
+// SETUP.md) keep applying unchanged — no new rule has to be published in the
+// Console before writes work. See gotcha #3 in PROJECT_STATUS.md: an
+// unpublished rule fails silently, which is exactly the failure mode to avoid
+// on a deadline. The subcollection form remains the better long-term shape and
+// is a clean follow-up migration once rules can be published deliberately.
+//
+// 26.2 docs are intentionally left UNPREFIXED so that season's existing data
+// keeps resolving exactly as before — nothing is migrated or moved.
+const SEASON = resolveSeason();
+const SEASON_CODE = SEASON.code;
+const LEGACY_SEASON = '26.2';
+// Schedule-driven reads follow SCHEDULE_SEASON, which lags CURRENT_SEASON
+// during tryouts/draft (new roster, no new schedule yet).
+const SCHEDULE_CODE = scheduleSeason().code;
+
+/** Season-scoped doc id. 26.2 keeps its original unprefixed ids. */
+function sid(id) {
+  return SEASON_CODE === LEGACY_SEASON ? String(id) : `${SEASON_CODE}__${id}`;
+}
+
+/**
+ * Guard for every mutating call. A finished season is a permanent historical
+ * record — its rankings, notes and scores must stop accepting edits.
+ * Throws rather than failing silently so a blocked write is visible.
+ */
+function assertWritable(what) {
+  if (isReadOnly(SEASON_CODE)) {
+    throw new Error(
+      `${SEASON.name} (${SEASON_CODE}) is complete and read-only — ${what} refused.`);
+  }
+}
 
 // Firestore document shape for players/{playerId}:
 // {
@@ -17,7 +60,7 @@ import {
 // }
 
 function playerRef(playerId) {
-  return doc(db, 'players', String(playerId));
+  return doc(db, 'players', sid(playerId));
 }
 
 // Returns { composite, count, rankings, modifiers, notes, team }
@@ -131,7 +174,7 @@ export async function clearJerseyNumber(playerId, coachName) {
 }
 
 // Coach favorites stored in coaches/{coachName}
-function coachRef(coachName) { return doc(db, 'coaches', coachName); }
+function coachRef(coachName) { return doc(db, 'coaches', sid(coachName)); }
 
 export async function saveFavorites(coachName, favoriteIds) {
   const ref  = coachRef(coachName);
@@ -181,7 +224,7 @@ export async function saveTeam(playerId, teamName) {
 // }
 
 function scheduleGameRef(gameNum) {
-  return doc(db, 'scheduleGames', String(gameNum));
+  return doc(db, 'scheduleGames', sid(gameNum));
 }
 
 export async function getScheduleGame(gameNum) {
@@ -202,7 +245,19 @@ export async function getAllScheduleGames() {
   try {
     const snap = await getDocs(collection(db, 'scheduleGames'));
     const games = {};
-    snap.forEach(doc => { games[doc.id] = doc.data(); });
+    // Docs from every season live in this one collection (see SEASON SCOPING
+    // above), so filter to the schedule season and strip the prefix — callers
+    // expect plain game numbers as keys and would otherwise double-count
+    // across seasons in every win/loss computation.
+    const prefix = `${SCHEDULE_CODE}__`;
+    snap.forEach(d => {
+      const isLegacy = !d.id.includes('__');
+      if (SCHEDULE_CODE === LEGACY_SEASON) {
+        if (isLegacy) games[d.id] = d.data();
+      } else if (d.id.startsWith(prefix)) {
+        games[d.id.slice(prefix.length)] = d.data();
+      }
+    });
     return games;
   } catch (err) {
     console.error('getAllScheduleGames error:', err);
@@ -225,7 +280,7 @@ export async function getAllScheduleGames() {
 // coach+team+game overwrites in place instead of piling up duplicates.
 function liveStatLogRef(coachName, team, sheetGameNum) {
   const id = `${coachName}_${team}_${sheetGameNum}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-  return doc(db, 'liveStatLogs', id);
+  return doc(db, 'liveStatLogs', sid(id));
 }
 
 export async function saveLiveStatLog(coachName, team, sheetGameNum, entries) {
@@ -254,7 +309,7 @@ export async function getLiveStatLog(coachName, team, sheetGameNum) {
 // per coach+team+game, holding all 4 quarters' notes together.
 function gameLogNotesRef(coachName, team, sheetGameNum) {
   const id = `${coachName}_${team}_${sheetGameNum}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-  return doc(db, 'gameLogNotes', id);
+  return doc(db, 'gameLogNotes', sid(id));
 }
 
 export async function saveGameLogNotes(coachName, team, sheetGameNum, notesByQuarter) {
@@ -290,7 +345,7 @@ export async function getGameLogNotes(coachName, team, sheetGameNum) {
 // { coachName, team, ghostsByJersey: { "7": "Sub Kid" }, updatedAt }
 function gameboardGhostsRef(coachName, team) {
   const id = `${coachName}_${team}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-  return doc(db, 'gameboardGhosts', id);
+  return doc(db, 'gameboardGhosts', sid(id));
 }
 
 export async function saveGameboardGhosts(coachName, team, ghostsByJersey) {
@@ -367,7 +422,7 @@ export async function saveGameComment(gameNum, text, coachName) {
 // instead, see saveGameConfig.
 
 function rotationConfigsRef(coachName) {
-  return collection(db, 'rotationConfigs', coachName, 'configs');
+  return collection(db, 'rotationConfigs', sid(coachName), 'configs');
 }
 
 export async function getRotationConfigs(coachName, team) {
@@ -426,7 +481,7 @@ export async function saveGameConfig(coachName, team, gameNum, config) {
   const existing = await getGameConfig(coachName, team, gameNum);
   const payload = { ...config, createdAt: serverTimestamp() };
   if (existing) {
-    const ref = doc(db, 'rotationConfigs', coachName, 'configs', existing.id);
+    const ref = doc(db, 'rotationConfigs', sid(coachName), 'configs', existing.id);
     await setDoc(ref, payload); // full overwrite, not merge — old pattern/order shouldn't linger
     return existing.id;
   }
@@ -451,11 +506,11 @@ export async function getGameConfigsForTeam(coachName, team) {
 }
 
 export async function renameRotationConfig(coachName, configId, newTitle) {
-  const ref = doc(db, 'rotationConfigs', coachName, 'configs', configId);
+  const ref = doc(db, 'rotationConfigs', sid(coachName), 'configs', configId);
   await updateDoc(ref, { title: newTitle });
 }
 
 export async function deleteRotationConfig(coachName, configId) {
-  const ref = doc(db, 'rotationConfigs', coachName, 'configs', configId);
+  const ref = doc(db, 'rotationConfigs', sid(coachName), 'configs', configId);
   await deleteDoc(ref);
 }

@@ -4,10 +4,19 @@
 // rendering logic — it only knows how to fetch and shape player records.
 
 // ── CONFIGURATION ──────────────────────────────────────────────────────────────
-export const SHEET_CSV_URL    = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQjE0aS5--XrlMU0YAnvS_dQVontr10xdYNPg5OxDe6rkoOzvGkQZ1vsRnKjfPSPP7SHr5g7YJRKbwp/pub?output=csv';
-export const PHOTOS_FOLDER_ID = '1oJCTtCalNQTcQbMsZaOAa4VyAnJr35EV';
-export const VIDEOS_FOLDER_ID = '1xJq9RH6DTvP3xsAwABlBzBqWw2NtX63q';
-export const ICONS_FOLDER_ID  = '1vp_UF_Zk3uKiCJ_6I9pCya7nFveR3_II';
+// Per-season values (sheet URL + Drive folder IDs) now live in season-config.js
+// so a new season is onboarded by editing ONE file. The exports below are kept
+// as live getters so existing importers keep working unchanged.
+import { resolveSeason, cacheKey } from './season-config.js';
+
+const SEASON = resolveSeason();
+
+export const SEASON_CODE      = SEASON.code;
+export const SEASON_NAME      = SEASON.name;
+export const SHEET_CSV_URL    = SEASON.sheetCsvUrl;
+export const PHOTOS_FOLDER_ID = SEASON.photosFolderId;
+export const VIDEOS_FOLDER_ID = SEASON.videosFolderId;
+export const ICONS_FOLDER_ID  = SEASON.iconsFolderId;
 export const DRIVE_API_KEY    = 'AIzaSyAoIlK4ncTUeJjPeOYJLXuj2GoWnMge3X8';
 
 export const COL = {
@@ -32,13 +41,27 @@ const iconIndex = {};
 // ── Sheet fetch ───────────────────────────────────────────────────────────────
 
 export async function fetchPlayers() {
-  const cached = sessionStorage.getItem('playerSheet');
+  const CK_PLAYERS = cacheKey('playerSheet', SEASON.code);
+  const cached = sessionStorage.getItem(CK_PLAYERS);
   if (cached) return JSON.parse(cached);
+  if (!SHEET_CSV_URL) {
+    throw new Error(
+      `No sheetCsvUrl configured for season ${SEASON.code} (${SEASON.name}). ` +
+      `Add the published CSV url to season-config.js.`);
+  }
   const res = await fetch(SHEET_CSV_URL);
   if (!res.ok) throw new Error(`Sheet fetch failed: ${res.status}`);
   const text = await res.text();
+  // A sheet that was shared but never "Publish to web"-ed returns an HTML
+  // login/preview page, which parseCSV would happily turn into garbage rows
+  // instead of erroring. Catch that here rather than showing a broken roster.
+  if (/^\s*<(?:!doctype|html)/i.test(text)) {
+    throw new Error(
+      `Sheet URL returned HTML, not CSV — the sheet is probably not published. ` +
+      `Use File > Share > Publish to web > CSV for season ${SEASON.code}.`);
+  }
   const players = parseCSV(text);
-  sessionStorage.setItem('playerSheet', JSON.stringify(players));
+  sessionStorage.setItem(CK_PLAYERS, JSON.stringify(players));
   return players;
 }
 
@@ -69,7 +92,8 @@ function splitCSVLine(line) {
 // ── Drive folder scanning ─────────────────────────────────────────────────────
 
 export async function buildDriveIndex() {
-  const cached = sessionStorage.getItem('driveIndex');
+  const CK_DRIVE = cacheKey('driveIndex', SEASON.code);
+  const cached = sessionStorage.getItem(CK_DRIVE);
   if (cached) { Object.assign(driveIndex, JSON.parse(cached)); return; }
 
   const [photos, videos] = await Promise.all([
@@ -90,13 +114,14 @@ export async function buildDriveIndex() {
     if (!driveIndex[pid]) driveIndex[pid] = {};
     driveIndex[pid].videoId = id;
   });
-  sessionStorage.setItem('driveIndex', JSON.stringify(driveIndex));
+  sessionStorage.setItem(CK_DRIVE, JSON.stringify(driveIndex));
 }
 
 // ── Team icons (filename, minus extension, matches TEAM_COLORS[team].name) ────
 
 export async function buildIconIndex() {
-  const cached = sessionStorage.getItem('iconIndex');
+  const CK_ICONS = cacheKey('iconIndex', SEASON.code);
+  const cached = sessionStorage.getItem(CK_ICONS);
   if (cached) { Object.assign(iconIndex, JSON.parse(cached)); return; }
 
   const icons = await listDriveFolder(ICONS_FOLDER_ID);
@@ -104,7 +129,7 @@ export async function buildIconIndex() {
   icons.forEach(({ name, id }) => {
     iconIndex[stripExtension(name)] = id;
   });
-  sessionStorage.setItem('iconIndex', JSON.stringify(iconIndex));
+  sessionStorage.setItem(CK_ICONS, JSON.stringify(iconIndex));
 }
 
 export function iconUrl(colorName) {
