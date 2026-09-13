@@ -675,6 +675,12 @@ main {
 .filter-notryout { color: var(--clr-muted); }
 .filter-notryout.active { background: #b5544b; border-color: #b5544b; color: #fff; }
 
+/* PRE-DRAFT (Fall 2026): "Has Video" filter chip, standing in for the Team
+   filter until the draft assigns teams. Remove with the chip in
+   directory.html and the handler in app.js. */
+.filter-hasvideo { color: var(--clr-muted); }
+.filter-hasvideo.active { background: #3f7fb8; border-color: #3f7fb8; color: #fff; }
+
 .stat-photo-img {
   width: 100%;
   height: 100%;

@@ -8,8 +8,13 @@ import {
 import { priorSeasons } from './player-identity.js';
 import { getSeason } from './season-config.js';
 import { missedTryout } from './tryout-attendance.js';
+import { hasVideoSet } from './video-availability.js';
 
 const MISSED_TRYOUT = missedTryout(SEASON_CODE);
+// PRE-DRAFT (Fall 2026): powers the Has Video filter/sort while videos are
+// still being matched and uploaded. Once every clip is on Drive the Drive scan
+// in players-data.js is the source of truth and this can go.
+const HAS_VIDEO = hasVideoSet(SEASON_CODE);
 
 let allPlayers  = [];
 let currentSort = 'id';
@@ -22,6 +27,7 @@ const activeFilters = {
   favorites: false,       // boolean toggle
   noShows:   false,       // boolean toggle (admin-marked no-show flag)
   noTryout:  false,       // TEMPORARY (Fall 2026 draft): missed tryouts
+  hasVideo:  false,       // PRE-DRAFT (Fall 2026): has a tryout video
 };
 
 // Favorites: Set of player ID strings
@@ -134,6 +140,12 @@ function applySort(players) {
       return parse(a[COL.AGE]) - parse(b[COL.AGE]);
     });
   }
+  // PRE-DRAFT (Fall 2026): players with a tryout video first, then by id.
+  if (currentSort === 'hasvideo') {
+    const has = p => (HAS_VIDEO.has(String(p[COL.ID])) || videoUrl(p)) ? 0 : 1;
+    return arr.sort((a, b) =>
+      has(a) - has(b) || parseInt(a[COL.ID] || 0) - parseInt(b[COL.ID] || 0));
+  }
   if (currentSort === 'rank') {
     return arr.sort((a, b) => {
       const ra = a._composite != null ? a._composite : 99;
@@ -173,6 +185,11 @@ function applyFilters(players) {
     // admin no-show flag above -- this is attendance, derived from whether a
     // tryout photo was captured. Remove with the chip after the draft.
     if (activeFilters.noTryout && !MISSED_TRYOUT.has(String(p[COL.ID]))) return false;
+
+    // PRE-DRAFT (Fall 2026): has-video filter. Checks the known list first,
+    // then the Drive index, so it stays correct as clips finish uploading.
+    if (activeFilters.hasVideo &&
+        !(HAS_VIDEO.has(String(p[COL.ID])) || videoUrl(p))) return false;
 
     // Grade filter
     if (activeFilters.grades.size > 0) {
@@ -335,6 +352,13 @@ function setupControls() {
   document.getElementById('filter-notryout')?.addEventListener('click', e => {
     activeFilters.noTryout = !activeFilters.noTryout;
     e.currentTarget.classList.toggle('active', activeFilters.noTryout);
+    renderGrid();
+  });
+
+  // PRE-DRAFT (Fall 2026): has-video toggle.
+  document.getElementById('filter-hasvideo')?.addEventListener('click', e => {
+    activeFilters.hasVideo = !activeFilters.hasVideo;
+    e.currentTarget.classList.toggle('active', activeFilters.hasVideo);
     renderGrid();
   });
 

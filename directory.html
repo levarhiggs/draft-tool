@@ -46,8 +46,10 @@
         <button class="sort-btn" data-sort="alpha">A – Z</button>
         <button class="sort-btn active" data-sort="id">ID #</button>
         <button class="sort-btn" data-sort="birthday">Age</button>
-        <button class="sort-btn" data-sort="team">Team</button>
-        <button class="sort-btn" data-sort="rank">Rank</button>
+        <!-- PRE-DRAFT (Fall 2026): Team and Rank sorts are hidden until the
+             draft assigns teams and coaches submit seeds. "Has Video" takes
+             their place. Restore both after the draft on Tue. -->
+        <button class="sort-btn" data-sort="hasvideo">Has Video</button>
       </div>
 
       <!-- Search bar -->
@@ -64,15 +66,21 @@
                Remove this button, its handler in app.js, and the
                .filter-notryout CSS once the draft is done. -->
           <button class="filter-chip filter-notryout" id="filter-notryout">✕ No Tryout</button>
+          <!-- PRE-DRAFT (Fall 2026): stands in for the Team filter until teams
+               exist. Remove with the Seed/Team rows below after the draft. -->
+          <button class="filter-chip filter-hasvideo" id="filter-hasvideo">▶ Has Video</button>
           <button class="filter-chip filter-fav" id="filter-favorites">♥ Favorites</button>
           <button class="filter-chip filter-noshow hidden" id="filter-noshows">✕ No Shows</button>
           <div id="filter-grades" class="filter-group"></div>
         </div>
-        <div class="filter-row">
+        <!-- PRE-DRAFT (Fall 2026): no teams until the draft, and no seeds until
+             coaches submit rankings, so both rows are hidden rather than shown
+             empty. Un-hide after the draft on Tue. -->
+        <div class="filter-row hidden">
           <span class="bar-label">Seed:</span>
           <div id="filter-seeds" class="filter-group"></div>
         </div>
-        <div class="filter-row">
+        <div class="filter-row hidden">
           <span class="bar-label">Team:</span>
           <div id="filter-teams" class="filter-group"></div>
         </div>
