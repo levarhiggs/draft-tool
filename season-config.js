@@ -42,17 +42,13 @@ export const SEASONS = {
     name:        'Fall 2026',
     longName:    'CSBC SJV Fall 2026',
     status:      'active',
-    // TODO(fall-intake): paste the PUBLISHED CSV url (File > Share >
-    // Publish to web > CSV). A normal share link returns HTML, which the
-    // CSV parser will silently turn into garbage rows rather than erroring.
-    sheetCsvUrl: '',
+    sheetCsvUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0PoVbwQIFlpXHC9EDjRIdi_VlozZ93GnBWEhu3zIZdxWLa2pCz32zlcK0intKWenfnjhmV4ThSXX8/pub?output=csv',
     // No Fall schedule yet — released ~1 week before games begin. Until then
     // schedule-driven pages (Schedules/Gameboard/Standings/Playoffs) keep
     // reading 26.2 via SCHEDULE_SEASON below.
     scheduleCsvUrl: '',
-    // TODO(fall-intake): new Drive folders, shared "Anyone with link > Viewer"
-    photosFolderId: '',
-    videosFolderId: '',
+    photosFolderId: '1xkM8AOWc_tOCwiXJsXVtK3wMWdCbi99Z',
+    videosFolderId: '1oTuWp5fC5lVM7csgPt0lPr2_wEPuF2UM',
     // Fall teams/colors aren't assigned until ~1-2 days before the first game
     // (see SEASON_INTAKE_RECONSTRUCTION.md), so team icons still come from 26.2.
     iconsFolderId:  '1vp_UF_Zk3uKiCJ_6I9pCya7nFveR3_II',
