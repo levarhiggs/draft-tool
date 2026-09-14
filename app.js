@@ -101,6 +101,22 @@ function toggleFavorite(playerId, e) {
   if (activeFilters.favorites) renderGrid();
 }
 
+/**
+ * "32 results" above the grid, so it's obvious how much a filter narrowed
+ * things. Says "All 87 players" when nothing is filtering, since a bare count
+ * there reads as if something were applied.
+ */
+function renderResultCount(shown, total) {
+  const el = document.getElementById('result-count');
+  if (!el) return;
+  const filtering = shown !== total;
+  el.textContent = filtering
+    ? `${shown} result${shown === 1 ? '' : 's'} of ${total}`
+    : `All ${total} players`;
+  el.classList.toggle('filtered', filtering);
+  el.classList.remove('hidden');
+}
+
 // ── Firebase enrichment ───────────────────────────────────────────────────────
 
 async function enrichWithFirebase(players) {
@@ -220,6 +236,8 @@ function renderGrid() {
   const coach   = getCurrentCoach();
   const sorted  = applySort(allPlayers);
   const visible = applyFilters(sorted);
+
+  renderResultCount(visible.length, allPlayers.length);
 
   if (!visible.length) {
     grid.innerHTML = '<div class="loading">No players match the current filters.</div>';

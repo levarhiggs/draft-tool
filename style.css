@@ -4256,3 +4256,21 @@ main {
   .pg-champions { margin-top: 28px; }
   .pg-champions-title { font-size: 0.76rem; }
 }
+
+
+/* ── Directory result count ─────────────────────────────────────────────────
+   Sits above the grid so it's obvious how much a filter narrowed the list.
+   Goes accent-coloured only while a filter is actually active. */
+.result-count {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 10px 16px 2px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--clr-muted);
+}
+.result-count.filtered { color: #7fb2f0; }
+@media (max-width: 700px) {
+  .result-count { padding: 8px 12px 2px; font-size: 0.78rem; }
+}
