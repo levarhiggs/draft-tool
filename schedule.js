@@ -3,7 +3,7 @@
 import { fetchSchedule, parseGameDate, COL } from './schedule-data.js';
 import { getScheduleGame, saveScheduleGame, saveGameComment } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
-import { TEAMS, TEAM_COLORS, TEAM_ADMINS } from './coaches-config.js';
+import { TEAMS, TEAM_COLORS, TEAM_ADMINS, personByName } from './coaches-config.js';
 
 // ── State ──────────────────────────────────────────────────────────────────────
 let allGames = [];             // raw CSV rows, augmented with _date (Date|null)
@@ -320,8 +320,7 @@ function lastUpdatedText(eff) {
   if (!d) return '—';
   const dateStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   const timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
-  const coachName = (eff.updatedBy || '').replace(/^(Coach|Director)\s+/, '');
-  return `${dateStr} ${timeStr} by ${coachName}`;
+  return `${dateStr} ${timeStr} by ${coachDisplayName(eff.updatedBy)}`;
 }
 
 function tsToDate(ts) {
@@ -608,8 +607,16 @@ function showGamePopover(anchorEl, game) {
   positionPopover(popover, anchorEl);
 }
 
+// A stored coach name is whatever that coach was called AT THE TIME —
+// old comments/scores are never rewritten (see PRODUCT_SPEC "Coach
+// identity"). Resolve through the current PERSONS list first so a name
+// that's since become ambiguous or changed (e.g. "Coach Kevin" from 26.2 is
+// now shown as "Coach Kevin S." once Fall added a second, different Kevin)
+// still attributes correctly, THEN strip the "Coach"/"Director" prefix for
+// this page's compact display.
 function coachDisplayName(coachName) {
-  return (coachName || '').replace(/^(Coach|Director)\s+/, '');
+  const current = personByName(coachName)?.displayNames[0] || coachName;
+  return (current || '').replace(/^(Coach|Director)\s+/, '');
 }
 
 // ── Score entry modal ────────────────────────────────────────────────────────

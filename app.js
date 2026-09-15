@@ -54,6 +54,7 @@ async function init() {
 
     renderGrid();
     setupControls();
+    wirePlayerModal();
 
     // Enrich with Firebase data then re-render and rebuild team chips
     await enrichWithFirebase(allPlayers);
@@ -265,6 +266,83 @@ function renderGrid() {
   grid.querySelectorAll('.heart-btn').forEach(btn => {
     btn.addEventListener('click', e => toggleFavorite(btn.dataset.id, e));
   });
+
+  // Logged-out cards are plain divs (see playerCardHTML) — wire the popup.
+  grid.querySelectorAll('[data-action="open-profile"]').forEach(el => {
+    const open = () => openPlayerModal(el.dataset.id);
+    el.addEventListener('click', open);
+    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+  });
+}
+
+// ── Public (logged-out) single-player profile popup ───────────────────────────
+
+function openPlayerModal(id) {
+  const p = allPlayers.find(pl => String(pl[COL.ID]) === String(id));
+  if (!p) return;
+
+  const name  = p[COL.NAME] || 'Unknown';
+  const photo = photoUrl(p);
+  const video = videoUrl(p);
+  const age   = ageDisplay(p[COL.AGE]);
+  const grade = p[COL.GRADE] || '—';
+
+  document.getElementById('player-modal-name').textContent = `${id} ${name}`;
+
+  const photoHtml = photo
+    ? `<img src="${photo}" alt="${escHtml(name)}" class="bio-modal-photo-img" />`
+    : `<div class="bio-modal-photo-placeholder">🏀</div>`;
+
+  const videoTileHtml = video
+    ? `<button class="rank-row-video-btn player-modal-video-tile" data-action="open-video" title="Watch tryout video">▶<span>VIDEO</span></button>`
+    : `<button class="rank-row-video-btn player-modal-video-tile disabled" disabled title="No video available">▶<span>NO VIDEO</span></button>`;
+
+  document.getElementById('player-modal-body').innerHTML = `
+    <div class="bio-modal-photo">${photoHtml}</div>
+    <div class="stats-grid player-modal-stats">
+      <div class="stat-box">
+        <div class="stat-label">Age</div>
+        <div class="stat-value">${escHtml(age)}</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Grade</div>
+        <div class="stat-value">${escHtml(grade)}</div>
+      </div>
+      ${videoTileHtml}
+    </div>
+  `;
+
+  document.getElementById('player-modal-body').querySelector('[data-action="open-video"]')
+    ?.addEventListener('click', () => openVideoModal(video));
+
+  document.getElementById('modal-player').classList.remove('hidden');
+}
+
+function closePlayerModal() {
+  document.getElementById('modal-player')?.classList.add('hidden');
+}
+
+function openVideoModal(video) {
+  if (!video) return;
+  document.getElementById('video-modal-body').innerHTML =
+    `<iframe class="profile-video" src="${video}" allowfullscreen allow="autoplay"></iframe>`;
+  document.getElementById('modal-video').classList.remove('hidden');
+}
+
+function closeVideoModal() {
+  document.getElementById('modal-video')?.classList.add('hidden');
+  document.getElementById('video-modal-body').innerHTML = ''; // stop playback
+}
+
+function wirePlayerModal() {
+  document.getElementById('btn-player-close')?.addEventListener('click', closePlayerModal);
+  document.getElementById('modal-player')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) closePlayerModal();
+  });
+  document.getElementById('btn-video-close')?.addEventListener('click', closeVideoModal);
+  document.getElementById('modal-video')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeVideoModal();
+  });
 }
 
 function playerCardHTML(p, isLoggedIn) {
@@ -324,18 +402,26 @@ function playerCardHTML(p, isLoggedIn) {
     ? `<img src="${photo}" alt="${escHtml(name)}" loading="lazy" />`
     : `<div class="player-card-img-placeholder">🏀</div>`;
 
+  const cardInner = `
+    ${imgHtml}
+    <div class="player-card-info">
+      <div class="player-card-name">${escHtml(id)} · ${escHtml(name)}</div>
+      <div class="player-card-meta">Grade ${escHtml(grade)} · Age ${escHtml(age)}</div>
+      ${priorHtml}
+      ${scoreHtml}
+      ${teamHtml}
+    </div>`;
+
+  // Coaches go straight into the full ranking page; a logged-out visitor
+  // gets a read-only profile popup right here instead — no reason for the
+  // public to land on the coaches' ranking tool.
+  const card = isLoggedIn
+    ? `<a class="player-card" href="player.html?id=${encodeURIComponent(id)}">${cardInner}</a>`
+    : `<div class="player-card" data-action="open-profile" data-id="${escHtml(id)}" role="button" tabindex="0">${cardInner}</div>`;
+
   return `
     <div class="player-card-wrap">
-      <a class="player-card" href="player.html?id=${encodeURIComponent(id)}">
-        ${imgHtml}
-        <div class="player-card-info">
-          <div class="player-card-name">${escHtml(id)} · ${escHtml(name)}</div>
-          <div class="player-card-meta">Grade ${escHtml(grade)} · Age ${escHtml(age)}</div>
-          ${priorHtml}
-          ${scoreHtml}
-          ${teamHtml}
-        </div>
-      </a>
+      ${card}
       <button class="heart-btn${isFav ? ' active' : ''}" data-id="${escHtml(id)}"
               title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">♥</button>
     </div>`;

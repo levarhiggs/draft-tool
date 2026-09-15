@@ -99,6 +99,28 @@ export async function getPriorComposite(seasonCode, priorId) {
   }
 }
 
+/**
+ * Full prior-season doc (per-coach rankings + notes), for showing as
+ * read-only history on a returning player — NOT written into the current
+ * season. Rankings/notes are keyed by whatever coach name was in use that
+ * season, which may not match anyone coaching now; display-only, never
+ * merged into this season's composite. Same read-only contract as
+ * getPriorComposite() above.
+ */
+export async function getPriorPlayerData(seasonCode, priorId) {
+  try {
+    const docId = seasonCode === LEGACY_SEASON
+      ? String(priorId)
+      : `${seasonCode}__${priorId}`;
+    const snap = await getDoc(doc(db, 'players', docId));
+    if (!snap.exists()) return null;
+    return { ...buildComposite(snap.data()), season: seasonCode };
+  } catch (err) {
+    console.error('getPriorPlayerData error:', err);
+    return null;
+  }
+}
+
 export function subscribePlayer(playerId, callback) {
   return onSnapshot(playerRef(playerId), snap => {
     callback(snap.exists() ? buildComposite(snap.data()) : emptyData());
@@ -138,6 +160,13 @@ export async function saveRanking(playerId, coachName, seed, modifier) {
   const value  = Math.round((seed + offset) * 10) / 10;
   const label  = modifier || DEFAULT_LABEL;
 
+  // A NaN here (e.g. a stale UI closure re-decoding a ranking mid-render race)
+  // must never reach Firestore — it would poison decodeRanking() for every
+  // future read of this coach's seed on this player.
+  if (!Number.isFinite(value)) {
+    throw new Error(`saveRanking: computed a non-finite value (seed=${seed}, modifier=${modifier})`);
+  }
+
   const ref  = playerRef(playerId);
   const snap = await getDoc(ref);
   if (snap.exists()) {
@@ -154,13 +183,16 @@ export async function saveRanking(playerId, coachName, seed, modifier) {
   }
 }
 
-// Given a stored ranking value, reverse-engineer the base seed and modifier label
+// Given a stored ranking value, reverse-engineer the base seed and modifier
+// label. DEFAULT_LABEL ('Reg') is a STORAGE detail meaning "no modifier was
+// chosen" — it must decode back to modifier: null, never to the literal
+// string 'Reg', or a caller that feeds it straight back into saveRanking()
+// looks up MODIFIER_OFFSET['Reg'] (undefined) and writes a NaN ranking.
 export function decodeRanking(value, modifiers, coachName) {
   if (value == null) return { seed: null, modifier: null };
-  const label = modifiers?.[coachName] || null;
-  const offset = label && label !== DEFAULT_LABEL
-    ? MODIFIER_OFFSET[label]
-    : (label === DEFAULT_LABEL ? DEFAULT_OFFSET : DEFAULT_OFFSET);
+  const rawLabel = modifiers?.[coachName] || null;
+  const label  = rawLabel && rawLabel !== DEFAULT_LABEL ? rawLabel : null;
+  const offset = label ? MODIFIER_OFFSET[label] : DEFAULT_OFFSET;
   const seed = Math.round((value - offset) * 10) / 10;
   return { seed: Math.round(seed), modifier: label };
 }
@@ -177,6 +209,13 @@ export async function saveNote(playerId, coachName, text) {
 
 export async function deleteNote(playerId, coachName) {
   await updateDoc(playerRef(playerId), { [`notes.${coachName}`]: deleteField() });
+}
+
+export async function deleteRanking(playerId, coachName) {
+  await updateDoc(playerRef(playerId), {
+    [`rankings.${coachName}`]:  deleteField(),
+    [`modifiers.${coachName}`]: deleteField(),
+  });
 }
 
 // Jersey # is set once per player, per coach, and rarely changes mid-season
@@ -215,6 +254,35 @@ export async function getFavorites(coachName) {
     const snap = await getDoc(coachRef(coachName));
     return snap.exists() ? (snap.data().favorites || []) : [];
   } catch { return []; }
+}
+
+// ── Coach PIN overrides ──────────────────────────────────────────────────────
+// PINs are defined in coaches-config.js (PERSONS[].pin) but that file only
+// changes when code is edited and deployed. A coach's self-service "Change
+// PIN" needs a real write path. Deliberately reuses the EXISTING `coaches`
+// collection (already has a published wide-open rule — a brand-new
+// `coachPins` collection was tried first and failed with "Missing or
+// insufficient permissions", since an unpublished rule denies silently by
+// default; see gotcha #3 in PROJECT_STATUS.md) rather than risk needing a
+// Firestore Console change before Wednesday's draft.
+//
+// Keyed `pin_{personId}` — NOT through sid() and NOT a bare personId — so
+// this can never collide with a season-prefixed favorites doc
+// (`26.3__Coach Levar`) or a legacy unprefixed one (`Coach Levar`) in the
+// same collection. A PIN belongs to the permanent person, independent of
+// season or display name, so it deliberately does NOT go through sid().
+function coachPinRef(personId) { return doc(db, 'coaches', `pin_${personId}`); }
+
+/** The coach's current PIN override, or null if they've never changed it. */
+export async function getPinOverride(personId) {
+  try {
+    const snap = await getDoc(coachPinRef(personId));
+    return snap.exists() ? (snap.data().pin ?? null) : null;
+  } catch { return null; }
+}
+
+export async function savePinOverride(personId, newPin) {
+  await setDoc(coachPinRef(personId), { pin: newPin, updatedAt: serverTimestamp() });
 }
 
 export async function saveNoShow(playerId, value) {

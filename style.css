@@ -443,6 +443,11 @@ main {
   box-shadow: var(--shadow);
 }
 
+.player-card:focus-visible {
+  outline: 2px solid var(--clr-accent);
+  outline-offset: 2px;
+}
+
 .player-card img {
   width: 100%;
   aspect-ratio: 3/4;
@@ -950,6 +955,28 @@ main {
   white-space: pre-wrap;
 }
 
+/* Notes modal: current-season vs. prior-season (read-only history) sections */
+.notes-modal-current-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--clr-muted);
+  margin-bottom: 8px;
+}
+.notes-modal-prior-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--clr-muted);
+  margin: 18px 0 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--clr-border);
+}
+.prior-note-item { opacity: 0.75; }
+.prior-note-item .note-coach { color: var(--clr-muted); }
+
 /* ── Modals ── */
 .modal-overlay {
   position: fixed;
@@ -1086,6 +1113,12 @@ main {
   font-size: 0.85rem;
 }
 .error-msg.hidden { display: none; }
+
+.success-msg {
+  color: var(--clr-success);
+  font-size: 0.85rem;
+}
+.success-msg.hidden { display: none; }
 
 /* ── Ranking Breakdown Modal ── */
 .rank-composite-display {
@@ -4273,4 +4306,185 @@ main {
 .result-count.filtered { color: #7fb2f0; }
 @media (max-width: 700px) {
   .result-count { padding: 8px 12px 2px; font-size: 0.78rem; }
+}
+
+/* ── All-Players Ranking List (player.html) ──────────────────────────────────
+   One continuously scrolling page, one row per player: photo left, ranking
+   mechanism (seed + modifier + notes) center, composite seed + video icon
+   right. Replaces the old one-player-per-page profile view — see
+   PROJECT_STATUS.md. Age/Birthday/Grade + badges live behind the photo tile
+   (modal-bio) rather than inline, to keep each row compact at 87 players. */
+.player-rank-list {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.rank-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 160px;
+  gap: 20px;
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: border-color 0.4s, background 0.4s;
+}
+
+.rank-row-highlight {
+  border-color: var(--clr-accent);
+  background: #232a4a;
+}
+
+.rank-row-photo {
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--clr-surface);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.rank-row-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rank-row-photo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  color: var(--clr-muted);
+}
+
+.rank-row-main { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+
+.rank-row-headline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rank-row-name { font-size: 1.3rem; font-weight: 800; line-height: 1.15; }
+
+.rank-row-notes-link { display: block; margin-top: 10px; font-size: 0.82rem; }
+
+.rank-row-mechanism { min-width: 0; }
+
+.rank-row-locked {
+  padding: 14px;
+  font-size: 0.85rem;
+}
+
+.rank-row-notes-field { display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--clr-muted); margin: 10px 0 0; }
+.rank-row-notes-field textarea {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  width: 100%;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 60px;
+}
+.rank-row-notes-field textarea:focus { outline: none; border-color: var(--clr-accent); }
+
+.rank-row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.rank-row-composite { width: 100%; text-align: center; }
+
+.rank-row-video-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: #c0392b;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 14px 10px;
+  font-size: 1.3rem;
+  cursor: pointer;
+  width: 100%;
+  font-family: inherit;
+}
+.rank-row-video-btn span { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; }
+.rank-row-video-btn:hover { background: #a93226; }
+.rank-row-video-btn.disabled {
+  background: var(--clr-surface);
+  color: var(--clr-muted);
+  cursor: default;
+  border: 1px solid var(--clr-border);
+}
+
+.modal-box-video { max-width: 720px; }
+
+.bio-modal-photo {
+  width: 100%;
+  aspect-ratio: 1;
+  max-height: 320px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--clr-surface);
+  margin-bottom: 14px;
+}
+.bio-modal-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bio-modal-photo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: var(--clr-muted);
+}
+
+.bio-modal-stats { grid-template-columns: repeat(3, 1fr); margin-bottom: 14px; }
+.bio-modal-birthday { font-size: 1.05rem; }
+.bio-modal-composite .stat-value { color: var(--clr-accent); }
+.bio-modal-badges { justify-content: flex-start; margin-bottom: 14px; }
+.bio-modal-notes-header { margin-top: 0; }
+
+.seed-clear-btn {
+  font-size: 0.78rem;
+  align-self: center;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+/* Public (logged-out) single-player popup on directory.html — reuses the
+   .bio-modal-photo* tiles from player.js's bio popup, plus the same
+   .rank-row-video-btn video button, so both popups feel like one system. */
+.player-modal-stats { grid-template-columns: repeat(3, 1fr); }
+.player-modal-video-tile {
+  padding: 10px;
+  font-size: 1rem;
+}
+.player-modal-video-tile span { font-size: 0.62rem; }
+
+@media (max-width: 720px) {
+  .rank-row {
+    grid-template-columns: 1fr;
+  }
+  .rank-row-photo { width: 100%; height: 200px; }
+  .rank-row-side { flex-direction: row; }
+  .rank-row-composite { max-width: 200px; }
 }
