@@ -267,9 +267,15 @@ function renderGrid() {
     btn.addEventListener('click', e => toggleFavorite(btn.dataset.id, e));
   });
 
-  // Logged-out cards are plain divs (see playerCardHTML) — wire the popup.
-  grid.querySelectorAll('[data-action="open-profile"]').forEach(el => {
-    const open = () => openPlayerModal(el.dataset.id);
+  // Logged-out cards are plain divs (see playerCardHTML) — tapping one plays
+  // that player's tryout video.
+  grid.querySelectorAll('[data-action="open-video"]').forEach(el => {
+    const open = () => {
+      const p = allPlayers.find(pl => String(pl[COL.ID]) === String(el.dataset.id));
+      const url = p && videoUrl(p);
+      if (!url) return toast(`No tryout video for ${p ? p[COL.NAME] : 'this player'}`);
+      openVideoModal(url, p[COL.NAME]);
+    };
     el.addEventListener('click', open);
     el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
   });
@@ -277,53 +283,10 @@ function renderGrid() {
 
 // ── Public (logged-out) single-player profile popup ───────────────────────────
 
-function openPlayerModal(id) {
-  const p = allPlayers.find(pl => String(pl[COL.ID]) === String(id));
-  if (!p) return;
-
-  const name  = p[COL.NAME] || 'Unknown';
-  const photo = photoUrl(p);
-  const video = videoUrl(p);
-  const age   = ageDisplay(p[COL.AGE]);
-  const grade = p[COL.GRADE] || '—';
-
-  document.getElementById('player-modal-name').textContent = `${id} ${name}`;
-
-  const photoHtml = photo
-    ? `<img src="${photo}" alt="${escHtml(name)}" class="bio-modal-photo-img" />`
-    : `<div class="bio-modal-photo-placeholder">🏀</div>`;
-
-  const videoTileHtml = video
-    ? `<button class="rank-row-video-btn player-modal-video-tile" data-action="open-video" title="Watch tryout video">▶<span>VIDEO</span></button>`
-    : `<button class="rank-row-video-btn player-modal-video-tile disabled" disabled title="No video available">▶<span>NO VIDEO</span></button>`;
-
-  document.getElementById('player-modal-body').innerHTML = `
-    <div class="bio-modal-photo">${photoHtml}</div>
-    <div class="stats-grid player-modal-stats">
-      <div class="stat-box">
-        <div class="stat-label">Age</div>
-        <div class="stat-value">${escHtml(age)}</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-label">Grade</div>
-        <div class="stat-value">${escHtml(grade)}</div>
-      </div>
-      ${videoTileHtml}
-    </div>
-  `;
-
-  document.getElementById('player-modal-body').querySelector('[data-action="open-video"]')
-    ?.addEventListener('click', () => openVideoModal(video));
-
-  document.getElementById('modal-player').classList.remove('hidden');
-}
-
-function closePlayerModal() {
-  document.getElementById('modal-player')?.classList.add('hidden');
-}
-
-function openVideoModal(video) {
+function openVideoModal(video, name = '') {
   if (!video) return;
+  const title = document.getElementById('video-modal-title');
+  if (title) title.textContent = name;
   document.getElementById('video-modal-body').innerHTML =
     `<iframe class="profile-video" src="${video}" allowfullscreen allow="autoplay"></iframe>`;
   document.getElementById('modal-video').classList.remove('hidden');
@@ -334,15 +297,23 @@ function closeVideoModal() {
   document.getElementById('video-modal-body').innerHTML = ''; // stop playback
 }
 
+/** Brief message for the no-video case, so a tap never feels like a dead end. */
+let dirToastTimer = null;
+function toast(msg) {
+  const host = document.getElementById('dir-toast');
+  if (!host) return;
+  host.textContent = msg;
+  host.classList.add('show');
+  clearTimeout(dirToastTimer);
+  dirToastTimer = setTimeout(() => host.classList.remove('show'), 2200);
+}
+
 function wirePlayerModal() {
-  document.getElementById('btn-player-close')?.addEventListener('click', closePlayerModal);
-  document.getElementById('modal-player')?.addEventListener('click', e => {
-    if (e.target === e.currentTarget) closePlayerModal();
-  });
   document.getElementById('btn-video-close')?.addEventListener('click', closeVideoModal);
   document.getElementById('modal-video')?.addEventListener('click', e => {
     if (e.target === e.currentTarget) closeVideoModal();
   });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeVideoModal(); });
 }
 
 function playerCardHTML(p, isLoggedIn) {
@@ -402,22 +373,31 @@ function playerCardHTML(p, isLoggedIn) {
     ? `<img src="${photo}" alt="${escHtml(name)}" loading="lazy" />`
     : `<div class="player-card-img-placeholder">🏀</div>`;
 
+  // Video badge on the thumbnail, same red/grey treatment as the ranking
+  // page and draft board so "has footage" reads identically everywhere.
+  const video = videoUrl(p);
+  const videoBadge = video
+    ? `<span class="card-video-badge" title="Watch tryout video">▶</span>`
+    : `<span class="card-video-badge disabled" title="No video available">▶</span>`;
+
   const cardInner = `
-    ${imgHtml}
+    <span class="player-card-thumb">${imgHtml}${videoBadge}</span>
     <div class="player-card-info">
-      <div class="player-card-name">${escHtml(id)} · ${escHtml(name)}</div>
+      <div class="player-card-name"><span class="pc-id">${escHtml(id)}</span><span class="pc-sep"> · </span>${escHtml(name)}</div>
       <div class="player-card-meta">Grade ${escHtml(grade)} · Age ${escHtml(age)}</div>
       ${priorHtml}
       ${scoreHtml}
       ${teamHtml}
     </div>`;
 
-  // Coaches go straight into the full ranking page; a logged-out visitor
-  // gets a read-only profile popup right here instead — no reason for the
-  // public to land on the coaches' ranking tool.
+  // Coaches go straight into the full ranking page. For the public, tapping
+  // the card opens the player's video directly — that's the thing a parent
+  // or coach actually wants from a face, and it saves a hop through a popup
+  // that only repeated what the card already showed.
   const card = isLoggedIn
     ? `<a class="player-card" href="player.html?id=${encodeURIComponent(id)}">${cardInner}</a>`
-    : `<div class="player-card" data-action="open-profile" data-id="${escHtml(id)}" role="button" tabindex="0">${cardInner}</div>`;
+    : `<div class="player-card${video ? '' : ' no-video'}" data-action="open-video"
+            data-id="${escHtml(id)}" role="button" tabindex="0">${cardInner}</div>`;
 
   return `
     <div class="player-card-wrap">

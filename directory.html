@@ -153,26 +153,18 @@
     </div>
   </div>
 
-  <!-- Public (logged-out) single-player profile popup -->
-  <div id="modal-player" class="modal-overlay hidden">
-    <div class="modal-box">
-      <h2 id="player-modal-name"></h2>
-      <div id="player-modal-body"></div>
-      <div class="modal-actions">
-        <button id="btn-player-close" class="btn-primary">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Video popup, opened from the profile popup above -->
+  <!-- Tryout video, opened by tapping a player's face -->
   <div id="modal-video" class="modal-overlay hidden">
     <div class="modal-box modal-box-lg modal-box-video">
+      <h2 id="video-modal-title"></h2>
       <div id="video-modal-body"></div>
       <div class="modal-actions">
         <button id="btn-video-close" class="btn-primary">Close</button>
       </div>
     </div>
   </div>
+
+  <div id="dir-toast" role="status" aria-live="polite"></div>
 
   <script type="module" src="app.js"></script>
   <script type="module" src="coach-login.js"></script>

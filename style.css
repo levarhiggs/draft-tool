@@ -408,6 +408,51 @@ main {
   gap: 18px;
 }
 
+/* Phones: three players per row. auto-fill with a 170px floor collapses to a
+   single giant card at phone width, which turned the directory into one
+   full-screen face per scroll. */
+@media (max-width: 700px) {
+  .player-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  /* Grid items default to min-width:auto, which refuses to shrink below the
+     photo's intrinsic width and pushes the row off-screen. The info block
+     needs it too, or long names spill past the card's edges. */
+  .player-card-wrap, .player-card, .player-card-info, .player-card-thumb { min-width: 0; }
+  .player-card-name, .player-card-meta { overflow-wrap: anywhere; }
+  /* Equal-height cards keep the grid readable as you scroll; the info block
+     grows downward instead of shoving the row out of alignment. */
+  .player-card { display: flex; flex-direction: column; height: 100%; }
+  /* flex: 1 alone keeps the auto basis, so a long name sizes the item wider
+     than its column. A 0 basis makes it take the column's width instead. */
+  .player-card-info { padding: 5px 6px; flex: 1 1 0; width: 100%; }
+  /* Let the name wrap to two lines instead of truncating to "06 · Sawy…",
+     and put the ID on its own line so it isn't eating the name's width. */
+  .player-card-name {
+    font-size: 0.68rem; line-height: 1.2;
+    white-space: normal;        /* base rule is nowrap — must be undone here */
+    text-overflow: clip;        /* ellipsis fights the line clamp */
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .player-card-name .pc-id { color: var(--clr-muted); font-weight: 600; }
+  .player-card-name .pc-sep { display: none; }
+  .player-card-name .pc-id::after { content: " "; }
+  .player-card-meta { font-size: 0.58rem; margin-top: 2px; }
+  .player-card-badges { gap: 2px; margin: 2px 0 1px; }
+  /* Badges default to nowrap, which is what still pushed past the card edge
+     at this width — let them wrap and clip instead. */
+  .player-card-badges { max-width: 100%; }
+  .player-card-returning,
+  .player-card-prevrank,
+  .player-card-missed {
+    font-size: 0.5rem; padding: 0 3px;
+    white-space: normal; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+  }
+  .player-card-score { font-size: 0.6rem; padding: 1px 5px; margin-top: 3px; }
+  .player-card-flames { display: none; }   /* no room beside the seed */
+  .player-card-team { font-size: 0.56rem; }
+  .heart-btn { width: 22px; height: 22px; top: 3px; right: 3px; font-size: 0.72rem; }
+}
+
 /* Team group header spans the full grid width */
 .team-group-header {
   grid-column: 1 / -1;
@@ -4721,3 +4766,39 @@ body.view-tall .pool-grid, body.view-split .pool-grid { grid-template-columns: r
   font-size: 0.78rem; color: var(--clr-muted); margin-top: 10px;
   border-top: 1px solid var(--clr-border); font-variant-numeric: tabular-nums;
 }
+
+/* ── Directory card: video badge + tap-to-play ───────────────────────────────
+   Tapping a face on the public directory plays that player's tryout video.
+   The badge uses the same red/grey language as the ranking page and draft
+   board, so "has footage" reads the same everywhere in the app. */
+.player-card-thumb { position: relative; display: block; }
+
+.card-video-badge {
+  position: absolute; bottom: 6px; left: 6px;
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 21px; border-radius: 5px;
+  background: #c0392b; color: #fff; font-size: 0.68rem; line-height: 1;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.45); pointer-events: none;
+}
+.card-video-badge.disabled { background: rgba(32,36,50,0.88); color: var(--clr-muted); }
+
+.player-card.no-video { cursor: default; }
+.player-card.no-video:hover { transform: none; border-color: var(--clr-border); box-shadow: none; }
+
+#dir-toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 12px);
+  background: var(--clr-card); border: 1px solid var(--clr-accent);
+  border-radius: 7px; padding: 9px 15px; font-size: 0.82rem; font-weight: 600;
+  box-shadow: 0 8px 26px rgba(0,0,0,0.45); opacity: 0; pointer-events: none;
+  z-index: 60; transition: opacity 0.18s ease, transform 0.18s ease;
+  max-width: calc(100vw - 32px);
+}
+#dir-toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+#video-modal-title { font-size: 1.05rem; margin: 0 0 10px; }
+#video-modal-title:empty { display: none; }
+
+@media (max-width: 700px) {
+  .card-video-badge { width: 26px; height: 18px; bottom: 4px; left: 4px; font-size: 0.6rem; }
+}
+@media (prefers-reduced-motion: reduce) { #dir-toast { transition: opacity 0.18s ease; } }
