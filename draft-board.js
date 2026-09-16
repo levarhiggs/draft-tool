@@ -24,6 +24,13 @@ import {
 
 const SPOTS = 8, MAX_COACHES = 15;
 
+/**
+ * Coaches created straight from the draft board (Add Coach -> New coach),
+ * not through coaches-config.js -- board-only seats with no login, no PIN.
+ * Declared up top since allKnownCoaches() below reads it on every render.
+ */
+const NEW_COACHES = new Map();   // personId -> { personId, name }
+
 // ── State ────────────────────────────────────────────────────────────────────
 let allPlayers = [];
 const live = {};          // playerId -> latest Firestore doc (rankings/notes/team)
@@ -184,8 +191,13 @@ async function init() {
     let rosterFirst;
     const rosterReady = new Promise(res => { rosterFirst = res; });
     let rosterSettled = false;
-    subscribeBoardRoster(ids => {
-      boardRoster = ids;
+    subscribeBoardRoster(data => {
+      boardRoster = data?.personIds || null;
+      // Board-only coaches (no login) resolve through this shared map on
+      // every device, not just the one that created them.
+      Object.entries(data?.names || {}).forEach(([id, name]) => {
+        if (!NEW_COACHES.has(id)) NEW_COACHES.set(id, { personId: id, name });
+      });
       if (!rosterSettled) { rosterSettled = true; rosterFirst(); return; }
       switchMode();
     });
@@ -214,9 +226,20 @@ async function init() {
   }
 }
 
+/**
+ * Every coach identity this device knows about: the real login roster plus
+ * any board-only coach created straight from this session (NEW_COACHES,
+ * defined near addCoach()). Board-only coaches never appear in
+ * getActiveCoaches() — they have no login — so anything resolving a
+ * personId to a name must go through this, not the bare roster call.
+ */
+function allKnownCoaches() {
+  return [...getActiveCoaches(SEASON_CODE), ...NEW_COACHES.values()];
+}
+
 /** Everyone who holds a draft slot this season, in board order. */
 function seatedCoaches() {
-  const all = getActiveCoaches(SEASON_CODE);
+  const all = allKnownCoaches();
   const ids = boardRoster || all.map(c => c.personId);
   return ids
     .map(id => all.find(r => r.personId === id))
@@ -244,7 +267,7 @@ async function switchMode() {
 }
 
 function adoptBoard() {
-  const all = getActiveCoaches(SEASON_CODE);
+  const all = allKnownCoaches();
   const seated = seatedCoaches();
   const order = board?.coachOrder?.length ? board.coachOrder : seated.map(c => c.personId);
   coachRows = order
@@ -976,7 +999,10 @@ async function pushRoster(msg, detail = '') {
   boardRoster = ids;                 // optimistic, so the row goes now
   render();
   try {
-    await saveBoardRoster(ids, coach()?.name || '');
+    // Board-only coach names ride along on every write, merged rather than
+    // replaced, so a name never disappears once another device has seen it.
+    const names = Object.fromEntries([...NEW_COACHES.values()].map(c => [c.personId, c.name]));
+    await saveBoardRoster(ids, coach()?.name || '', names);
     toast(msg, detail || 'Updated for every coach');
   } catch (err) {
     toast('Could not save the roster', err.message);
@@ -1025,24 +1051,64 @@ function addCoach() {
   if (!isAdmin() || isLive || coachRows.length >= MAX_COACHES) return;
   const onBoard = new Set(coachRows.map(c => c.personId));
   const avail = getActiveCoaches(SEASON_CODE).filter(c => !onBoard.has(c.personId));
-  if (!avail.length) {
-    return showDialog('Everyone is already on the board',
-      'Every coach with a login this season already holds a draft slot.');
-  }
+  const opts = avail.length
+    ? avail.map(c => `<option value="${c.personId}">${escHtml(c.name)}</option>`).join('')
+    : '<option value="">— none available —</option>';
+
   showDialog('Add a coach to the board',
-    'Give a coach a draft slot. This shows up on every coach’s board.',
+    'Seat a coach who already has an account, or create a new one.',
     () => {
-      const id = el('dlg-select').value;
-      const found = avail.find(c => c.personId === id);
-      if (!found) return;
-      coachRows.push({ personId: found.personId, name: found.name });
-      pushRoster(`${found.name} added to the board`, `Seat ${coachRows.length}`);
+      const mode = document.querySelector('input[name="add-mode"]:checked').value;
+      if (mode === 'existing') {
+        const id = el('dlg-select').value;
+        const found = avail.find(c => c.personId === id);
+        if (!found) return;
+        coachRows.push({ personId: found.personId, name: found.name });
+        pushRoster(`${found.name} added to the board`, `Seat ${coachRows.length}`);
+      } else {
+        const name = el('dlg-newname').value.trim();
+        if (!name) return toast('Enter a name for the new coach');
+        const label = /^coach\b/i.test(name) || /^director\b/i.test(name) ? name : `Coach ${name}`;
+        // A board-only seat -- not a real login. addNewCoach() below hands
+        // back a stable id derived from the name, so re-adding the same
+        // person after removing them lands on the same seat instead of a
+        // fresh one each time.
+        const id = addNewCoach(label);
+        coachRows.push({ personId: id, name: label });
+        pushRoster(`${label} created and added`, `Seat ${coachRows.length}`);
+      }
     }, 'Add coach', 'Cancel',
-    `<label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--clr-muted)">
-       Coach
-       <select id="dlg-select">${avail.map(c =>
-         `<option value="${c.personId}">${escHtml(c.name)}</option>`).join('')}</select>
-     </label>`);
+    `<div class="add-modes">
+       <label class="add-mode">
+         <input type="radio" name="add-mode" value="existing" id="mode-existing"
+                ${avail.length ? 'checked' : 'disabled'}>
+         <span>Existing coach</span>
+       </label>
+       <select id="dlg-select" ${avail.length ? '' : 'disabled'}>${opts}</select>
+
+       <label class="add-mode">
+         <input type="radio" name="add-mode" value="new" id="mode-new"
+                ${avail.length ? '' : 'checked'}>
+         <span>New coach</span>
+       </label>
+       <input id="dlg-newname" placeholder="First name, e.g. Marcus">
+     </div>`);
+
+  // Picking either field selects its radio, so the choice follows intent.
+  el('dlg-select')?.addEventListener('focus', () => { const r = el('mode-existing'); if (r && !r.disabled) r.checked = true; });
+  el('dlg-newname')?.addEventListener('focus', () => { el('mode-new').checked = true; });
+}
+
+/**
+ * Registers a board-only coach (NEW_COACHES is declared near the top of the
+ * file). Stable id derived from the name, so removing and re-adding the same
+ * person lands on the same seat instead of fragmenting into multiple ids.
+ */
+function addNewCoach(name) {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const id = `BOARD-${slug || Date.now()}`;
+  if (!NEW_COACHES.has(id)) NEW_COACHES.set(id, { personId: id, name });
+  return id;
 }
 
 // ── Toast + dialog ───────────────────────────────────────────────────────────

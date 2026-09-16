@@ -4825,3 +4825,14 @@ body.view-tall .pool-grid, body.view-split .pool-grid { grid-template-columns: r
   .card-video-badge { width: 26px; height: 18px; bottom: 4px; left: 4px; font-size: 0.6rem; }
 }
 @media (prefers-reduced-motion: reduce) { #dir-toast { transition: opacity 0.18s ease; } }
+
+/* Add-coach dialog: existing-vs-new radio choice */
+.add-modes { display: flex; flex-direction: column; gap: 7px; }
+.add-mode { display: flex; align-items: center; gap: 7px; font-size: 0.82rem; font-weight: 600; }
+.add-mode input { accent-color: var(--clr-accent); }
+.add-modes select, .add-modes #dlg-newname {
+  background: var(--clr-surface); border: 1px solid var(--clr-border); color: var(--clr-text);
+  border-radius: 5px; padding: 7px 9px; font: inherit; font-size: 0.82rem;
+  margin-left: 22px; width: calc(100% - 22px);
+}
+.add-modes select:disabled { opacity: 0.5; }

@@ -349,18 +349,29 @@ function boardRosterRef() {
   return doc(db, 'coaches', `roster_${SEASON_CODE}`);
 }
 
+/**
+ * personIds is the seated roster. names carries display names for
+ * BOARD-only coaches (created straight from the draft board, no login) --
+ * getActiveCoaches() has no idea these people exist, so every device needs
+ * a shared place to resolve their id back to a name. Callback receives
+ * { personIds, names } or null if nothing's been saved yet.
+ */
 export function subscribeBoardRoster(callback) {
   return onSnapshot(boardRosterRef(), snap => {
-    callback(snap.exists() ? (snap.data().personIds || null) : null);
+    if (!snap.exists()) return callback(null);
+    const d = snap.data();
+    callback({ personIds: d.personIds || null, names: d.names || {} });
   }, err => {
     console.error('subscribeBoardRoster error:', err);
     callback(null);
   });
 }
 
-export async function saveBoardRoster(personIds, updatedBy) {
+export async function saveBoardRoster(personIds, updatedBy, names) {
   assertWritable('board roster update');
-  await setDoc(boardRosterRef(), { personIds, updatedBy, updatedAt: serverTimestamp() });
+  const patch = { personIds, updatedBy, updatedAt: serverTimestamp() };
+  if (names) patch.names = names;
+  await setDoc(boardRosterRef(), patch, { merge: true });
 }
 
 export async function getSandbox(personId) {
