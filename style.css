@@ -4664,7 +4664,11 @@ body.editing-coaches .coach-cell .grip { display: none; }
 .slot-input.bad { color: #c4564a; animation: dbShake 0.3s; }
 @keyframes dbShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
 
-.snake-arrows { height: 16px; }
+/* Snake-order connectors above and below the board. The path is drawn in JS
+   (renderArrows) from live column positions; this names the colour so it isn't
+   buried in a template string. Matches .spot-head so the rails read as part of
+   the header system rather than as decoration. */
+.snake-arrows { height: 16px; --snake-rail: #1c5a80; }
 .snake-arrows svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .board-tools { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
 .board-tools.view-switch { margin-top: 0; }

@@ -483,7 +483,7 @@ function renderArrows() {
       d += `M${xs[a]} ${y} L${xs[a]} ${yMid} L${xs[b]} ${yMid} L${xs[b]} ${y} `;
     });
     host.innerHTML = `<svg viewBox="0 0 ${gRect.width} 16" preserveAspectRatio="none" aria-hidden="true">` +
-      `<path d="${d}" fill="none" stroke="var(--rail)" stroke-width="3"/></svg>`;
+      `<path d="${d}" fill="none" stroke="var(--snake-rail, #1c5a80)" stroke-width="3"/></svg>`;
   };
   const top = [], bot = [];
   for (let s = 0; s + 1 < SPOTS; s++) (s % 2 === 0 ? bot : top).push([s, s + 1]);
