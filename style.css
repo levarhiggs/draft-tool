@@ -4543,6 +4543,7 @@ main {
    visually it's one page; only the mode chip and what's editable change.
    See _local/DRAFT_BOARD_SPEC.md. */
 #db-main { max-width: 1400px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+#db-content { display: flex; flex-direction: column; gap: 16px; }
 
 .mode-chip {
   font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
@@ -4667,6 +4668,8 @@ body.editing-coaches .coach-cell .grip { display: none; }
 .snake-arrows svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .board-tools { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
 .board-tools.view-switch { margin-top: 0; }
+.view-switch .btn-dark { border-color: #3a3f4c; }
+.view-switch .btn-dark[aria-pressed="true"] { border-color: var(--clr-accent); }
 .btn { background: var(--clr-surface); color: var(--clr-text); border: 1px solid var(--clr-border); border-radius: 6px; padding: 7px 13px; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
 .btn:hover { border-color: var(--clr-accent); }
 .btn-dark { background: #0b0d13; color: #fff; border-color: #0b0d13; }
