@@ -285,6 +285,89 @@ export async function savePinOverride(personId, newPin) {
   await setDoc(coachPinRef(personId), { pin: newPin, updatedAt: serverTimestamp() });
 }
 
+// ── Draft board ──────────────────────────────────────────────────────────────
+// Three scopes, one rule: state lives with whoever owns the decision it
+// represents (see _local/DRAFT_BOARD_SPEC.md).
+//
+//   AUTHORITATIVE  coaches/draftBoard_{season}   the real draft, commissioner-owned
+//   PRIVATE        coaches/sandbox_{season}_{personId}   each coach's practice board
+//   SHARED         players/{season}__{id}.rankings       composite, already exists
+//
+// Both live in the `coaches` collection for the same reason the PIN overrides
+// do: it has a published wide-open rule, and a new collection would need one
+// added in the Console first — which fails silently until someone does
+// (gotcha #3). Prefixed ids keep them from colliding with favorites docs.
+//
+// draftBoard doc shape:
+// {
+//   live:          bool,          // the mode switch every client reacts to
+//   coachOrder:    ['C002', ...], // rows, top to bottom
+//   slots:         { 'C002:0': '04', ... },  // '{personId}:{spotIndex}' -> playerId
+//   pickStartedAt: ms epoch,      // one anchor; each client derives its own clock
+//   startedAt:     ms epoch,
+//   endedAt:       ms epoch | null,
+//   adminSeeds:    { '04': 1.2 }, // commissioner's live display-override
+//   updatedBy:     'Coach Levar',
+// }
+function draftBoardRef() {
+  return doc(db, 'coaches', `draftBoard_${SEASON_CODE}`);
+}
+function sandboxRef(personId) {
+  return doc(db, 'coaches', `sandbox_${SEASON_CODE}_${personId}`);
+}
+
+export function subscribeDraftBoard(callback) {
+  return onSnapshot(draftBoardRef(), snap => {
+    callback(snap.exists() ? snap.data() : null);
+  }, err => {
+    console.error('subscribeDraftBoard error:', err);
+    callback(null);
+  });
+}
+
+export async function saveDraftBoard(patch) {
+  assertWritable('draft board update');
+  await setDoc(draftBoardRef(), { ...patch, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+/** Replaces slots wholesale — merge:true would keep deleted picks alive. */
+export async function saveDraftSlots(slots, updatedBy) {
+  assertWritable('draft board update');
+  await setDoc(draftBoardRef(), { slots, updatedBy, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+export async function getSandbox(personId) {
+  try {
+    const snap = await getDoc(sandboxRef(personId));
+    return snap.exists() ? snap.data() : null;
+  } catch (err) {
+    console.error('getSandbox error:', err);
+    return null;
+  }
+}
+
+export async function saveSandbox(personId, data) {
+  assertWritable('sandbox update');
+  await setDoc(sandboxRef(personId), { ...data, updatedAt: serverTimestamp() });
+}
+
+/**
+ * Writes each drafted player's team onto their player doc, so the directory,
+ * gameboard and standings all see the assignment with no changes of their own.
+ * Called once when the commissioner ends the draft.
+ */
+export async function commitDraftResults(slots, personIdToTeam) {
+  assertWritable('draft results');
+  const writes = Object.entries(slots).map(([key, playerId]) => {
+    const personId = key.split(':')[0];
+    const team = personIdToTeam[personId];
+    if (!team) return null;
+    return saveTeam(playerId, team);
+  }).filter(Boolean);
+  await Promise.all(writes);
+  return writes.length;
+}
+
 export async function saveNoShow(playerId, value) {
   const ref  = playerRef(playerId);
   const snap = await getDoc(ref);

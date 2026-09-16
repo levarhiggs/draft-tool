@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Draft Board — CSBC SJV Fall 2026</title>
+  <meta name="description" content="Snake draft board and seed pool for CSBC SJV Fall 2026." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="favicon.png" type="image/png" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0f1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CSBC Draft" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <div class="header-left">
+        <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <h1>Draft Board</h1>
+        <span id="mode-chip" class="mode-chip">Sandbox</span>
+      </div>
+      <div class="header-controls">
+        <div id="coach-badge" class="coach-badge hidden">
+          <button id="btn-change-pin" class="btn-sm">Change PIN</button>
+          <span id="coach-badge-name"></span>
+          <button id="btn-logout" class="btn-sm">Log Out</button>
+        </div>
+        <button id="btn-login" class="btn-primary">Coach Login</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Side menu -->
+  <div id="side-menu-overlay" class="side-menu-overlay hidden"></div>
+  <nav id="side-menu" class="side-menu" aria-label="Main menu">
+    <div class="side-menu-header">
+      <span>Menu</span>
+      <button id="btn-menu-close" class="btn-menu-close" aria-label="Close menu">✕</button>
+    </div>
+    <a href="directory.html" class="side-menu-link">🏀 Player Directory</a>
+    <a href="draft-board.html" class="side-menu-link active">📋 Draft Board</a>
+    <a href="draft-results.html" class="side-menu-link">🏆 Draft Results</a>
+    <a href="schedules.html" class="side-menu-link">📅 Schedules</a>
+    <a href="gameboard.html" class="side-menu-link">🎯 Gameboard</a>
+    <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
+    <a href="standings.html" class="side-menu-link">📊 Standings</a>
+    <a href="playoffs.html" class="side-menu-link">🥇 Playoffs</a>
+  </nav>
+
+  <main id="db-main">
+    <div class="loading" id="db-loading">Loading draft board…</div>
+
+    <div id="db-content" class="hidden">
+
+      <!-- Mode / live controls -->
+      <div class="db-topbar">
+        <span class="db-mode-note" id="db-mode-note"></span>
+        <span class="db-spacer"></span>
+        <div class="role-switch" id="view-switch" role="group" aria-label="Tile style">
+          <button id="view-names"  aria-pressed="true">Names</button>
+          <button id="view-photos" aria-pressed="false">Photos</button>
+          <button id="view-split"  aria-pressed="false">Split</button>
+        </div>
+        <button class="live-toggle hidden" id="live-btn" aria-pressed="false">
+          <span class="dot" aria-hidden="true"></span>
+          <span id="live-label">Live Draft Off</span>
+          <span class="switch" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <!-- On the clock -->
+      <div class="turn-banner" id="turn-banner" hidden>
+        <span class="turn-label">On the clock</span>
+        <span class="turn-name" id="turn-name">—</span>
+        <span class="turn-pick">Pick <b id="turn-pick">1</b> · Spot <b id="turn-spot">1</b></span>
+        <span class="clock">
+          <span class="clock-stack">
+            <span class="clock-cap">This pick</span>
+            <span class="clock-time" id="clock-time">0:00</span>
+          </span>
+          <span class="clock-stack">
+            <span class="clock-cap">Total draft</span>
+            <span class="clock-total" id="clock-total">0:00</span>
+          </span>
+          <button class="clock-btn" id="clock-reset">Reset</button>
+          <button class="clock-btn" id="clock-mute" aria-pressed="false" title="Mute the chimes">🔔</button>
+        </span>
+      </div>
+
+      <div class="draft-summary" id="draft-summary" hidden>
+        <span class="turn-label">Draft complete</span>
+        <span class="summary-time" id="summary-time">0:00</span>
+        <span class="summary-note" id="summary-note"></span>
+      </div>
+
+      <!-- Snake board -->
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Draft Board</h2>
+          <span class="panel-sub" id="board-sub">8 roster spots · snake order runs down each column</span>
+        </div>
+        <div class="panel-body">
+          <div class="board">
+            <div class="snake-arrows" id="arrows-top"></div>
+            <div class="board-grid" id="board-grid"></div>
+            <div class="snake-arrows" id="arrows-bot"></div>
+          </div>
+          <div class="board-tools">
+            <button class="btn btn-dark hidden" id="edit-coaches" aria-pressed="false">Add / Remove Coach</button>
+            <button class="btn hidden" id="add-coach">+ Add Coach</button>
+            <span class="hint" id="coach-hint"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Unranked -->
+      <div class="unranked-shell" id="unranked-shell">
+        <div class="unranked-label">
+          <span>UNRANKED</span>
+          <span class="unranked-count" id="unranked-count"></span>
+        </div>
+        <div class="unranked-track" id="unranked-track"></div>
+      </div>
+
+      <!-- Pool -->
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Draft Pool</h2>
+          <span class="panel-sub" id="pool-sub"></span>
+        </div>
+        <div class="panel-body">
+          <div class="pool">
+            <div class="pool-entry" id="pool-entry"></div>
+            <div class="pool-grid" id="pool-head"></div>
+            <div class="pool-grid" id="pool-grid" style="margin-top:5px"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Generic dialog -->
+  <div class="modal-overlay hidden" id="scrim">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+      <h2 id="dlg-title">Title</h2>
+      <p id="dlg-body"></p>
+      <div id="dlg-extra" style="display:none"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="dlg-cancel">Cancel</button>
+        <button class="btn-primary" id="dlg-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Coach Login Modal -->
+  <div id="modal-login" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>Coach Login</h2>
+      <label>Select your name
+        <select id="login-name">
+          <option value="">— choose —</option>
+        </select>
+      </label>
+      <label>PIN
+        <input id="login-pin" type="password" placeholder="Enter your PIN" />
+      </label>
+      <p id="login-error" class="error-msg hidden">Incorrect PIN. Try again.</p>
+      <div class="modal-actions">
+        <button id="btn-login-cancel" class="btn-secondary">Cancel</button>
+        <button id="btn-login-submit" class="btn-primary">Log In</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change PIN Modal -->
+  <div id="modal-change-pin" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>Change PIN</h2>
+      <label>New PIN
+        <input id="change-pin-new" type="password" placeholder="Choose a new PIN" />
+      </label>
+      <label>Confirm New PIN
+        <input id="change-pin-confirm" type="password" placeholder="Enter it again" />
+      </label>
+      <p id="change-pin-error" class="error-msg hidden"></p>
+      <p id="change-pin-success" class="success-msg hidden">PIN updated!</p>
+      <div class="modal-actions">
+        <button id="btn-change-pin-cancel" class="btn-secondary">Cancel</button>
+        <button id="btn-change-pin-submit" class="btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="draft-board.js"></script>
+  <script type="module" src="coach-login.js"></script>
+  <script type="module" src="side-menu.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/draft-tool/sw.js');
+  </script>
+</body>
+</html>

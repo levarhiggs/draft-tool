@@ -567,7 +567,11 @@ export function escHtml(str) {
 
 export { COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID, photoUrl, videoUrl };
 
-init();
+// player.js and draft-board.js import escHtml/COL/photoUrl from here, which
+// used to drag the directory's whole bootstrap along with them — fetching the
+// roster a second time and then throwing on the missing #player-grid. Only
+// run it on the page that actually owns that grid.
+if (document.getElementById('player-grid')) init();
 
 // ── Mobile drawer ─────────────────────────────────────────────────────────────
 (function wireDrawer() {

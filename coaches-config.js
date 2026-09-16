@@ -141,6 +141,25 @@ export function personByName(name) {
   return PERSONS.find(p => p.displayNames.includes(name)) || null;
 }
 
+/**
+ * The team name a drafted player gets written to, e.g. "Team Craig".
+ *
+ * Fall's real TEAMS/TEAM_COLORS don't exist yet — colors are assigned a day
+ * or two before the first game (SEASON_INTAKE_RECONSTRUCTION.md) — so the
+ * draft can't wait on them. This derives the same `Team {suffix}` shape the
+ * app already uses everywhere, from the coach's current display name.
+ *
+ * Deliberately mirrors gameboard.js's existing coach->team string match, so
+ * a team assigned at the draft resolves the same way there. Once the real
+ * color names land, TEAM_COLORS keys must match what this produced.
+ */
+export function teamNameFor(personId) {
+  const p = PERSONS.find(x => x.id === personId);
+  if (!p) return '';
+  const suffix = p.displayNames[0].replace(/^(Coach|Director)\s+/, '');
+  return `Team ${suffix}`;
+}
+
 // ── Team color, as it appears in the season schedule sheet (V/H columns
 // identify teams by color name, not coach/team name — this is the link
 // between the two). Also used for color chips/badges in the UI.
