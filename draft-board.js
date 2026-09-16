@@ -975,9 +975,13 @@ async function toggleLive() {
     const placed = Object.keys(slots).length;
     const start = async (clear) => {
       const next = clear ? {} : { ...slots };
+      // saveDraftBoard's merge:true would leave old slot keys sitting
+      // underneath an empty {} — saveDraftSlots is the one that actually
+      // clears keys that dropped out, so a real board wipe has to go
+      // through it, not through the general patch call below.
+      await saveDraftSlots(next, coach().name);
       await saveDraftBoard({
         live: true,
-        slots: next,
         coachOrder: coachRows.map(c => c.personId),
         startedAt: Date.now(),
         endedAt: null,

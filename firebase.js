@@ -330,10 +330,30 @@ export async function saveDraftBoard(patch) {
   await setDoc(draftBoardRef(), { ...patch, updatedAt: serverTimestamp() }, { merge: true });
 }
 
-/** Replaces slots wholesale — merge:true would keep deleted picks alive. */
+/**
+ * Replaces slots wholesale. Firestore's merge:true merges nested map fields
+ * KEY BY KEY, so writing `slots: {}` (or any smaller object) over an
+ * existing slots map does NOT clear the keys that are missing from the new
+ * object — they simply survive untouched. That silently broke "Clear board"
+ * before starting a live draft: the board looked empty in the UI (which
+ * rendered off the patch just sent) but the old picks were still in
+ * Firestore underneath, and reappeared as soon as anything re-read the doc
+ * (e.g. toggling live draft back off). Explicitly deleteField() every old
+ * key that isn't in the new slots object so a clear actually clears.
+ */
 export async function saveDraftSlots(slots, updatedBy) {
   assertWritable('draft board update');
-  await setDoc(draftBoardRef(), { slots, updatedBy, updatedAt: serverTimestamp() }, { merge: true });
+  const ref = draftBoardRef();
+  const snap = await getDoc(ref);
+  const existing = snap.exists() ? (snap.data().slots || {}) : {};
+  const patch = { ...slots };
+  Object.keys(existing).forEach(key => {
+    if (!(key in slots)) patch[key] = deleteField();
+  });
+  await setDoc(ref, {
+    ...Object.fromEntries(Object.entries(patch).map(([k, v]) => [`slots.${k}`, v])),
+    updatedBy, updatedAt: serverTimestamp(),
+  }, { merge: true });
 }
 
 // ── Board roster ─────────────────────────────────────────────────────────────
