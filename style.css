@@ -4708,3 +4708,16 @@ body.view-tall .pool-grid, body.view-split .pool-grid { grid-template-columns: r
   .db-mode-note { width: 100%; }
   .clock { margin-left: 0; }
 }
+
+/* Draft-end snapshot chrome — hidden on screen, visible only inside the
+   saved PNG so the image identifies itself if it's ever the only record. */
+.capture-head, .capture-foot { padding: 10px 4px; text-align: center; }
+.capture-head.hidden, .capture-foot.hidden { display: none; }
+.capture-head {
+  font-size: 1.15rem; font-weight: 800; letter-spacing: 0.04em;
+  color: var(--clr-text); border-bottom: 2px solid #1c5a80; margin-bottom: 10px;
+}
+.capture-foot {
+  font-size: 0.78rem; color: var(--clr-muted); margin-top: 10px;
+  border-top: 1px solid var(--clr-border); font-variant-numeric: tabular-nums;
+}

@@ -106,14 +106,19 @@
           <span class="panel-sub" id="board-sub">8 roster spots · snake order runs down each column</span>
         </div>
         <div class="panel-body">
-          <div class="board">
+          <div class="board" id="board-capture">
+            <!-- Hidden on screen; shown only while the draft-end snapshot is
+                 being taken, so the saved image identifies itself. -->
+            <div class="capture-head hidden" id="capture-head"></div>
             <div class="snake-arrows" id="arrows-top"></div>
             <div class="board-grid" id="board-grid"></div>
             <div class="snake-arrows" id="arrows-bot"></div>
+            <div class="capture-foot hidden" id="capture-foot"></div>
           </div>
           <div class="board-tools">
             <button class="btn btn-dark hidden" id="edit-coaches" aria-pressed="false">Add / Remove Coach</button>
             <button class="btn hidden" id="add-coach">+ Add Coach</button>
+            <button class="btn" id="save-image">Save board image</button>
             <span class="hint" id="coach-hint"></span>
           </div>
         </div>
@@ -199,6 +204,8 @@
     </div>
   </div>
 
+  <!-- Draft-end snapshot. Same pinned build the Rotations export uses. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script type="module" src="draft-board.js"></script>
   <script type="module" src="coach-login.js"></script>
   <script type="module" src="side-menu.js"></script>

@@ -847,17 +847,84 @@ async function toggleLive() {
     `team assignments, and the Draft Results page will reflect this board. ` +
     `Everyone returns to their own sandbox afterward.`,
     async () => {
+      // Snapshot FIRST. If the writes below fail, the pixels still prove
+      // who drafted whom — that's the whole point of saving an image.
+      const shot = await captureBoard();
       try {
         const map = {};
         coachRows.forEach(c => { map[c.personId] = teamNameFor(c.personId) || c.name; });
         const n = await commitDraftResults(slots, map);
         await saveDraftBoard({ live: false, endedAt: Date.now(), updatedBy: coach().name });
         showSummary();
-        toast('Draft complete', `${n} player${n === 1 ? '' : 's'} assigned to teams`);
+        toast('Draft complete', `${n} player${n === 1 ? '' : 's'} assigned to teams` +
+          (shot ? ' · board image saved' : ''));
       } catch (err) {
-        toast('Could not finish the draft', err.message);
+        toast('Could not finish the draft', err.message +
+          (shot ? ' — board image was saved' : ''));
       }
     }, 'End draft & assign teams', 'Keep drafting');
+}
+
+/**
+ * Saves a PNG of the finished board to the commissioner's device.
+ *
+ * This is a deliberate belt-and-braces step: if the Firestore data is ever
+ * lost or corrupted, the pixels are still proof of who drafted whom. It runs
+ * on draft end, before anything else can change the board.
+ *
+ * Two traps, both already learned the hard way in rotations.js:
+ *  - Player photos come from Drive, a cross-origin host with no CORS headers.
+ *    html2canvas can't read pixels from those, so a capture in photo mode
+ *    produces blank cells. Force name tiles for the duration of the capture.
+ *  - html2canvas snapshots what's actually laid out, so the DOM has to be
+ *    changed AND reflowed before it reads — hence the double rAF.
+ */
+function captureBoard() {
+  return new Promise(resolve => {
+    const target = el('board-capture');
+    if (typeof html2canvas !== 'function' || !target) return resolve(false);
+
+    const prevView = view;
+    if (prevView !== 'names') setView('names');   // avoid tainted-canvas blanks
+
+    const head = el('capture-head'), foot = el('capture-foot');
+    const when = new Date();
+    const stamp = when.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' @ ' + when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    head.textContent = `CSBC SJV Fall 2026 — Final Draft Board`;
+    foot.textContent = `${Object.keys(slots).length} picks · completed ${stamp}`;
+    head.classList.remove('hidden');
+    foot.classList.remove('hidden');
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      html2canvas(target, { backgroundColor: '#0f1117', scale: 2 }).then(canvas => {
+        const link = document.createElement('a');
+        const d = when.toISOString().slice(0, 10);
+        link.download = `csbc-fall-2026-draft-board-${d}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+
+        // Desktop convenience: also drop it on the clipboard so it can be
+        // pasted straight into a message. Silently unsupported on mobile,
+        // where the download is the whole outcome.
+        if (navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+          canvas.toBlob(blob => {
+            if (!blob) return;
+            navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+              .catch(() => {});
+          }, 'image/png');
+        }
+        resolve(true);
+      }).catch(err => {
+        console.error('Board snapshot failed:', err);
+        resolve(false);
+      }).finally(() => {
+        head.classList.add('hidden');
+        foot.classList.add('hidden');
+        if (prevView !== 'names') setView(prevView);
+      });
+    }));
+  });
 }
 
 function showSummary() {
@@ -963,6 +1030,16 @@ function wireStatic() {
 
   el('live-btn').addEventListener('click', toggleLive);
   el('add-coach').addEventListener('click', addCoach);
+  el('save-image').addEventListener('click', async () => {
+    // Hold the node directly — e.currentTarget is null once the handler
+    // resumes after an await.
+    const btn = el('save-image');
+    btn.disabled = true;
+    const ok = await captureBoard();
+    btn.disabled = false;
+    toast(ok ? 'Board image saved' : 'Could not save the image',
+      ok ? 'Check your downloads' : 'Try again in a moment');
+  });
   el('edit-coaches').addEventListener('click', () => { editing = !editing; render(); });
   el('clock-reset').addEventListener('click', () => { resetClock(); tickClock(); });
   el('clock-mute').addEventListener('click', e => {
