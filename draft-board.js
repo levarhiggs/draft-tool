@@ -59,7 +59,7 @@ let saveTimer = null;
  * 'personal'  — placement and editing driven by YOUR OWN seed. Editable
  *   whenever the coach otherwise could edit at all (see canEditSeeds()).
  */
-let poolMode = 'composite';
+let poolMode = 'personal';
 
 const el = id => document.getElementById(id);
 const byId = id => allPlayers.find(p => String(p[COL.ID]) === String(id));

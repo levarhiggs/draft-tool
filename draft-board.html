@@ -62,10 +62,10 @@
       <div class="db-topbar">
         <span class="db-mode-note" id="db-mode-note"></span>
         <span class="db-spacer"></span>
-        <div class="role-switch" id="view-switch" role="group" aria-label="Tile style">
-          <button id="view-names"  aria-pressed="true">Names</button>
-          <button id="view-photos" aria-pressed="false">Photos</button>
-          <button id="view-split"  aria-pressed="false">Split</button>
+        <div class="board-tools view-switch" id="view-switch" role="group" aria-label="Tile style">
+          <button class="btn btn-dark" id="view-names"  aria-pressed="true">Names</button>
+          <button class="btn btn-dark" id="view-photos" aria-pressed="false">Photos</button>
+          <button class="btn btn-dark" id="view-split"  aria-pressed="false">Split</button>
         </div>
         <button class="live-toggle hidden" id="live-btn" aria-pressed="false">
           <span class="dot" aria-hidden="true"></span>
@@ -137,11 +137,11 @@
       <section class="panel">
         <div class="panel-head">
           <h2 class="panel-title">Draft Pool</h2>
-          <span class="panel-sub" id="pool-sub"></span>
           <div class="pool-mode-toggle" role="group" aria-label="Pool view mode">
-            <button class="pmode-btn" id="pmode-composite" aria-pressed="true">Composite</button>
-            <button class="pmode-btn" id="pmode-personal" aria-pressed="false">Personal</button>
+            <button class="pmode-btn" id="pmode-personal" aria-pressed="true">Personal</button>
+            <button class="pmode-btn" id="pmode-composite" aria-pressed="false">Composite</button>
           </div>
+          <span class="panel-sub" id="pool-sub"></span>
         </div>
         <div class="panel-body">
           <div class="pool">

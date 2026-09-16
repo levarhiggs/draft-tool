@@ -4611,7 +4611,7 @@ body.is-live .live-toggle .switch::after { transform: translateX(18px); backgrou
 .panel-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 13px 16px; border-bottom: 1px solid var(--clr-border); }
 .panel-title { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin: 0; }
 .panel-sub { font-size: 0.78rem; color: var(--clr-muted); }
-.pool-mode-toggle { display: flex; gap: 4px; margin-left: auto; }
+.pool-mode-toggle { display: flex; gap: 4px; }
 .pmode-btn { background: var(--clr-surface); color: var(--clr-muted); border: 1px solid var(--clr-border); border-radius: 6px; padding: 6px 12px; font: inherit; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
 .pmode-btn:hover { border-color: var(--clr-accent); color: var(--clr-text); }
 .pmode-btn[aria-pressed="true"] { background: var(--clr-accent); border-color: var(--clr-accent); color: #fff; }
@@ -4666,6 +4666,7 @@ body.editing-coaches .coach-cell .grip { display: none; }
 .snake-arrows { height: 16px; }
 .snake-arrows svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .board-tools { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.board-tools.view-switch { margin-top: 0; }
 .btn { background: var(--clr-surface); color: var(--clr-text); border: 1px solid var(--clr-border); border-radius: 6px; padding: 7px 13px; font: inherit; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
 .btn:hover { border-color: var(--clr-accent); }
 .btn-dark { background: #0b0d13; color: #fff; border-color: #0b0d13; }
