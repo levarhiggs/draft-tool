@@ -64,7 +64,44 @@ const canEdit = () => !!coach() && (!isLive || isAdmin());
 
 // ── Seeds ────────────────────────────────────────────────────────────────────
 const MOD_OFFSET = { Strong: 0.0, Reg: 0.2, Mid: 0.5, Low: 0.8 };
-const MOD_CYCLE  = ['Strong', 'Reg', 'Mid', 'Low'];
+const MOD_CYCLE  = ['Reg', 'Strong', 'Low', 'Mid'];
+
+/**
+ * While a coach is actively cycling a card's modifier, the column must NOT
+ * re-sort on every click — each save fires a live Firestore update that
+ * would otherwise yank the card out from under the cursor mid-click, so
+ * cycling to "Strong" meant chasing the tile around the screen.
+ *
+ * pinnedSort remembers each pinned player's position (by id) at the moment
+ * the FIRST click in a burst happened; renderPool() reads it and holds that
+ * ordering instead of the live composite/effSeed sort. A short idle timer
+ * per player releases the pin once clicking stops, so the real sort catches
+ * up a beat after the coach is actually done, not after every click.
+ */
+const pinnedSort = new Map();   // tier -> [ids in the order they were shown when pinned]
+const pinTimers  = new Map();   // id -> { tier, timer } — the pin THIS click armed
+const PIN_RELEASE_MS = 900;
+
+function pinCard(id, tier) {
+  if (!pinnedSort.has(tier)) {
+    // Snapshot the CURRENT on-screen order for this tier so nothing else
+    // jumps around either — only the sort key changes, the layout doesn't,
+    // until the pin releases.
+    const order = [...document.querySelectorAll(`.tier-col[data-tier="${tier}"] .p-card`)]
+      .map(el => el.dataset.pid).filter(Boolean);
+    pinnedSort.set(tier, order);
+  }
+  clearTimeout(pinTimers.get(id)?.timer);
+  const timer = setTimeout(() => {
+    pinTimers.delete(id);
+    // Release this tier only once nothing still active in it is pinned —
+    // another card in the same column may still be mid-click-streak.
+    const stillActive = [...pinTimers.values()].some(v => v.tier === tier);
+    if (!stillActive) pinnedSort.delete(tier);
+    render();
+  }, PIN_RELEASE_MS);
+  pinTimers.set(id, { tier, timer });
+}
 
 function compositeOf(id) {
   const d = live[id];
@@ -497,16 +534,30 @@ function renderPool() {
     const col = document.createElement('div');
     col.className = 'tier-col';
     col.dataset.tier = t;
-    allPlayers
-      .filter(p => tierOf(String(p[COL.ID])) === t)
-      .sort((a, b) => {
-        const ai = String(a[COL.ID]), bi = String(b[COL.ID]);
-        const ad = placed.has(ai), bd = placed.has(bi);
-        if (ad !== bd) return ad ? 1 : -1;
-        if (ad && bd) return ai.localeCompare(bi);
-        return (effSeed(ai) ?? 9) - (effSeed(bi) ?? 9);
-      })
-      .forEach(p => col.appendChild(poolCard(p, placed)));
+    const inTier = allPlayers.filter(p => tierOf(String(p[COL.ID])) === t);
+
+    const pinned = pinnedSort.get(t);
+    if (pinned) {
+      // Hold the on-screen order from the moment this tier was pinned. A
+      // card whose seed just moved it INTO this tier (from another one,
+      // mid-pin) wasn't part of that snapshot — append those at the end
+      // rather than dropping them.
+      const byId2 = new Map(inTier.map(p => [String(p[COL.ID]), p]));
+      const ordered = pinned.map(id => byId2.get(id)).filter(Boolean);
+      const seen = new Set(pinned);
+      inTier.filter(p => !seen.has(String(p[COL.ID]))).forEach(p => ordered.push(p));
+      ordered.forEach(p => col.appendChild(poolCard(p, placed)));
+    } else {
+      inTier
+        .sort((a, b) => {
+          const ai = String(a[COL.ID]), bi = String(b[COL.ID]);
+          const ad = placed.has(ai), bd = placed.has(bi);
+          if (ad !== bd) return ad ? 1 : -1;
+          if (ad && bd) return ai.localeCompare(bi);
+          return (effSeed(ai) ?? 9) - (effSeed(bi) ?? 9);
+        })
+        .forEach(p => col.appendChild(poolCard(p, placed)));
+    }
     grid.appendChild(col);
   }
 }
@@ -522,6 +573,7 @@ function poolCard(p, placed) {
   const card = document.createElement('div');
   card.className = 'p-card' + (drafted ? ' is-drafted' : '') + (poolPhotos ? ' photo' : '') +
     (fav ? ' is-fav' : '') + (isLive && adminSeedOf(id) != null ? ' admin-override' : '');
+  card.dataset.pid = id;   // read by pinCard() to snapshot on-screen order
   card.tabIndex = 0;
   card.innerHTML =
     (poolPhotos ? avatarHTML(p, 'card-ava-tall') : '') +
@@ -585,14 +637,25 @@ async function setSeed(id, tier, mod) {
 }
 
 async function cycleMod(id) {
+  const seed = mySeedOf(id);
+  if (seed == null) return;
+  const tier = Math.floor(seed);
+
+  // Pin the column BEFORE saving — the live update from this write must
+  // not re-sort the card out from under a coach mid-click-streak.
+  pinCard(id, tier);
+
   const cur = MOD_CYCLE.indexOf(myModOf(id) || 'Reg');
   const next = MOD_CYCLE[(cur + 1) % MOD_CYCLE.length];
   const before = tierOf(id);
-  const seed = mySeedOf(id);
-  if (seed == null) return;
-  await setSeed(id, Math.floor(seed), next);
+  await setSeed(id, tier, next);
   const after = tierOf(id);
   if (after !== before && after != null) {
+    // A real column change is worth breaking the pin early for — the coach
+    // needs to see it land in its new home, not held in the old one.
+    pinnedSort.delete(tier);
+    clearTimeout(pinTimers.get(id)?.timer);
+    pinTimers.delete(id);
     toast(`${byId(id)?.[COL.NAME]} moved to column ${after}`, next);
   }
 }
