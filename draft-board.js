@@ -1276,6 +1276,21 @@ function wireStatic() {
     el('pmode-' + m).addEventListener('click', () => setPoolMode(m)));
 
   window.addEventListener('resize', renderArrows);
+  window.addEventListener('resize', updateStickyOffset);
+  updateStickyOffset();
+}
+
+/**
+ * The site header is position:sticky at the very top; the mode/view topbar
+ * below it also needs to stick, but right underneath the header rather than
+ * under it. The header wraps to a taller two-line layout on narrow screens
+ * (see the header h1 media query in style.css), so its height isn't a fixed
+ * number — measure it and hand the topbar's sticky offset a CSS variable
+ * instead of guessing a pixel value that would drift out of sync.
+ */
+function updateStickyOffset() {
+  const header = document.querySelector('header');
+  if (header) document.documentElement.style.setProperty('--header-h', `${header.offsetHeight}px`);
 }
 
 function setView(v) {

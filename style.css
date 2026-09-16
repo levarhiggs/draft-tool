@@ -4554,7 +4554,11 @@ main {
   background: rgba(196, 86, 74, 0.2); border-color: #c4564a; color: #ff8d80;
 }
 
-.db-topbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.db-topbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  position: sticky; top: var(--header-h, 60px); z-index: 90;
+  background: var(--clr-bg); padding: 10px 0; margin: 0 -16px; padding-inline: 16px;
+}
 .db-spacer { flex: 1; }
 .db-mode-note { font-size: 0.82rem; color: var(--clr-muted); }
 
@@ -4769,6 +4773,7 @@ body.view-tall .pool-grid, body.view-split .pool-grid { grid-template-columns: r
   #db-main { padding: 12px; }
   .db-mode-note { width: 100%; }
   .clock { margin-left: 0; }
+  .db-topbar { margin: 0 -12px; padding-inline: 12px; }
 }
 
 /* Draft-end snapshot chrome — hidden on screen, visible only inside the
