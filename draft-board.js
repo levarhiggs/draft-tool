@@ -18,6 +18,7 @@ import {
 import {
   subscribePlayer, saveRanking, deleteRanking, saveFavorites, getFavorites,
   subscribeDraftBoard, saveDraftBoard, saveDraftSlots,
+  subscribeBoardRoster, saveBoardRoster,
   getSandbox, saveSandbox, commitDraftResults, decodeRanking,
 } from './firebase.js';
 
@@ -31,6 +32,10 @@ let favorites = new Set();
 
 let board = null;         // authoritative draftBoard doc, or null
 let sandbox = null;       // this coach's private board
+// Who holds a draft slot this season — SHARED, and deliberately not the same
+// list as who can log in. null until the first snapshot; falls back to
+// coaches-config.js when no override has been saved.
+let boardRoster = null;
 let isLive = false;
 let coachRows = [];       // [{ personId, name }] — current board rows
 let slots = {};           // '{personId}:{spot}' -> playerId
@@ -175,8 +180,21 @@ async function init() {
       else render();
     });
 
+    // Roster changes are shared — every open device re-renders on a change.
+    let rosterFirst;
+    const rosterReady = new Promise(res => { rosterFirst = res; });
+    let rosterSettled = false;
+    subscribeBoardRoster(ids => {
+      boardRoster = ids;
+      if (!rosterSettled) { rosterSettled = true; rosterFirst(); return; }
+      switchMode();
+    });
+
     // Don't hang forever if Firestore is unreachable — fall back to sandbox.
-    await Promise.race([ready, new Promise(r => setTimeout(r, 4000))]);
+    await Promise.race([
+      Promise.all([ready, rosterReady]),
+      new Promise(r => setTimeout(r, 4000)),
+    ]);
     await switchMode();
 
     el('db-loading').classList.add('hidden');
@@ -196,32 +214,41 @@ async function init() {
   }
 }
 
+/** Everyone who holds a draft slot this season, in board order. */
+function seatedCoaches() {
+  const all = getActiveCoaches(SEASON_CODE);
+  const ids = boardRoster || all.map(c => c.personId);
+  return ids
+    .map(id => all.find(r => r.personId === id))
+    .filter(Boolean)
+    .map(r => ({ personId: r.personId, name: r.name }));
+}
+
 /** Point `slots`/`coachRows` at whichever board this mode should render. */
 async function switchMode() {
   if (isLive) { adoptBoard(); render(); return; }
   const pid = myPersonId();
   sandbox = pid ? await getSandbox(pid) : null;
-  const roster = getActiveCoaches(SEASON_CODE);
-  const order = sandbox?.coachOrder?.length ? sandbox.coachOrder : roster.map(c => c.personId);
-  coachRows = order
-    .map(id => roster.find(r => r.personId === id))
-    .filter(Boolean)
-    .map(r => ({ personId: r.personId, name: r.name }));
-  // Anyone seated but missing from a stale saved order still gets a row.
-  roster.forEach(r => {
-    if (!coachRows.some(c => c.personId === r.personId)) {
-      coachRows.push({ personId: r.personId, name: r.name });
-    }
-  });
+
+  // The roster is shared; only the ORDER is a per-coach preference. A coach
+  // removed from the board stays removed for everyone — re-seating anyone
+  // missing here is what made deletions bounce back.
+  const seated = seatedCoaches();
+  const pref = sandbox?.coachOrder || [];
+  coachRows = [
+    ...pref.map(id => seated.find(s => s.personId === id)).filter(Boolean),
+    ...seated.filter(s => !pref.includes(s.personId)),
+  ];
   slots = { ...(sandbox?.slots || {}) };
   render();
 }
 
 function adoptBoard() {
-  const roster = getActiveCoaches(SEASON_CODE);
-  const order = board?.coachOrder?.length ? board.coachOrder : roster.map(c => c.personId);
+  const all = getActiveCoaches(SEASON_CODE);
+  const seated = seatedCoaches();
+  const order = board?.coachOrder?.length ? board.coachOrder : seated.map(c => c.personId);
   coachRows = order
-    .map(id => roster.find(r => r.personId === id) || { personId: id, name: id })
+    .map(id => all.find(r => r.personId === id) || { personId: id, name: id })
     .map(r => ({ personId: r.personId, name: r.name }));
   slots = { ...(board?.slots || {}) };
 }
@@ -939,14 +966,36 @@ function showSummary() {
 }
 
 // ── Coach management (commissioner, sandbox only) ────────────────────────────
+/**
+ * Writes the seated roster to Firestore. Shared, so it reaches every coach's
+ * board on their next snapshot — unlike the row ORDER, which stays a personal
+ * preference in each coach's sandbox.
+ */
+async function pushRoster(msg, detail = '') {
+  const ids = coachRows.map(c => c.personId);
+  boardRoster = ids;                 // optimistic, so the row goes now
+  render();
+  try {
+    await saveBoardRoster(ids, coach()?.name || '');
+    toast(msg, detail || 'Updated for every coach');
+  } catch (err) {
+    toast('Could not save the roster', err.message);
+  }
+}
+
 function removeCoach(idx) {
   if (!isAdmin() || isLive) return;
   const c = coachRows[idx];
   const theirs = Object.keys(slots).filter(k => k.startsWith(c.personId + ':'));
   if (!theirs.length) {
-    return showDialog('Remove coach?',
-      `<strong>${escHtml(c.name)}</strong> leaves this season's lineup. They keep their account and history.`,
-      () => { coachRows.splice(idx, 1); persist(); render(); }, 'Remove');
+    return showDialog('Remove from the draft board?',
+      `<strong>${escHtml(c.name)}</strong> loses their draft slot for this season, on ` +
+      `every coach's board. They can still log in, rank players and leave notes — ` +
+      `this only means they aren't drafting a team.`,
+      () => {
+        coachRows.splice(idx, 1);
+        pushRoster(`${c.name} removed from the board`);
+      }, 'Remove from board');
   }
   const open = coachRows.filter((o, i) => i !== idx &&
     !Object.keys(slots).some(k => k.startsWith(o.personId + ':')));
@@ -962,7 +1011,8 @@ function removeCoach(idx) {
       const to = el('dlg-select').value;
       theirs.forEach(k => { slots[`${to}:${k.split(':')[1]}`] = slots[k]; delete slots[k]; });
       coachRows.splice(idx, 1);
-      persist(); render();
+      persist();
+      pushRoster(`${c.name} removed · roster transferred`);
     }, 'Transfer & remove', 'Cancel',
     `<label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--clr-muted)">
        Transfer roster to
@@ -973,21 +1023,20 @@ function removeCoach(idx) {
 
 function addCoach() {
   if (!isAdmin() || isLive || coachRows.length >= MAX_COACHES) return;
-  const seated = new Set(coachRows.map(c => c.personId));
-  const avail = getActiveCoaches(SEASON_CODE).filter(c => !seated.has(c.personId));
+  const onBoard = new Set(coachRows.map(c => c.personId));
+  const avail = getActiveCoaches(SEASON_CODE).filter(c => !onBoard.has(c.personId));
   if (!avail.length) {
-    return showDialog('No coaches available',
-      'Every coach seated for this season is already on the board. Add them in ' +
-      '<code>coaches-config.js</code> first.');
+    return showDialog('Everyone is already on the board',
+      'Every coach with a login this season already holds a draft slot.');
   }
-  showDialog('Add a coach', 'Seat a coach who already has an account.',
+  showDialog('Add a coach to the board',
+    'Give a coach a draft slot. This shows up on every coach’s board.',
     () => {
       const id = el('dlg-select').value;
       const found = avail.find(c => c.personId === id);
       if (!found) return;
       coachRows.push({ personId: found.personId, name: found.name });
-      persist(); render();
-      toast(`${found.name} added to the board`, `Seat ${coachRows.length}`);
+      pushRoster(`${found.name} added to the board`, `Seat ${coachRows.length}`);
     }, 'Add coach', 'Cancel',
     `<label style="display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--clr-muted)">
        Coach

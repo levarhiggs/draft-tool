@@ -336,6 +336,33 @@ export async function saveDraftSlots(slots, updatedBy) {
   await setDoc(draftBoardRef(), { slots, updatedBy, updatedAt: serverTimestamp() }, { merge: true });
 }
 
+// ── Board roster ─────────────────────────────────────────────────────────────
+// WHO HOLDS A DRAFT SLOT is separate from WHO CAN LOG IN. A commissioner who
+// evaluates players but doesn't run a team is a coach with no board row —
+// so removing someone from the board must not touch their login.
+//
+// Shared across every device (a coach roster is a fact about the league, not
+// a per-coach opinion), and stored in Firestore so it takes effect without a
+// code push. coaches-config.js SLOT_ASSIGNMENTS stays the fallback when no
+// override has been written.
+function boardRosterRef() {
+  return doc(db, 'coaches', `roster_${SEASON_CODE}`);
+}
+
+export function subscribeBoardRoster(callback) {
+  return onSnapshot(boardRosterRef(), snap => {
+    callback(snap.exists() ? (snap.data().personIds || null) : null);
+  }, err => {
+    console.error('subscribeBoardRoster error:', err);
+    callback(null);
+  });
+}
+
+export async function saveBoardRoster(personIds, updatedBy) {
+  assertWritable('board roster update');
+  await setDoc(boardRosterRef(), { personIds, updatedBy, updatedAt: serverTimestamp() });
+}
+
 export async function getSandbox(personId) {
   try {
     const snap = await getDoc(sandboxRef(personId));
