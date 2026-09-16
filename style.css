@@ -4611,6 +4611,10 @@ body.is-live .live-toggle .switch::after { transform: translateX(18px); backgrou
 .panel-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 13px 16px; border-bottom: 1px solid var(--clr-border); }
 .panel-title { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin: 0; }
 .panel-sub { font-size: 0.78rem; color: var(--clr-muted); }
+.pool-mode-toggle { display: flex; gap: 4px; margin-left: auto; }
+.pmode-btn { background: var(--clr-surface); color: var(--clr-muted); border: 1px solid var(--clr-border); border-radius: 6px; padding: 6px 12px; font: inherit; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+.pmode-btn:hover { border-color: var(--clr-accent); color: var(--clr-text); }
+.pmode-btn[aria-pressed="true"] { background: var(--clr-accent); border-color: var(--clr-accent); color: #fff; }
 .panel-body { padding: 14px 16px 18px; overflow-x: auto; }
 
 .board { min-width: 860px; }
@@ -4707,6 +4711,9 @@ body.editing-coaches .coach-cell .grip { display: none; }
 .rank-vals { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
 .rank-vals .mine-val { display: flex; align-items: center; gap: 4px; font-size: 0.72rem; font-weight: 700; color: var(--clr-text); }
 .rank-vals .comp-val { font-size: 0.72rem; font-weight: 700; color: var(--clr-accent); }
+
+.pmeta-composite { display: flex; justify-content: flex-end; margin-top: 1px; }
+.comp-only-val { font-size: 0.9rem; font-weight: 700; color: var(--clr-accent); font-variant-numeric: tabular-nums; }
 
 .mod { font: inherit; font-size: 0.6rem; font-weight: 700; border: 1px solid transparent; border-radius: 3px; padding: 0 5px; cursor: pointer; line-height: 1.5; }
 .mod:hover:not([disabled]) { filter: brightness(1.25); }

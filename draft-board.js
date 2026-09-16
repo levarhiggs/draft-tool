@@ -53,6 +53,14 @@ let focusKey = '', wantFocus = false;
 let editing = false;
 let saveTimer = null;
 
+/**
+ * 'composite' — read-only for everyone, always. Shows the group's average;
+ *   no seed/modifier UI on a card, just the number.
+ * 'personal'  — placement and editing driven by YOUR OWN seed. Editable
+ *   whenever the coach otherwise could edit at all (see canEditSeeds()).
+ */
+let poolMode = 'composite';
+
 const el = id => document.getElementById(id);
 const byId = id => allPlayers.find(p => String(p[COL.ID]) === String(id));
 const coach = () => getCurrentCoach();
@@ -126,8 +134,22 @@ function myModOf(id) {
   const { modifier } = decodeRanking(d.rankings?.[c.name] ?? null, d.modifiers, c.name);
   return modifier;
 }
-/** While live the commissioner's seed drives placement; otherwise composite. */
+/**
+ * Which seed places a card in the pool. Two independent axes:
+ *
+ *   poolMode  'composite' | 'personal' — what the coach is LOOKING at
+ *   isLive    the commissioner's seed already overrode composite before
+ *             this toggle existed; that rule only applies in composite mode
+ *             now, since live-draft's whole point is projecting the GROUP's
+ *             board, and personal mode is explicitly not that.
+ *
+ * This is the fix for the trap where dragging a disputed player to Strong-3
+ * sprang back to composite's column before a coach could even set the
+ * modifier: personal mode places by YOUR OWN seed, full stop, so it never
+ * fights you for where your own opinion lives.
+ */
 function effSeed(id) {
+  if (poolMode === 'personal') return mySeedOf(id);
   if (isLive) {
     const a = adminSeedOf(id);
     if (a != null) return a;
@@ -497,9 +519,16 @@ function renderUnranked() {
 }
 
 /** Seeds freeze for everyone but the commissioner once the draft is live. */
-const canEditSeeds = () => !!coach() && (!isLive || isAdmin());
+// Composite mode is read-only for everyone, always -- it's a view of the
+// group's number, not anyone's personal input. Personal mode follows the
+// existing live-draft freeze (only the commissioner edits while live).
+const canEditSeeds = () => poolMode === 'personal' && !!coach() && (!isLive || isAdmin());
 
 function renderPool() {
+  el('pool-sub').textContent = poolMode === 'composite'
+    ? 'Composite — read-only group ranking'
+    : 'Personal — your own seed, editable';
+
   const entry = el('pool-entry');
   entry.innerHTML = '';
   for (let t = 1; t <= SPOTS; t++) {
@@ -575,22 +604,30 @@ function poolCard(p, placed) {
     (fav ? ' is-fav' : '') + (isLive && adminSeedOf(id) != null ? ' admin-override' : '');
   card.dataset.pid = id;   // read by pinCard() to snapshot on-screen order
   card.tabIndex = 0;
+  // Composite mode is a read of the group's number, full stop — no personal
+  // seed row, no modifier chip to click. Personal mode is the only place a
+  // coach's own vote is visible or touchable in the pool.
+  const metaHtml = drafted
+    ? `<div class="pmeta"><span class="drafted-tag">DRAFTED</span></div>`
+    : poolMode === 'composite'
+      ? `<div class="pmeta pmeta-composite"><span class="comp-only-val">${comp != null ? comp.toFixed(1) : '—'}</span></div>`
+      : `<div class="rank-head"><span>Your Rank</span><span>Composite</span></div>` +
+        `<div class="rank-vals">` +
+          `<span class="mine-val">${mine != null ? mine.toFixed(1) : '—'}` +
+            `<button class="mod" data-mod-btn="${mod}">${mod}</button></span>` +
+          `<span class="comp-val">${comp != null ? comp.toFixed(1) : '—'}</span>` +
+        `</div>`;
+
   card.innerHTML =
     (poolPhotos ? avatarHTML(p, 'card-ava-tall') : '') +
     `<button class="fav-btn" data-fav aria-pressed="${fav}"
              aria-label="${fav ? 'Unfavorite' : 'Favorite'} ${escHtml(p[COL.NAME])}">♥</button>` +
     `<div class="prow"><span class="pid">${escHtml(id)}</span>` +
     `<span class="pname">${escHtml(p[COL.NAME])}</span></div>` +
-    (drafted
-      ? `<div class="pmeta"><span class="drafted-tag">DRAFTED</span></div>`
-      : `<div class="rank-head"><span>Your Rank</span><span>Composite</span></div>` +
-        `<div class="rank-vals">` +
-          `<span class="mine-val">${mine != null ? mine.toFixed(1) : '—'}` +
-            `<button class="mod" data-mod-btn="${mod}">${mod}</button></span>` +
-          `<span class="comp-val">${comp != null ? comp.toFixed(1) : '—'}</span>` +
-        `</div>`);
+    metaHtml;
 
-  // Hearts survive live mode — the one private action that does.
+  // Hearts survive live mode AND composite mode — it's the one private
+  // action that's never gated by what view you're looking at.
   const favBtn = card.querySelector('[data-fav]');
   favBtn.addEventListener('pointerdown', e => e.stopPropagation());
   favBtn.addEventListener('click', async e => {
@@ -604,7 +641,7 @@ function poolCard(p, placed) {
   const modBtn = card.querySelector('[data-mod-btn]');
   if (modBtn) {
     modBtn.disabled = !canEditSeeds() || mine == null;
-    modBtn.title = canEditSeeds() ? 'Click to cycle Strong → Reg → Mid → Low' : '';
+    modBtn.title = canEditSeeds() ? 'Click to cycle Reg → Strong → Low → Mid' : '';
     modBtn.addEventListener('pointerdown', e => e.stopPropagation());
     modBtn.addEventListener('click', e => { e.stopPropagation(); cycleMod(id); });
   }
@@ -625,12 +662,16 @@ function avatarHTML(p, cls) {
 }
 
 // ── Seeding ──────────────────────────────────────────────────────────────────
-async function setSeed(id, tier, mod) {
+async function setSeed(id, tier, mod, announce = true) {
   const c = coach();
   if (!c || !canEditSeeds()) return;
   const m = mod || myModOf(id) || 'Reg';
   try {
     await saveRanking(id, c.name, tier, m === 'Reg' ? null : m);
+    if (announce) {
+      const name = byId(id)?.[COL.NAME] || `#${id}`;
+      toast(`Saved: ${name} → ${tier}${m !== 'Reg' ? ' ' + m : ''}`, 'Your ranking is updated');
+    }
   } catch (err) {
     toast('Could not save that seed', err.message);
   }
@@ -648,7 +689,7 @@ async function cycleMod(id) {
   const cur = MOD_CYCLE.indexOf(myModOf(id) || 'Reg');
   const next = MOD_CYCLE[(cur + 1) % MOD_CYCLE.length];
   const before = tierOf(id);
-  await setSeed(id, tier, next);
+  await setSeed(id, tier, next, false);
   const after = tierOf(id);
   if (after !== before && after != null) {
     // A real column change is worth breaking the pin early for — the coach
@@ -657,6 +698,8 @@ async function cycleMod(id) {
     clearTimeout(pinTimers.get(id)?.timer);
     pinTimers.delete(id);
     toast(`${byId(id)?.[COL.NAME]} moved to column ${after}`, next);
+  } else {
+    toast(`Saved: ${byId(id)?.[COL.NAME] || id} → ${tier} ${next}`, 'Your ranking is updated');
   }
 }
 
@@ -1229,6 +1272,9 @@ function wireStatic() {
   ['names', 'photos', 'split'].forEach(k =>
     el('view-' + k).addEventListener('click', () => setView(k)));
 
+  ['composite', 'personal'].forEach(m =>
+    el('pmode-' + m).addEventListener('click', () => setPoolMode(m)));
+
   window.addEventListener('resize', renderArrows);
 }
 
@@ -1240,6 +1286,19 @@ function setView(v) {
   document.body.classList.toggle('view-split', v === 'split');
   photoMode = v === 'photos';
   poolPhotos = v === 'photos' || v === 'split';
+  render();
+}
+
+function setPoolMode(m) {
+  poolMode = m;
+  ['composite', 'personal'].forEach(k =>
+    el('pmode-' + k).setAttribute('aria-pressed', String(k === m)));
+  // Switching modes changes which seed places each card, so any tier
+  // pinned under the old mode is stale — drop the holds instead of
+  // carrying a composite-mode snapshot into personal mode or vice versa.
+  pinnedSort.clear();
+  pinTimers.forEach(t => clearTimeout(t.timer));
+  pinTimers.clear();
   render();
 }
 
