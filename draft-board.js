@@ -414,7 +414,13 @@ function renderBoard(np) {
       `<span class="cname">${escHtml(c.name)}</span>` +
       `<button class="rm" title="Remove ${escHtml(c.name)}" aria-label="Remove ${escHtml(c.name)}">✕</button>`;
     if (!isLive && coach()) {
-      cell.querySelector('.grip').addEventListener('pointerdown', e => startCoachDrag(e, ci));
+      // The grip icon alone was too small a target to reliably grab —
+      // the whole cell is now the drag handle, except the remove button
+      // (which needs its own click, not a drag start).
+      cell.addEventListener('pointerdown', e => {
+        if (e.target.closest('.rm')) return;
+        startCoachDrag(e, ci);
+      });
     }
     cell.querySelector('.rm').addEventListener('click', () => removeCoach(ci));
     g.appendChild(cell);

@@ -4628,6 +4628,8 @@ body.is-live .live-toggle .switch::after { transform: translateX(18px); backgrou
 .spot-head.next-col { background: #c4564a; }
 
 .coach-cell { display: flex; align-items: center; gap: 7px; background: #1c5a80; color: #fff; border-radius: 4px; padding: 0 8px 0 5px; min-height: 34px; font-weight: 600; font-size: 0.82rem; }
+body:not(.is-live) .coach-cell { cursor: grab; }
+body:not(.is-live) .coach-cell.dragging { cursor: grabbing; }
 .coach-cell .seq { font-size: 0.9rem; font-weight: 700; opacity: 0.75; min-width: 15px; text-align: right; font-variant-numeric: tabular-nums; }
 .coach-cell .cname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .coach-cell .grip { cursor: grab; opacity: 0.55; font-size: 0.85rem; line-height: 1; padding: 3px 1px; background: none; border: 0; color: inherit; }
