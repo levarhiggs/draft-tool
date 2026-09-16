@@ -4622,6 +4622,23 @@ body.is-live .live-toggle .switch::after { transform: translateX(18px); backgrou
 .pmode-btn[aria-pressed="true"] { background: var(--clr-accent); border-color: var(--clr-accent); color: #fff; }
 .panel-body { padding: 14px 16px 18px; overflow-x: auto; }
 
+/* The pool panel's own body is what actually scrolls vertically once the
+   list of players runs long (overflow-x:auto above forces overflow-y:auto
+   too, per the CSS spec) — so the seed-entry inputs and column-number
+   headers stick to the TOP OF THAT BOX, not the viewport. .panel's
+   overflow:hidden (there to clip the rounded corners) would otherwise clip
+   position:sticky right along with everything else, so it's relaxed just
+   for this one panel; the inner padding already keeps content clear of the
+   corners without it. */
+.pool-panel { overflow: visible; }
+.pool-panel .panel-body { max-height: 78vh; overflow-y: auto; }
+#pool-entry, #pool-head {
+  position: sticky; z-index: 5;
+  background: var(--clr-card); padding-top: 2px;
+}
+#pool-entry { top: 0; margin-bottom: 0; padding-bottom: 9px; }
+#pool-head { top: var(--pool-entry-h, 33px); padding-bottom: 5px; box-shadow: 0 2px 0 var(--clr-border); }
+
 .board { min-width: 860px; }
 .board-grid { display: grid; grid-template-columns: 190px repeat(8, minmax(74px, 1fr)); gap: 4px; }
 .spot-head { background: #1c5a80; color: #fff; text-align: center; font-size: 1.05rem; font-weight: 700; padding: 5px 0; border-radius: 4px; font-variant-numeric: tabular-nums; }

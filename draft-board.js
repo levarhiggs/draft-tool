@@ -595,6 +595,10 @@ function renderPool() {
     }
     grid.appendChild(col);
   }
+
+  // #pool-entry's height just changed (it was rebuilt above) — #pool-head's
+  // sticky offset needs to track it or the two rows overlap.
+  updateStickyOffset();
 }
 
 function poolCard(p, placed) {
@@ -1291,16 +1295,28 @@ function wireStatic() {
 }
 
 /**
- * The site header is position:sticky at the very top; the mode/view topbar
- * below it also needs to stick, but right underneath the header rather than
- * under it. The header wraps to a taller two-line layout on narrow screens
- * (see the header h1 media query in style.css), so its height isn't a fixed
- * number — measure it and hand the topbar's sticky offset a CSS variable
- * instead of guessing a pixel value that would drift out of sync.
+ * Three layers stack on top of each other while scrolling: the site header,
+ * the mode/view topbar right under it, and (further down the page) the pool's
+ * seed-entry row + column headers right under THAT. Each needs to know the
+ * combined height of everything sticky above it. None of these have a fixed
+ * pixel height — the header wraps to two lines on narrow screens, and the
+ * topbar wraps too — so measure them instead of guessing an offset that
+ * would drift out of sync the next time either one's content changes.
  */
 function updateStickyOffset() {
   const header = document.querySelector('header');
-  if (header) document.documentElement.style.setProperty('--header-h', `${header.offsetHeight}px`);
+  const topbar = document.querySelector('.db-topbar');
+  const headerH = header ? header.offsetHeight : 0;
+  const topbarH = topbar ? topbar.offsetHeight : 0;
+  document.documentElement.style.setProperty('--header-h', `${headerH}px`);
+  document.documentElement.style.setProperty('--pool-sticky-top', `${headerH + topbarH}px`);
+
+  // #pool-entry and #pool-head both stick to the top of the pool's own
+  // scrollbox (see .pool-panel .panel-body in style.css) — they'd land on
+  // top of each other at top:0 unless #pool-head is pushed down by exactly
+  // #pool-entry's rendered height, which isn't a fixed number.
+  const entry = el('pool-entry');
+  if (entry) document.documentElement.style.setProperty('--pool-entry-h', `${entry.offsetHeight}px`);
 }
 
 function setView(v) {
