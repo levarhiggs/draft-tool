@@ -63,15 +63,14 @@
         <div class="filter-row">
           <span class="bar-label">Filter:</span>
           <!-- TEMPORARY (Fall 2026 draft only): filters to players who missed
-               tryouts. Public, unlike the admin "No Shows" chip below it.
-               Remove this button, its handler in app.js, and the
-               .filter-notryout CSS once the draft is done. -->
+               tryouts. Replaced the admin-only "No Shows" chip, which filtered
+               the same players off a manually-set flag. Remove this button, its
+               handler in app.js, and the .filter-notryout CSS after the draft. -->
           <button class="filter-chip filter-notryout" id="filter-notryout">✕ No Tryout</button>
           <!-- PRE-DRAFT (Fall 2026): stands in for the Team filter until teams
                exist. Remove with the Seed/Team rows below after the draft. -->
           <button class="filter-chip filter-hasvideo" id="filter-hasvideo">▶ Has Video</button>
           <button class="filter-chip filter-fav" id="filter-favorites">♥ Favorites</button>
-          <button class="filter-chip filter-noshow hidden" id="filter-noshows">✕ No Shows</button>
           <div id="filter-grades" class="filter-group"></div>
         </div>
         <!-- PRE-DRAFT (Fall 2026): no teams until the draft, and no seeds until

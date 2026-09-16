@@ -25,7 +25,6 @@ const activeFilters = {
   seeds:     new Set(),   // floor integers 1–8
   teams:     new Set(),   // team name strings
   favorites: false,       // boolean toggle
-  noShows:   false,       // boolean toggle (admin-marked no-show flag)
   noTryout:  false,       // TEMPORARY (Fall 2026 draft): missed tryouts
   hasVideo:  false,       // PRE-DRAFT (Fall 2026): has a tryout video
 };
@@ -195,12 +194,10 @@ function applyFilters(players) {
     // Favorites filter
     if (activeFilters.favorites && !favorites.has(String(p[COL.ID]))) return false;
 
-    // No-show filter (admin-marked)
-    if (activeFilters.noShows && !p._noShow) return false;
-
-    // TEMPORARY (Fall 2026 draft): missed-tryout filter. Distinct from the
-    // admin no-show flag above -- this is attendance, derived from whether a
-    // tryout photo was captured. Remove with the chip after the draft.
+    // TEMPORARY (Fall 2026 draft): missed-tryout filter. Replaced the old
+    // admin-only "No Shows" chip -- this is attendance, derived from whether
+    // a tryout photo was captured, rather than a hand-set flag. Remove with
+    // the chip after the draft.
     if (activeFilters.noTryout && !MISSED_TRYOUT.has(String(p[COL.ID]))) return false;
 
     // PRE-DRAFT (Fall 2026): has-video filter. Checks the known list first,
@@ -396,7 +393,7 @@ function playerCardHTML(p, isLoggedIn) {
   // that only repeated what the card already showed.
   const card = isLoggedIn
     ? `<a class="player-card" href="player.html?id=${encodeURIComponent(id)}">${cardInner}</a>`
-    : `<div class="player-card${video ? '' : ' no-video'}" data-action="open-video"
+    : `<div class="player-card${video ? '' : ' pc-novideo'}" data-action="open-video"
             data-id="${escHtml(id)}" role="button" tabindex="0">${cardInner}</div>`;
 
   return `
@@ -452,30 +449,9 @@ function setupControls() {
     renderGrid();
   });
 
-  // No-shows toggle (coach only)
-  document.getElementById('filter-noshows')?.addEventListener('click', e => {
-    activeFilters.noShows = !activeFilters.noShows;
-    e.currentTarget.classList.toggle('active', activeFilters.noShows);
-    renderGrid();
-  });
-
-  // Show/hide no-shows button based on login state
-  updateNoShowButtonVisibility();
-  document.addEventListener('coachChanged', () => {
-    updateNoShowButtonVisibility();
-    renderGrid();
-  });
-}
-
-function updateNoShowButtonVisibility() {
-  const btn = document.getElementById('filter-noshows');
-  if (!btn) return;
-  const coach = getCurrentCoach();
-  btn.classList.toggle('hidden', !coach);
-  if (!coach) {
-    activeFilters.noShows = false;
-    btn.classList.remove('active');
-  }
+  // Cards swap between a link (coach) and a tap-to-play div (public), so a
+  // login change has to re-render the grid.
+  document.addEventListener('coachChanged', () => renderGrid());
 }
 
 function buildFilterChips() {
