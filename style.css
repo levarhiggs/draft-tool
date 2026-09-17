@@ -4787,6 +4787,41 @@ body.view-tall .slot-input { min-height: 70px; font-size: 1rem; }
 body.view-tall .pool-grid, body.view-split .pool-grid { grid-template-columns: repeat(8, minmax(104px, 1fr)); }
 .p-card.is-drafted .card-ava-tall { aspect-ratio: auto; height: 26px; font-size: 0.65rem; opacity: 0.5; }
 
+/* ── Draft board player lightbox ──────────────────────────────────────────
+   Tap a drafted tile to see that player's face at full size. The board's
+   own avatars are 38px, which is fine for scanning and useless for actually
+   looking at someone. */
+#db-lightbox {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 24px;
+}
+#db-lightbox.hidden { display: none; }
+#db-lightbox img {
+  max-width: 88vw; max-height: 82vh;
+  border-radius: 12px; object-fit: contain;
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.7);
+}
+#db-lightbox-caption {
+  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7); color: #fff;
+  padding: 8px 20px; border-radius: 20px;
+  font-size: 0.9rem; font-weight: 600; pointer-events: none;
+  max-width: 90vw; text-align: center;
+}
+#db-lightbox-close {
+  position: fixed; top: 18px; right: 20px;
+  background: rgba(0, 0, 0, 0.55); color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 50%;
+  width: 38px; height: 38px; font-size: 1rem; cursor: pointer; line-height: 1;
+}
+#db-lightbox-close:hover { background: rgba(0, 0, 0, 0.8); }
+/* A filled tile is clickable even when the board is locked, so say so —
+   the grab cursor only applies when it can actually be dragged. */
+.slot.filled { cursor: pointer; }
+body:not(.draft-final) .slot.filled { cursor: grab; }
+
 #toast {
   position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 14px);
   background: var(--clr-card); border: 1px solid var(--clr-accent); border-left: 3px solid var(--clr-accent);

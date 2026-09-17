@@ -156,6 +156,14 @@
 
   <div id="toast" role="status" aria-live="polite"></div>
 
+  <!-- Player photo lightbox — click any drafted tile to see the face big.
+       Same shape as the one on draft-results.html. -->
+  <div id="db-lightbox" class="hidden" role="dialog" aria-modal="true" aria-label="Player photo">
+    <button id="db-lightbox-close" aria-label="Close">✕</button>
+    <img id="db-lightbox-img" src="" alt="" />
+    <div id="db-lightbox-caption"></div>
+  </div>
+
   <!-- Generic dialog -->
   <div class="modal-overlay hidden" id="scrim">
     <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="dlg-title">

@@ -63,6 +63,9 @@ let photoMode = false, poolPhotos = false;
 let focusKey = '', wantFocus = false;
 let editing = false;
 let saveTimer = null;
+// Set while a drag that actually moved is finishing, so the click that
+// follows a pointerup doesn't also open the player photo.
+let suppressClick = false;
 
 /**
  * 'composite' — read-only for everyone, always. Shows the group's average;
@@ -510,12 +513,19 @@ function renderBoard(np) {
             `<span class="pname">${escHtml(firstName)}</span>` +
             `<span class="picknum">${pickNumber(ci, s)}</span>`;
         slot.title = canEdit()
-          ? `${p ? p[COL.NAME] : pid} — double-click to send back to the pool`
-          : (p ? p[COL.NAME] : pid);
+          ? `${p ? p[COL.NAME] : pid} — click for photo, double-click to send back to the pool`
+          : `${p ? p[COL.NAME] : pid} — click for photo`;
         if (canEdit()) {
           slot.addEventListener('dblclick', () => returnToPool(key, pid));
           slot.addEventListener('pointerdown', e => startCardDrag(e, pid, slot, key));
         }
+        // Click opens the photo. suppressClick is set by a drag that actually
+        // moved, so releasing a drag over the original tile doesn't also pop
+        // the lightbox open.
+        slot.addEventListener('click', () => {
+          if (suppressClick) return;
+          openPlayerPhoto(pid);
+        });
       } else if (canEdit()) {
         slot.innerHTML =
           `<input class="slot-input" inputmode="numeric" autocomplete="off" maxlength="3"
@@ -740,6 +750,33 @@ function avatarHTML(p, cls) {
   return `<span class="${cls}" style="background:hsl(${hue} 42% 38%)">${escHtml(initials)}</span>`;
 }
 
+// ── Player photo lightbox ────────────────────────────────────────────────────
+// The board's avatars are 38px. Clicking a drafted tile opens the same photo
+// at full size, so coaches (and anyone watching the projected board) can
+// actually see who a pick is.
+
+/** Drive thumbnails are sized by query param; ask for a big one. */
+function bigPhotoUrl(p) {
+  const url = photoUrl(p);
+  return url ? url.replace(/sz=w\d+/, 'sz=w1200') : null;
+}
+
+function openPlayerPhoto(playerId) {
+  const p = byId(playerId);
+  const url = p ? bigPhotoUrl(p) : null;
+  if (!url) return toast(p ? `No photo for ${p[COL.NAME]}` : `No photo for #${playerId}`);
+  const img = el('db-lightbox-img');
+  img.src = url;
+  img.alt = p[COL.NAME];
+  el('db-lightbox-caption').textContent = `#${playerId} · ${p[COL.NAME]}`;
+  el('db-lightbox').classList.remove('hidden');
+}
+
+function closePlayerPhoto() {
+  el('db-lightbox').classList.add('hidden');
+  el('db-lightbox-img').src = '';   // stop the download if it's still in flight
+}
+
 // ── Seeding ──────────────────────────────────────────────────────────────────
 async function setSeed(id, tier, mod, announce = true) {
   const c = coach();
@@ -871,9 +908,13 @@ function startCardDrag(e, playerId, node, srcKey = null) {
   document.body.appendChild(ghost);
 
   let target = null;
+  // A press that never moves is a click (open the photo), not a drag.
+  const startX = e.clientX, startY = e.clientY;
+  let moved = false;
   const clearHi = () => document.querySelectorAll('.drop-ok').forEach(n => n.classList.remove('drop-ok'));
 
   function move(ev) {
+    if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) > 4) moved = true;
     ghost.style.left = ev.clientX - 40 + 'px';
     ghost.style.top = ev.clientY - 18 + 'px';
     clearHi();
@@ -887,6 +928,12 @@ function startCardDrag(e, playerId, node, srcKey = null) {
     ghost.remove();
     node.classList.remove('dragging');
     clearHi();
+    if (moved) {
+      // Cleared on the next tick — after the click event this pointerup
+      // generates has already been dispatched and ignored.
+      suppressClick = true;
+      setTimeout(() => { suppressClick = false; }, 0);
+    }
     if (!target) return;
 
     const p = byId(playerId);
@@ -1331,6 +1378,12 @@ function wireStatic() {
   el('dlg-cancel').addEventListener('click', () => { const f = dlgCancel; closeDialog(); if (f) f(); });
   el('scrim').addEventListener('click', e => { if (e.target === el('scrim')) closeDialog(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDialog(); });
+
+  // Photo lightbox: click anywhere on it, or Escape, to dismiss.
+  el('db-lightbox').addEventListener('click', closePlayerPhoto);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closePlayerPhoto();
+  });
 
   el('live-btn').addEventListener('click', toggleLive);
   el('add-coach').addEventListener('click', addCoach);
