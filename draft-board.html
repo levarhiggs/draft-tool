@@ -67,6 +67,15 @@
           <button class="btn btn-dark" id="view-photos" aria-pressed="false">Photos</button>
           <button class="btn btn-dark" id="view-split"  aria-pressed="false">Split</button>
         </div>
+        <button class="wheel-trigger" id="wheel-open" title="Random Coach Pick Wheel"
+                aria-label="Open the random coach pick wheel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9"/>
+            <line x1="12" y1="3" x2="12" y2="12"/>
+            <line x1="12" y1="12" x2="18" y2="16"/>
+            <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+          </svg>
+        </button>
         <button class="live-toggle hidden" id="live-btn" aria-pressed="false">
           <span class="dot" aria-hidden="true"></span>
           <span id="live-label">Live Draft Off</span>
@@ -174,6 +183,52 @@
       </div>
     </div>
     <button id="db-lightbox-next" class="db-lightbox-arrow" aria-label="Next player">›</button>
+  </div>
+
+  <!-- Random Coach Pick Wheel — opened from the circular button in the
+       topbar. Pre-populated from coachRows (see draft-board.js), never
+       hardcoded, so it always reflects whoever is actually on this board. -->
+  <div class="wheel-overlay" id="wheel-overlay">
+    <div class="wheel-modal" role="dialog" aria-modal="true" aria-labelledby="wheel-title">
+      <div class="wheel-modal-head">
+        <div>
+          <h2 id="wheel-title">Random Coach Pick</h2>
+          <div class="hint" id="wheel-sub"></div>
+        </div>
+        <button class="wheel-modal-close" id="wheel-close" aria-label="Close">✕</button>
+      </div>
+
+      <div class="wheel-stage" id="wheel-stage">
+        <svg class="wheel-pointer" viewBox="0 0 34 40">
+          <path d="M17 40 L2 10 Q2 0 17 0 Q32 0 32 10 Z" fill="#e35b4f" stroke="#a8352b" stroke-width="1.5"/>
+        </svg>
+        <canvas id="wheel-canvas" width="640" height="640"></canvas>
+        <button class="wheel-hub" id="wheel-hub" aria-label="Spin the wheel">
+          <span class="wheel-hub-ball" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <div class="wheel-controls">
+        <button class="btn btn-dark" id="wheel-spin">Spin the Wheel</button>
+        <div class="wheel-winner empty" id="wheel-winner">Spin to pick a coach</div>
+      </div>
+
+      <div class="wheel-drawn-order hidden" id="wheel-drawn-order">
+        <b>Draw order so far</b>
+        <ol id="wheel-drawn-list"></ol>
+      </div>
+
+      <div class="wheel-names-panel">
+        <div class="wheel-names-head">
+          <span>Coaches on the wheel</span>
+          <div class="wheel-link-group">
+            <button class="link-btn" id="wheel-undo" disabled>Undo</button>
+            <button class="link-btn" id="wheel-reset">Reset wheel</button>
+          </div>
+        </div>
+        <div class="wheel-chip-list" id="wheel-chip-list"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Generic dialog -->

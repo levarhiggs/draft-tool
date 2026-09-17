@@ -1516,6 +1516,8 @@ function wireStatic() {
   el('db-lightbox-close').addEventListener('click', closePlayerPhoto);
   el('db-lightbox-prev').addEventListener('click', () => lightboxStep(-1));
   el('db-lightbox-next').addEventListener('click', () => lightboxStep(1));
+
+  wireWheel();
   wireLightboxVideoBtn();
   document.addEventListener('keydown', e => {
     if (el('db-lightbox').classList.contains('hidden')) return;
@@ -1603,6 +1605,310 @@ function setPoolMode(m) {
   pinTimers.forEach(t => clearTimeout(t.timer));
   pinTimers.clear();
   render();
+}
+
+// ── Random Coach Pick Wheel ──────────────────────────────────────────────────
+// Prototyped and tested as a standalone artifact before wiring in (see
+// _local/ for the design notes). Purely client-side and not persisted to
+// Firestore — it's a lottery aid for the pre-draft lottery step, not part of
+// the board's own state, so nothing here needs to sync between devices.
+// A novelty for this season (the draft it would have run the lottery for
+// already happened) but built for real use in Fall/next season's draft.
+const WHEEL_PALETTE = [
+  '#4f8ef7', '#e35b4f', '#f5a623', '#3ec28f', '#a86bef', '#f2637a',
+  '#33c1c9', '#ff9f5a', '#6b78e8', '#c9d64a', '#f06fb0', '#4fd1e0',
+];
+
+let wheelNames = [];       // [{ name, color, removed }], rebuilt on open
+let wheelRotation = 0;     // radians
+let wheelSpinning = false;
+let wheelDrawOrder = [];
+let wheelRemovalStack = [];   // for Undo — see removeWheelCoach()
+
+function wheelActive() { return wheelNames.filter(n => !n.removed); }
+
+/** Pulled fresh from coachRows every time the wheel opens — never a
+ *  hardcoded roster, so it always reflects who's actually seated on this
+ *  board right now, added/removed coaches included. Admins (the
+ *  commissioner) don't hold a team and aren't lottery candidates. */
+function buildWheelRoster() {
+  const eligible = coachRows.filter(c => !TEAM_ADMINS.includes(c.name));
+  wheelNames = eligible.map((c, i) => ({
+    name: c.name, color: WHEEL_PALETTE[i % WHEEL_PALETTE.length], removed: false,
+  }));
+  wheelRotation = 0;
+  wheelDrawOrder = [];
+  wheelRemovalStack = [];
+}
+
+function removeWheelCoach(name) {
+  const item = wheelNames.find(n => n.name === name && !n.removed);
+  if (!item) return;
+  item.removed = true;
+  wheelRemovalStack.push(name);
+  updateWheelUndoState();
+}
+
+function undoWheelRemoval() {
+  const name = wheelRemovalStack.pop();
+  if (!name) return;
+  const item = wheelNames.find(n => n.name === name && n.removed);
+  if (item) item.removed = false;
+  if (wheelDrawOrder.length && wheelDrawOrder[wheelDrawOrder.length - 1] === name) {
+    wheelDrawOrder.pop();
+  }
+  drawWheelCanvas();
+  renderWheelChips();
+  updateWheelSub();
+  renderWheelDrawOrder();
+  updateWheelUndoState();
+  el('wheel-winner').className = 'wheel-winner empty';
+  el('wheel-winner').textContent = wheelActive().length ? 'Spin to pick a coach' : 'Everyone has been picked';
+  setWheelSpinEnabled(wheelActive().length > 0);
+}
+
+function setWheelSpinEnabled(enabled) {
+  el('wheel-spin').disabled = !enabled;
+  el('wheel-hub').disabled = !enabled;
+}
+
+function updateWheelUndoState() {
+  const btn = el('wheel-undo');
+  btn.disabled = wheelRemovalStack.length === 0;
+  btn.title = wheelRemovalStack.length
+    ? `Bring back ${wheelRemovalStack[wheelRemovalStack.length - 1]}` : '';
+}
+
+function drawWheelCanvas() {
+  const canvas = el('wheel-canvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const cx = w / 2, cy = h / 2, r = w / 2 - 6;
+  ctx.clearRect(0, 0, w, h);
+
+  const active = wheelActive();
+  const n = active.length;
+  if (n === 0) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#3a3f52';
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '600 24px -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Wheel is empty', cx, cy);
+    return;
+  }
+
+  const slice = (Math.PI * 2) / n;
+  active.forEach((item, i) => {
+    const start = wheelRotation + i * slice;
+    const end = start + slice;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, end);
+    ctx.closePath();
+    ctx.fillStyle = item.color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(start + slice / 2);
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff';
+    const fontSize = n > 14 ? 15 : n > 9 ? 18 : 22;
+    ctx.font = `700 ${fontSize}px -apple-system, sans-serif`;
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 3;
+    let label = item.name.replace(/^Coach\s+/, '');
+    const maxChars = n > 14 ? 12 : 16;
+    if (label.length > maxChars) label = label.slice(0, maxChars - 1) + '…';
+    ctx.fillText(label, r - 18, 0);
+    ctx.restore();
+  });
+}
+
+function renderWheelChips() {
+  const list = el('wheel-chip-list');
+  list.innerHTML = '';
+  wheelNames.forEach((item, idx) => {
+    const chip = document.createElement('div');
+    chip.className = 'wheel-chip' + (item.removed ? ' removed' : '');
+    chip.innerHTML =
+      `<span style="width:9px;height:9px;border-radius:50%;background:${item.color};display:inline-block;${item.removed ? 'opacity:.5' : ''}"></span>` +
+      `<span>${escHtml(item.name)}</span>` +
+      (item.removed ? '' : `<button data-idx="${idx}" title="Remove from wheel" aria-label="Remove ${escHtml(item.name)}">✕</button>`);
+    list.appendChild(chip);
+  });
+  list.querySelectorAll('button[data-idx]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      removeWheelCoach(wheelNames[+btn.dataset.idx].name);
+      drawWheelCanvas();
+      renderWheelChips();
+      updateWheelSub();
+    });
+  });
+}
+
+function updateWheelSub() {
+  const n = wheelActive().length;
+  el('wheel-sub').textContent = n === 1 ? '1 coach on the wheel' : `${n} coaches on the wheel`;
+}
+
+function renderWheelDrawOrder() {
+  const box = el('wheel-drawn-order');
+  if (!wheelDrawOrder.length) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  el('wheel-drawn-list').innerHTML = wheelDrawOrder.map(n => `<li>${escHtml(n)}</li>`).join('');
+}
+
+/**
+ * Landing sound — a whole step above openingBell()'s E6/B6/E7 (F#6/C#7) with
+ * a shorter decay (0.55s vs. 1.5s), so the spin's start and end don't blur
+ * into the same sound. openingBell() itself (already in this file, and
+ * already what the pick clock plays on every reset) is reused unchanged for
+ * the start sound rather than duplicating it.
+ */
+function wheelLandingChime() {
+  if (muted) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    [1479.98, 2217.46].forEach((freq, i) => {
+      const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const startAt = audioCtx.currentTime + i * 0.09;
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(0.28, startAt + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.55);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(startAt);
+      osc.stop(startAt + 0.6);
+    });
+  } catch { /* no audio */ }
+}
+
+function easeOutCubicWheel(t) { return 1 - Math.pow(1 - t, 3); }
+
+function spinWheel() {
+  const active = wheelActive();
+  if (wheelSpinning || active.length === 0) return;
+  wheelSpinning = true;
+  setWheelSpinEnabled(false);
+  el('wheel-stage').classList.add('spinning');
+  el('wheel-winner').className = 'wheel-winner empty';
+  el('wheel-winner').textContent = 'Spinning…';
+  openingBell();
+
+  const n = active.length;
+  const slice = (Math.PI * 2) / n;
+  const winnerIndex = Math.floor(Math.random() * n);
+
+  const targetSliceCenter = winnerIndex * slice + slice / 2;
+  const twoPi = Math.PI * 2;
+  const spins = 5 + Math.floor(Math.random() * 3);
+  let finalRotation = (-Math.PI / 2 - targetSliceCenter);
+  finalRotation = ((finalRotation % twoPi) + twoPi) % twoPi;
+  finalRotation += spins * twoPi;
+
+  const duration = 4200 + Math.random() * 600;
+  const start = performance.now();
+  const from = wheelRotation;
+  const to = wheelRotation - (wheelRotation % twoPi) + finalRotation;
+
+  function frame(now) {
+    const t = Math.min(1, (now - start) / duration);
+    wheelRotation = from + (to - from) * easeOutCubicWheel(t);
+    drawWheelCanvas();
+    if (t < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      wheelRotation = to;
+      drawWheelCanvas();
+      finishWheelSpin(active[winnerIndex].name);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function finishWheelSpin(winnerName) {
+  wheelSpinning = false;
+  el('wheel-stage').classList.remove('spinning');
+  wheelLandingChime();
+
+  // Removed the instant they're drawn — no separate "remove" step to skip,
+  // so Undo always has exactly the last spin to reverse and a coach can
+  // never be drawn twice by spinning again without an extra click.
+  wheelDrawOrder.push(winnerName);
+  removeWheelCoach(winnerName);
+  drawWheelCanvas();
+  renderWheelChips();
+  updateWheelSub();
+  renderWheelDrawOrder();
+  setWheelSpinEnabled(wheelActive().length > 0);
+
+  const banner = el('wheel-winner');
+  banner.className = 'wheel-winner';
+  banner.innerHTML =
+    `<div><div class="wheel-winner-label">Selected</div><div class="wheel-winner-name">${escHtml(winnerName)}</div></div>` +
+    `<div class="wheel-winner-actions"><button class="btn btn-dark" id="wheel-spin-again">Spin again</button></div>`;
+  const againBtn = el('wheel-spin-again');
+  if (wheelActive().length === 0) {
+    againBtn.disabled = true;
+    againBtn.title = 'Everyone has been picked';
+  } else {
+    againBtn.addEventListener('click', spinWheel);
+  }
+}
+
+function resetWheel() {
+  buildWheelRoster();
+  el('wheel-winner').className = 'wheel-winner empty';
+  el('wheel-winner').textContent = 'Spin to pick a coach';
+  setWheelSpinEnabled(true);
+  drawWheelCanvas();
+  renderWheelChips();
+  updateWheelSub();
+  renderWheelDrawOrder();
+  updateWheelUndoState();
+}
+
+function openWheel() {
+  buildWheelRoster();
+  el('wheel-overlay').classList.add('open');
+  setWheelSpinEnabled(true);
+  el('wheel-winner').className = 'wheel-winner empty';
+  el('wheel-winner').textContent = 'Spin to pick a coach';
+  drawWheelCanvas();
+  renderWheelChips();
+  updateWheelSub();
+  renderWheelDrawOrder();
+  updateWheelUndoState();
+}
+
+function closeWheel() {
+  el('wheel-overlay').classList.remove('open');
+}
+
+function wireWheel() {
+  el('wheel-open').addEventListener('click', openWheel);
+  el('wheel-close').addEventListener('click', closeWheel);
+  el('wheel-overlay').addEventListener('click', e => {
+    if (e.target === el('wheel-overlay')) closeWheel();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && el('wheel-overlay').classList.contains('open')) closeWheel();
+  });
+  el('wheel-spin').addEventListener('click', spinWheel);
+  el('wheel-hub').addEventListener('click', spinWheel);
+  el('wheel-reset').addEventListener('click', resetWheel);
+  el('wheel-undo').addEventListener('click', undoWheelRemoval);
 }
 
 init();
