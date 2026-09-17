@@ -496,13 +496,18 @@ function renderBoard(np) {
       slot.tabIndex = 0;
 
       if (pid) {
+        // Photo view has the vertical room for a full name and is what the
+        // public sees; Names view packs 8 columns across, so it stays on the
+        // first name to fit.
+        const fullName = p ? p[COL.NAME] : '?';
+        const firstName = p ? p[COL.NAME].split(' ')[0] : '?';
         slot.innerHTML = photoMode
           ? avatarHTML(p, 'slot-ava-tall') +
             `<span class="tall-meta"><span class="pid">${escHtml(pid)}</span>` +
-            `<span class="pname">${escHtml(p ? p[COL.NAME].split(' ')[0] : '?')}</span></span>` +
+            `<span class="pname">${escHtml(fullName)}</span></span>` +
             `<span class="picknum">${pickNumber(ci, s)}</span>`
           : `<span class="pid">${escHtml(pid)}</span>` +
-            `<span class="pname">${escHtml(p ? p[COL.NAME].split(' ')[0] : '?')}</span>` +
+            `<span class="pname">${escHtml(firstName)}</span>` +
             `<span class="picknum">${pickNumber(ci, s)}</span>`;
         slot.title = canEdit()
           ? `${p ? p[COL.NAME] : pid} — double-click to send back to the pool`

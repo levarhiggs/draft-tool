@@ -4775,7 +4775,13 @@ body.view-tall .board-grid .slot { min-height: 78px; flex-direction: row; gap: 6
 body.view-tall .slot.filled { justify-content: flex-start; }
 .slot-ava-tall { width: 38px; aspect-ratio: 0.602; border-radius: 4px; flex-shrink: 0; object-fit: cover; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.65rem; }
 .tall-meta { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.tall-meta .pname { font-size: 0.62rem; color: var(--clr-muted); }
+/* Photo view shows the full name, which rarely fits the narrow column beside
+   the avatar on one line — wrap to a second line instead of ellipsing a
+   surname away, overriding the nowrap that Names view relies on. */
+.tall-meta .pname {
+  font-size: 0.62rem; color: var(--clr-muted);
+  white-space: normal; overflow-wrap: anywhere; text-overflow: clip;
+}
 body.view-tall .slot-input { min-height: 70px; font-size: 1rem; }
 .card-ava-tall { width: 100%; aspect-ratio: 0.602; border-radius: 5px; margin-bottom: 5px; object-fit: cover; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 1.1rem; }
 body.view-tall .pool-grid, body.view-split .pool-grid { grid-template-columns: repeat(8, minmax(104px, 1fr)); }
