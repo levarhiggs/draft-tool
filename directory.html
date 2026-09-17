@@ -47,10 +47,11 @@
         <button class="sort-btn" data-sort="alpha">A – Z</button>
         <button class="sort-btn active" data-sort="id">ID #</button>
         <button class="sort-btn" data-sort="birthday">Age</button>
-        <!-- PRE-DRAFT (Fall 2026): Team and Rank sorts are hidden until the
-             draft assigns teams and coaches submit seeds. "Has Video" takes
-             their place. Restore both after the draft on Tue. -->
         <button class="sort-btn" data-sort="hasvideo">Has Video</button>
+        <!-- Restored after the Fall 2026 draft. Rank sort stays out: it orders
+             by composite, which only two coaches contributed to before draft
+             night, so it would rank most of the roster off one opinion. -->
+        <button class="sort-btn" data-sort="team">Team</button>
       </div>
 
       <!-- Search bar -->
@@ -73,14 +74,18 @@
           <button class="filter-chip filter-fav" id="filter-favorites">♥ Favorites</button>
           <div id="filter-grades" class="filter-group"></div>
         </div>
-        <!-- PRE-DRAFT (Fall 2026): no teams until the draft, and no seeds until
-             coaches submit rankings, so both rows are hidden rather than shown
-             empty. Un-hide after the draft on Tue. -->
+        <!-- Seed stays hidden after the Fall 2026 draft: it filters on the
+             floor of the composite, and composite is an average of the two
+             coaches who ranked before draft night — not a number worth
+             filtering by now that teams are set. -->
         <div class="filter-row hidden">
           <span class="bar-label">Seed:</span>
           <div id="filter-seeds" class="filter-group"></div>
         </div>
-        <div class="filter-row hidden">
+        <!-- Team chips are built from the players' actual assignments
+             (buildTeamChips in app.js), so they track whatever the draft
+             wrote — no coach list to keep in sync here. -->
+        <div class="filter-row">
           <span class="bar-label">Team:</span>
           <div id="filter-teams" class="filter-group"></div>
         </div>
