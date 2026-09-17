@@ -56,80 +56,18 @@
   <main>
     <div class="sched-page">
 
-      <!-- Toolbar -->
-      <div class="sched-toolbar">
-        <label class="rot-team-select-label">
-          Team
-          <select id="sched-team-select">
-            <option value="">All Teams</option>
-          </select>
-        </label>
-
-        <div class="rot-avatar-toggle" role="group" aria-label="View style">
-          <span class="bar-label">View:</span>
-          <button class="avatar-toggle-btn active" data-view="calendar">Calendar</button>
-          <button class="avatar-toggle-btn" data-view="table">Table</button>
-        </div>
-      </div>
-
-      <!-- Direct link to Gameboard's Board view (season standings/rankings)
-           — teams have all started playing, so this gives a one-tap path
-           to "who's winning" without needing to log in or find Gameboard
-           in the side menu. ?view=board forces Board view regardless of
-           login state — a logged-in coach visiting gameboard.html plain
-           would otherwise default straight to Game view (see setView in
-           gameboard.js). -->
-      <div class="sched-rankings-link-row">
-        <a href="gameboard.html?view=board" class="sched-rankings-link">Click here for Rankings</a>
-      </div>
-
-      <!-- Team filter dots: same filter as the dropdown above, just a
-           faster tap target — one dot per team, color-coded, in the same
-           1-12 order as the coaches/teams array. Sits above both the
-           calendar and table views since it drives whichever is showing. -->
-      <div id="sched-team-dots" class="sched-team-dots" role="group" aria-label="Filter by team"></div>
-
-      <div id="sched-empty-state" class="loading">Loading schedule…</div>
-
-      <!-- Table view -->
-      <div id="sched-table-wrap" class="sched-table-wrap hidden">
-        <table class="sched-table">
-          <thead>
-            <tr>
-              <th>Matchup</th>
-              <th>Winner</th>
-              <th>Final Score</th>
-              <th id="sched-th-gamenum">Game #</th>
-              <th>Date</th>
-              <th>Time</th>
-              <th>Last Updated</th>
-            </tr>
-          </thead>
-          <tbody id="sched-table-body"></tbody>
-        </table>
-      </div>
-
-      <!-- Calendar view -->
-      <div id="sched-calendar-wrap" class="sched-calendar-wrap hidden">
-        <div class="sched-cal-nav">
-          <button id="sched-cal-prev" class="btn-secondary" type="button">‹ Prev</button>
-          <div id="sched-cal-month-label" class="sched-cal-month-label"></div>
-          <button id="sched-cal-next" class="btn-secondary" type="button">Next ›</button>
-        </div>
-        <!-- The weekday-labels row lives OUTSIDE the horizontally-scrolling
-             wrapper below, so its position:sticky (pinning it while the page
-             scrolls down) is relative to the real page — not a wrapper with
-             overflow-x set, which forces an implicit overflow-y scroll
-             container too and silently breaks sticky positioning. Its
-             horizontal scroll position is kept in sync with the grid below
-             via a small JS listener (see wireCalendarScrollSync), so columns
-             still stay aligned when swiping sideways on narrow screens. -->
-        <div id="sched-cal-weekdays" class="sched-cal-weekdays">
-          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
-        </div>
-        <div id="sched-cal-scroll" class="sched-cal-scroll">
-          <div id="sched-cal-grid" class="sched-cal-grid"></div>
-        </div>
+      <!-- PENDING (Fall 2026): the schedule sheet and team colors haven't
+           been published yet, and colors are reassigned every season, so
+           there's nothing real to show here until they land. Restore the
+           toolbar/table/calendar markup below (removed 2026-09-17, see git
+           history on this file) once schedule.js has real data to read. -->
+      <div class="season-pending">
+        <div class="season-pending-icon">📅</div>
+        <h2>Schedule Coming Soon</h2>
+        <p>The Fall 2026 game schedule and team colors haven't been published
+           yet. Check back in about a week.</p>
+        <p>In the meantime, see who's on each team on the
+           <a href="draft-results.html">Draft Results</a> page.</p>
       </div>
 
     </div>
@@ -158,30 +96,10 @@
     </div>
   </div>
 
-  <!-- Score entry modal -->
-  <div id="modal-score" class="modal-overlay hidden">
-    <div class="modal-box">
-      <h2>Enter Score</h2>
-      <p id="score-modal-matchup" class="sched-score-matchup"></p>
-      <p id="score-permission-note" class="sched-permission-note hidden">You're not a participant in this game, so the score is view-only — you can still leave a comment below.</p>
-      <label id="score-visitor-label"><span id="score-visitor-label-text">Visitor score</span>
-        <input id="score-visitor-input" type="number" min="0" step="1" inputmode="numeric" />
-      </label>
-      <label id="score-home-label"><span id="score-home-label-text">Home score</span>
-        <input id="score-home-input" type="number" min="0" step="1" inputmode="numeric" />
-      </label>
-      <label id="score-comment-label"><span>Comment (optional)</span>
-        <textarea id="score-comment-input" rows="2" placeholder="e.g. Good game!" maxlength="100"></textarea>
-      </label>
-      <p id="score-error" class="error-msg hidden">Enter both scores.</p>
-      <div class="modal-actions">
-        <button id="btn-score-cancel" class="btn-secondary">Cancel</button>
-        <button id="btn-score-save" class="btn-primary">Save</button>
-      </div>
-    </div>
-  </div>
-
-  <script type="module" src="schedule.js"></script>
+  <!-- schedule.js and its score-entry modal are unloaded for now — the page
+       has nothing left for either to attach to while the schedule is
+       pending (see the season-pending panel above). Restore both alongside
+       the table/calendar markup once there's a real schedule to show. -->
   <script type="module" src="coach-login.js"></script>
   <script type="module" src="side-menu.js"></script>
   <script>
