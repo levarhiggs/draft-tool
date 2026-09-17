@@ -4771,27 +4771,35 @@ body.editing-coaches .coach-cell .grip { display: none; }
 .p-card.is-fav.is-drafted { box-shadow: none; border-color: var(--clr-border); }
 
 /* Photo modes. Portrait matches the 0.602 tryout crop. */
-body.view-tall .board-grid .slot { min-height: 78px; flex-direction: row; gap: 6px; padding: 4px 5px; }
+/* height, not min-height — a fixed row is the whole point (see below), and
+   min-height would let wrapped text push it taller again. */
+body.view-tall .board-grid .slot { height: 51px; flex-direction: row; gap: 6px; padding: 4px 5px; }
 body.view-tall .slot.filled { justify-content: flex-start; }
-/* The photo fills half the cell's width and the cell's full height — cell
-   size never changes, so a taller/narrower crop of the same photo shows
-   instead of the whole portrait; object-fit:cover crops from the bottom
-   since object-position anchors to the top (a face-first crop, not a
-   stretch). flex-basis (not a fixed px width) is what actually makes it
-   scale with the cell instead of sitting at a constant size. */
+/* The photo fills half the cell's width and the cell's full height. The
+   CELL'S height is fixed above — seeing the whole board without scrolling
+   is the actual goal — so a taller photo has to come from a WIDER cell, not
+   a taller one: the cell only grows sideways with the browser window, so a
+   wide desktop view gets a bigger photo for free while portrait mobile does
+   not. object-fit:cover crops from the bottom, since object-position
+   anchors to the top (a face-first crop, not a stretch). flex-basis (not a
+   fixed px width) is what makes the photo scale with the cell at all. */
 .slot-ava-tall {
-  flex: 1 1 50%; align-self: stretch; min-width: 0;
+  flex: 1 1 50%; align-self: stretch; min-width: 0; height: 100%;
   border-radius: 4px; object-fit: cover; object-position: center top;
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 700; font-size: 0.65rem;
 }
-.tall-meta { display: flex; flex-direction: column; flex: 1 1 50%; min-width: 0; line-height: 1.2; }
-/* Photo view shows the full name, which rarely fits the narrow column beside
-   the avatar on one line — wrap to a second line instead of ellipsing a
-   surname away, overriding the nowrap that Names view relies on. */
+.tall-meta {
+  display: flex; flex-direction: column; flex: 1 1 50%; min-width: 0;
+  height: 100%; justify-content: center; line-height: 1.15; overflow: hidden;
+}
+/* The row's height is fixed and short, so the full name can't be allowed to
+   wrap onto a second line the way it could when the row could grow to fit
+   it — clip to one line with an ellipsis instead. The lightbox (opened by
+   clicking the tile) is where the full name actually gets room to breathe. */
 .tall-meta .pname {
-  font-size: 0.62rem; color: var(--clr-muted);
-  white-space: normal; overflow-wrap: anywhere; text-overflow: clip;
+  font-size: 0.6rem; color: var(--clr-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 body.view-tall .slot-input { min-height: 70px; font-size: 1rem; }
 .card-ava-tall { width: 100%; aspect-ratio: 0.602; border-radius: 5px; margin-bottom: 5px; object-fit: cover; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 1.1rem; }

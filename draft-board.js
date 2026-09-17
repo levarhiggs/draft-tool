@@ -31,17 +31,6 @@ const SPOTS = 8, MAX_COACHES = 15;
  */
 const NEW_COACHES = new Map();   // personId -> { personId, name }
 
-/**
- * Players who joined after the roster sheet was published, so fetchPlayers()
- * doesn't return them. Merged into allPlayers at boot (see init) purely so
- * the board can draw a name instead of "?". Delete an entry as soon as the
- * player is added to the sheet — a duplicate id here is ignored, but a stale
- * name would quietly override nothing and mislead whoever reads this next.
- */
-const LATE_ADDITIONS = [
-  { [COL.ID]: '12', [COL.NAME]: 'Levar Higgs' },   // drafted 2026-09-16, pick 1 overall
-];
-
 // ── State ────────────────────────────────────────────────────────────────────
 let allPlayers = [];
 const live = {};          // playerId -> latest Firestore doc (rankings/notes/team)
@@ -233,15 +222,6 @@ async function init() {
   try {
     const [players] = await Promise.all([fetchPlayers(), buildDriveIndex()]);
     allPlayers = players.slice();
-    // Players added after the roster sheet was published aren't in the fetch,
-    // so the board would draw them as "?" — they're real drafted kids, and a
-    // question mark where a name belongs is worse than a hardcoded row.
-    // Remove an entry once it lands in the sheet.
-    LATE_ADDITIONS.forEach(extra => {
-      if (!allPlayers.some(p => String(p[COL.ID]) === String(extra[COL.ID]))) {
-        allPlayers.push(extra);
-      }
-    });
     allPlayers.sort((a, b) => {
       const na = parseFloat(a[COL.ID]), nb = parseFloat(b[COL.ID]);
       return (!isNaN(na) && !isNaN(nb)) ? na - nb : 0;
