@@ -43,7 +43,6 @@ h1{
   font-size:.85rem;font-weight:800;flex-shrink:0;
 }
 .team-name{font-size:1rem;font-weight:700;line-height:1.2}
-.team-pick-count{margin-left:auto;font-size:.72rem;color:var(--muted);white-space:nowrap}
 .player-list{display:grid;grid-template-columns:repeat(4,1fr);gap:0}
 .player-tile{
   display:flex;flex-direction:column;align-items:center;
@@ -51,10 +50,9 @@ h1{
   border-bottom:1px solid var(--border);position:relative;
 }
 .player-tile:nth-child(4n){border-right:none}
-.pick-badge{
-  position:absolute;top:5px;left:5px;
-  font-size:.58rem;font-weight:800;color:var(--muted);line-height:1;
-}
+/* .pick-badge, .player-id and .team-pick-count were dropped with the pick
+   numbers, ids and player counts — this is the parent-facing roster, so it
+   shows who is on a team and not how the draft got there. */
 .player-photo{
   width:76px;height:76px;border-radius:50%;
   object-fit:cover;object-position:center top;
@@ -67,7 +65,6 @@ h1{
   background:var(--border);display:flex;align-items:center;
   justify-content:center;font-size:1.6rem;margin-bottom:6px;flex-shrink:0;
 }
-.player-id{font-size:.6rem;color:var(--muted);font-weight:700;letter-spacing:.04em;line-height:1;margin-bottom:2px}
 .player-name{font-size:.68rem;font-weight:600;text-align:center;line-height:1.25;color:var(--text);word-break:break-word}
 /* lightbox */
 #lightbox{
@@ -383,8 +380,18 @@ async function buildPhotoIndex() {
   sessionStorage.setItem('drivePhotos_26.3', JSON.stringify(photoIndex));
 }
 
+/**
+ * This page is what coaches share with parents, so it shows the roster and
+ * nothing about how the roster came to be: no player ids, no pick numbers,
+ * no seed order. Those are internal draft mechanics and live on the draft
+ * board instead. Players are listed alphabetically by first name, which is
+ * how a parent scans for their kid.
+ */
 function renderTeam(t) {
-  const tiles = t.players.map(p => {
+  const roster = t.players.slice().sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+
+  const tiles = roster.map(p => {
     const entry = photoIndex[p.id];
     const photoHtml = entry
       ? `<img class="player-photo"
@@ -395,9 +402,7 @@ function renderTeam(t) {
       : `<div class="player-photo-placeholder">🏀</div>`;
     return `
       <div class="player-tile">
-        <span class="pick-badge">#${p.pick}</span>
         ${photoHtml}
-        <div class="player-id">${p.id}</div>
         <div class="player-name">${p.name}</div>
       </div>`;
   }).join('');
@@ -407,7 +412,6 @@ function renderTeam(t) {
       <div class="team-header">
         <div class="team-number" style="background:${t.color}20;color:${t.color};border:1.5px solid ${t.color}40">${t.num}</div>
         <div class="team-name">${t.coach}</div>
-        <div class="team-pick-count">${t.players.length} players</div>
       </div>
       <div class="player-list">${tiles}</div>
     </div>`;
