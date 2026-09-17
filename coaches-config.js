@@ -191,19 +191,26 @@ export const TEAM_ADMINS = [
   'Coach Levar',
 ];
 
-// Team names available for assignment
+// Team names available for assignment.
+//
+// Fall 2026, set from the 2026-09-16 draft board — 11 teams, in board order.
+// Ken, Kingston, Micah and Paul coached the draft without app logins, so they
+// have no PERSONS entry; their team names come straight from the board rather
+// than from teamNameFor(), which only resolves people who do. Summer's teams
+// are gone from this list on purpose: it drives the Team Assignment dropdown,
+// and a stale name there is a way to assign a Fall player to a team that no
+// longer exists.
 export const TEAMS = [
-  'Team Humberto',
-  'Team Alex',
-  'Team Jeff',
-  'Team Daven-Josiah',
-  'Team Ben',
-  'Team Tati',
+  'Team Ken',
   'Team Sedat',
-  'Team Andre',
-  'Team Alfred-Levar',
-  'Team Kevin',
-  'Team Mike C.',
-  'Team Chris',
+  'Team Xavier',
+  'Team Mason-Jaylen',
+  'Team Kingston',
+  'Team Craig',
+  'Team Humberto',
+  'Team Micah',
+  'Team Kevin K.',
+  'Team David',
+  'Team Paul',
   'Undrafted',
 ];
