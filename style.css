@@ -4865,12 +4865,9 @@ body.view-tall .pool-grid, body.view-split .pool-grid { grid-template-columns: r
 #db-lightbox-name { font-size: 1.1rem; font-weight: 700; }
 #db-lightbox-sub {
   margin-top: 3px; font-size: 0.85rem; color: rgba(255,255,255,0.75);
-  display: flex; align-items: center; justify-content: center; gap: 5px; flex-wrap: wrap;
 }
-.db-lightbox-swatch {
-  display: inline-block; width: 11px; height: 11px; border-radius: 50%;
-  border: 1px solid rgba(255,255,255,0.4); vertical-align: -1px;
-}
+/* .db-lightbox-swatch (a team-color dot) is unused for now — team name and
+   color are suppressed in draft-board.js until Fall's real colors land. */
 #db-lightbox-close {
   position: fixed; top: 18px; right: 20px; z-index: 2;
   background: rgba(0, 0, 0, 0.55); color: #fff;

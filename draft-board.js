@@ -13,7 +13,7 @@ import { escHtml, COL, photoUrl, videoUrl } from './app.js';
 import { fetchPlayers, buildDriveIndex, SEASON_CODE } from './players-data.js';
 import { getCurrentCoach } from './coach-login.js';
 import {
-  getActiveCoaches, personByName, teamNameFor, TEAM_ADMINS, TEAM_COLORS,
+  getActiveCoaches, personByName, teamNameFor, TEAM_ADMINS,
 } from './coaches-config.js';
 import {
   subscribePlayer, saveRanking, deleteRanking, saveFavorites, getFavorites,
@@ -788,22 +788,17 @@ function showLightboxSlide(personId) {
 
   const rowCoach = coachRows.find(c => c.personId === personId);
   const coachName = rowCoach?.name || '';
-  // teamNameFor() only resolves a person who's in coaches-config.js. Four
-  // Fall coaches ran the draft as board-only seats (no PERSONS entry, no
-  // login) — the published board still has them under their BOARD-* id, so
-  // this falls back to deriving the same "Team {name}" shape teamNameFor()
-  // would have produced, straight from the name already showing on the row.
-  const team = (personId && teamNameFor(personId))
-    || (coachName ? `Team ${coachName.replace(/^(Coach|Director)\s+/, '')}` : '');
-  const colorName = team && TEAM_COLORS[team]?.name;
-  const colorHex = team && TEAM_COLORS[team]?.hex;
 
   el('db-lightbox-name').textContent = p ? p[COL.NAME] : `#${playerId}`;
-  el('db-lightbox-sub').innerHTML =
-    `${escHtml(coachName)}` +
-    (colorName
-      ? ` · <span class="db-lightbox-swatch" style="background:${colorHex}"></span>${escHtml(colorName)}`
-      : team ? ` · ${escHtml(team)}` : '');
+  // Team name and color are suppressed for now: TEAM_COLORS still holds
+  // last season's colors (a fresh set is assigned every season, so Sedat
+  // and Humberto — both returning — would show a color that's simply
+  // wrong), and for every other coach "Team {Name}" directly under a
+  // caption that already says "{Name}" was just the same word twice. Bring
+  // this back once Fall's real colors are assigned; teamNameFor() already
+  // has the fallback for the four board-only coaches worked out (see the
+  // git history on this line) if it's still needed then.
+  el('db-lightbox-sub').textContent = coachName;
 
   // Nothing to step to with just one pick — hide the arrows rather than
   // show a control that would only ever land back on the same player.
