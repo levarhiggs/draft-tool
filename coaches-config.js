@@ -66,6 +66,18 @@ export const PERSONS = [
   { id: 'C019', displayNames: ['Coach Xavier'],        pin: 'xavier'  },  // Xavier Charles
   { id: 'C020', displayNames: ['Coach David'],         pin: 'david'   },  // David Success
   { id: 'C021', displayNames: ['Coach Mason-Jaylen'],  pin: 'mason'   },  // Mason-Jaylen Noel (coaching duo)
+
+  // Added 2026-09-16, the morning after the draft. These four coached the
+  // draft itself without app logins — they were created straight from the
+  // draft board, which needs no PERSONS entry — so the published board
+  // still resolves their names through roster_26.3's `names` map under
+  // BOARD-* ids. Those board ids are deliberately NOT changed to these
+  // C### ids: the board doc is the season's record now, and rewriting its
+  // keys would break the link between a row and the picks under it.
+  { id: 'C022', displayNames: ['Coach Ken'],           pin: 'ken'      },
+  { id: 'C023', displayNames: ['Coach Kingston'],      pin: 'kingston' },
+  { id: 'C024', displayNames: ['Coach Micah'],         pin: 'micah'    },
+  { id: 'C025', displayNames: ['Coach Paul'],          pin: 'paul'     },
 ];
 
 /** Placeholder for an unfilled slot — never assigned, never has a PIN. */
@@ -97,15 +109,32 @@ export const SLOT_ASSIGNMENTS = {
     '26.2.13': 'C013',
   },
 
-  // Fall 2026 roster loaded 2026-09-15 (11 coaches: 3 returning + 8 new).
-  // Slots 12-15 are empty (placeholders, no PIN) — fill with a new or
-  // existing person's C### id if a coach arrives late.
+  // Fall 2026, rewritten 2026-09-16 to match the completed draft: the 11
+  // coaches who actually took a team, in the board's own row order, so slot
+  // number == team number. Slot 1 is the commissioner (C002), who evaluates
+  // but doesn't coach a team.
+  //
+  // Michael (C014), Andrew (C017) and Reshaun (C018) were assigned here
+  // before the draft but didn't end up with teams, so they're unassigned —
+  // that alone removes their login, no flag and no deletion. Their PERSONS
+  // records stay put on purpose: any ranking or note they left is keyed by
+  // display name and still resolves through personByName().
   '26.3': {
-    '26.3.1':  'C002', '26.3.2':  'C007', '26.3.3':  'C011', '26.3.4':  'C014',
-    '26.3.5':  'C015', '26.3.6':  'C016', '26.3.7':  'C017', '26.3.8':  'C018',
-    '26.3.9':  'C019', '26.3.10': 'C020', '26.3.11': 'C021',
-    '26.3.12': 'PLACEHOLDER-12', '26.3.13': 'PLACEHOLDER-13',
-    '26.3.14': 'PLACEHOLDER-14', '26.3.15': 'PLACEHOLDER-15',
+    '26.3.1':  'C002',  // Coach Levar — commissioner, no team
+    '26.3.2':  'C022',  // 1  Coach Ken
+    '26.3.3':  'C011',  // 2  Coach Sedat
+    '26.3.4':  'C019',  // 3  Coach Xavier
+    '26.3.5':  'C021',  // 4  Coach Mason-Jaylen
+    '26.3.6':  'C023',  // 5  Coach Kingston
+    '26.3.7':  'C016',  // 6  Coach Craig
+    '26.3.8':  'C007',  // 7  Coach Humberto
+    '26.3.9':  'C024',  // 8  Coach Micah
+    '26.3.10': 'C015',  // 9  Coach Kevin K.
+    '26.3.11': 'C020',  // 10 Coach David
+    '26.3.12': 'C025',  // 11 Coach Paul
+    '26.3.13': 'PLACEHOLDER-13',
+    '26.3.14': 'PLACEHOLDER-14',
+    '26.3.15': 'PLACEHOLDER-15',
   },
 };
 
