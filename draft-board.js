@@ -67,8 +67,12 @@ const coach = () => getCurrentCoach();
 const isAdmin = () => { const c = coach(); return !!c && TEAM_ADMINS.includes(c.name); };
 const myPersonId = () => coach()?.personId || personByName(coach()?.name)?.id || null;
 
-/** Sandbox = your own board. Live = the commissioner's, read-only unless admin. */
-const canEdit = () => !!coach() && (!isLive || isAdmin());
+/**
+ * Sandbox = your own board. Live = the commissioner's, read-only unless
+ * admin. Finished = the published result, read-only for everyone — it's the
+ * season's record now, and a stray drag shouldn't be able to rewrite it.
+ */
+const canEdit = () => !!coach() && !draftFinished() && (!isLive || isAdmin());
 
 // ── Seeds ────────────────────────────────────────────────────────────────────
 const MOD_OFFSET = { Strong: 0.0, Reg: 0.2, Mid: 0.5, Low: 0.8 };
@@ -242,7 +246,7 @@ async function init() {
       isLive = !!doc?.live;
       if (!settled) { settled = true; firstSnapshot(); return; }
       if (isLive !== wasLive) await switchMode();
-      else if (isLive) { adoptBoard(); render(); }
+      else if (isLive || draftFinished()) { adoptBoard(); render(); }
       else render();
     });
 
@@ -306,9 +310,21 @@ function seatedCoaches() {
     .map(r => ({ personId: r.personId, name: r.name }));
 }
 
+/**
+ * True once a draft has been run to completion and switched off. The board
+ * then stops being a private sandbox and becomes the season's published
+ * result: the same rows and picks for everyone, logged in or not.
+ */
+const draftFinished = () => !isLive && !!board?.endedAt && !!board?.slots
+  && Object.keys(board.slots).length > 0;
+
 /** Point `slots`/`coachRows` at whichever board this mode should render. */
 async function switchMode() {
   if (isLive) { adoptBoard(); render(); return; }
+  // A finished draft outranks the sandbox — nobody wants to reopen the app
+  // after the draft and find their own pre-draft practice board where the
+  // real results should be. adoptBoard() already renders the shared doc.
+  if (draftFinished()) { adoptBoard(); render(); return; }
   const pid = myPersonId();
   sandbox = pid ? await getSandbox(pid) : null;
 
@@ -347,27 +363,38 @@ function render() {
   const c = coach();
   document.body.classList.toggle('is-live', isLive);
   document.body.classList.toggle('editing-coaches', editing);
+  document.body.classList.toggle('draft-final', draftFinished());
 
-  el('mode-chip').textContent = isLive ? 'LIVE DRAFT' : 'Sandbox';
+  const done = draftFinished();
+
+  // The pool is a ranking tool — it's for coaches, and it's meaningless once
+  // the draft is over. Hidden (never removed) so logging in brings it back.
+  el('pool-panel').classList.toggle('hidden', !c);
+
+  el('mode-chip').textContent = isLive ? 'LIVE DRAFT' : done ? 'FINAL' : 'Sandbox';
   el('mode-chip').classList.toggle('live', isLive);
-  el('db-mode-note').textContent = !c
-    ? 'Log in as a coach to use the board.'
-    : isLive
-      ? (isAdmin()
-          ? 'You are running the live draft. Every coach sees this board.'
-          : 'Live draft in progress — following the commissioner’s board.')
-      : 'Sandbox — this board is yours alone. Nothing here affects anyone else.';
+  el('db-mode-note').textContent = isLive
+    ? (isAdmin()
+        ? 'You are running the live draft. Every coach sees this board.'
+        : 'Live draft in progress — following the commissioner’s board.')
+    : done
+      ? 'Final draft results — Fall 2026.'
+      : !c
+        ? 'Log in as a coach to use the board.'
+        : 'Sandbox — this board is yours alone. Nothing here affects anyone else.';
 
   el('live-btn').classList.toggle('hidden', !isAdmin());
   el('live-btn').setAttribute('aria-pressed', String(isLive));
   el('live-label').textContent = isLive ? 'Live Draft On' : 'Live Draft Off';
-  el('edit-coaches').classList.toggle('hidden', !isAdmin() || isLive);
-  el('add-coach').classList.toggle('hidden', !isAdmin() || isLive);
+  el('edit-coaches').classList.toggle('hidden', !isAdmin() || isLive || done);
+  el('add-coach').classList.toggle('hidden', !isAdmin() || isLive || done);
   el('coach-hint').textContent = isLive
     ? 'Coach list is locked while the draft is live'
-    : isAdmin()
-      ? `${coachRows.length} of ${MAX_COACHES} coach slots used · drag ⣿ to reorder`
-      : (c ? 'Drag ⣿ to reorder your own view' : '');
+    : done
+      ? `${coachRows.length} teams · team number is the row number`
+      : isAdmin()
+        ? `${coachRows.length} of ${MAX_COACHES} coach slots used · drag a row to reorder`
+        : (c ? 'Drag a row to reorder your own view' : '');
 
   el('pool-sub').textContent =
     'Seed placement based on average of all submitted coach rankings. ' +
@@ -413,7 +440,7 @@ function renderBoard(np) {
       `<span class="seq">${ci + 1}</span>` +
       `<span class="cname">${escHtml(c.name)}</span>` +
       `<button class="rm" title="Remove ${escHtml(c.name)}" aria-label="Remove ${escHtml(c.name)}">✕</button>`;
-    if (!isLive && coach()) {
+    if (!isLive && !draftFinished() && coach()) {
       // The grip icon alone was too small a target to reliably grab —
       // the whole cell is now the drag handle, except the remove button
       // (which needs its own click, not a drag start).
@@ -445,7 +472,9 @@ function renderBoard(np) {
           : `<span class="pid">${escHtml(pid)}</span>` +
             `<span class="pname">${escHtml(p ? p[COL.NAME].split(' ')[0] : '?')}</span>` +
             `<span class="picknum">${pickNumber(ci, s)}</span>`;
-        slot.title = `${p ? p[COL.NAME] : pid} — double-click to send back to the pool`;
+        slot.title = canEdit()
+          ? `${p ? p[COL.NAME] : pid} — double-click to send back to the pool`
+          : (p ? p[COL.NAME] : pid);
         if (canEdit()) {
           slot.addEventListener('dblclick', () => returnToPool(key, pid));
           slot.addEventListener('pointerdown', e => startCardDrag(e, pid, slot, key));
@@ -501,6 +530,9 @@ function renderUnranked() {
   const track = el('unranked-track');
   const shell = el('unranked-shell');
   track.innerHTML = '';
+  // Logged out, there's no "your ranking" for an unranked player to be
+  // missing from — the strip is a ranking tool, so it isn't shown at all.
+  if (!coach()) { shell.classList.add('hidden'); return; }
   const placed = placedIds();
   const list = allPlayers.filter(p => {
     const id = String(p[COL.ID]);

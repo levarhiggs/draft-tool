@@ -4652,6 +4652,14 @@ body:not(.is-live) .coach-cell.dragging { cursor: grabbing; }
 .coach-cell .grip { cursor: grab; opacity: 0.55; font-size: 0.85rem; line-height: 1; padding: 3px 1px; background: none; border: 0; color: inherit; }
 .coach-cell .grip:hover { opacity: 1; }
 body.is-live .coach-cell .grip { display: none; }
+/* Finished draft: the board is the published record, so drop every
+   affordance that implies it can still be rearranged. Listed after the
+   cursor:grab rules above so these win on source order. */
+body.draft-final .coach-cell .grip,
+body.draft-final .coach-cell .rm { display: none; }
+body.draft-final .coach-cell,
+body.draft-final .slot,
+body.draft-final .slot.filled { cursor: default; }
 .coach-cell .rm { display: none; background: none; border: 0; color: #ffd9d4; cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 3px; }
 body.editing-coaches .coach-cell .rm { display: block; }
 body.editing-coaches .coach-cell .grip { display: none; }
