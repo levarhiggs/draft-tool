@@ -31,6 +31,17 @@ const SPOTS = 8, MAX_COACHES = 15;
  */
 const NEW_COACHES = new Map();   // personId -> { personId, name }
 
+/**
+ * Players who joined after the roster sheet was published, so fetchPlayers()
+ * doesn't return them. Merged into allPlayers at boot (see init) purely so
+ * the board can draw a name instead of "?". Delete an entry as soon as the
+ * player is added to the sheet — a duplicate id here is ignored, but a stale
+ * name would quietly override nothing and mislead whoever reads this next.
+ */
+const LATE_ADDITIONS = [
+  { [COL.ID]: '12', [COL.NAME]: 'Levar Higgs' },   // drafted 2026-09-16, pick 1 overall
+];
+
 // ── State ────────────────────────────────────────────────────────────────────
 let allPlayers = [];
 const live = {};          // playerId -> latest Firestore doc (rankings/notes/team)
@@ -218,7 +229,17 @@ function persist() {
 async function init() {
   try {
     const [players] = await Promise.all([fetchPlayers(), buildDriveIndex()]);
-    allPlayers = players.slice().sort((a, b) => {
+    allPlayers = players.slice();
+    // Players added after the roster sheet was published aren't in the fetch,
+    // so the board would draw them as "?" — they're real drafted kids, and a
+    // question mark where a name belongs is worse than a hardcoded row.
+    // Remove an entry once it lands in the sheet.
+    LATE_ADDITIONS.forEach(extra => {
+      if (!allPlayers.some(p => String(p[COL.ID]) === String(extra[COL.ID]))) {
+        allPlayers.push(extra);
+      }
+    });
+    allPlayers.sort((a, b) => {
       const na = parseFloat(a[COL.ID]), nb = parseFloat(b[COL.ID]);
       return (!isNaN(na) && !isNaN(nb)) ? na - nb : 0;
     });
@@ -275,11 +296,19 @@ async function init() {
     el('db-loading').classList.add('hidden');
     el('db-content').classList.remove('hidden');
     wireStatic();
+    // Public view opens on Photos: a visitor is here to see who went where,
+    // and faces read faster than a grid of names. Coaches keep Names, which
+    // fits more on screen while working. setView() renders, so this runs
+    // before the render() below rather than fighting it.
+    setView(coach() ? 'names' : 'photos');
     render();
 
     document.addEventListener('coachChanged', async () => {
       const cc = coach();
       favorites = cc ? new Set(await getFavorites(cc.name).catch(() => [])) : new Set();
+      // Logging out of Split would leave the view stuck on a button that's
+      // no longer there to switch away from.
+      if (!cc && view === 'split') setView('photos');
       await switchMode();
       render();
     });
@@ -370,6 +399,9 @@ function render() {
   // The pool is a ranking tool — it's for coaches, and it's meaningless once
   // the draft is over. Hidden (never removed) so logging in brings it back.
   el('pool-panel').classList.toggle('hidden', !c);
+  // Split exists to show the board and the pool together; with the pool
+  // hidden it's just Photos with extra steps, so it goes too.
+  el('view-split').classList.toggle('hidden', !c);
 
   el('mode-chip').textContent = isLive ? 'LIVE DRAFT' : done ? 'FINAL' : 'Sandbox';
   el('mode-chip').classList.toggle('live', isLive);
