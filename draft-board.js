@@ -13,7 +13,7 @@ import { escHtml, COL, photoUrl } from './app.js';
 import { fetchPlayers, buildDriveIndex, SEASON_CODE } from './players-data.js';
 import { getCurrentCoach } from './coach-login.js';
 import {
-  getActiveCoaches, personByName, teamNameFor, TEAM_ADMINS,
+  getActiveCoaches, personByName, teamNameFor, TEAM_ADMINS, TEAM_COLORS,
 } from './coaches-config.js';
 import {
   subscribePlayer, saveRanking, deleteRanking, saveFavorites, getFavorites,
@@ -524,7 +524,7 @@ function renderBoard(np) {
         // the lightbox open.
         slot.addEventListener('click', () => {
           if (suppressClick) return;
-          openPlayerPhoto(pid);
+          openPlayerPhoto(c.personId, s);
         });
       } else if (canEdit()) {
         slot.innerHTML =
@@ -751,9 +751,9 @@ function avatarHTML(p, cls) {
 }
 
 // ── Player photo lightbox ────────────────────────────────────────────────────
-// The board's avatars are 38px. Clicking a drafted tile opens the same photo
-// at full size, so coaches (and anyone watching the projected board) can
-// actually see who a pick is.
+// The board's avatars are small. Clicking a drafted tile opens the same
+// photo at full size, with the rest of that coach's roster one arrow-key or
+// swipe away — walking seed order (spot 1..8), wrapping at the ends.
 
 /** Drive thumbnails are sized by query param; ask for a big one. */
 function bigPhotoUrl(p) {
@@ -761,20 +761,130 @@ function bigPhotoUrl(p) {
   return url ? url.replace(/sz=w\d+/, 'sz=w1200') : null;
 }
 
-function openPlayerPhoto(playerId) {
+// The roster currently open in the lightbox: [{ playerId, spotIdx }, ...] in
+// seed order, plus where in it we are. null when the lightbox is closed.
+let lbRoster = null;
+let lbIndex = -1;
+
+function openPlayerPhoto(personId, spotIdx) {
+  const roster = [];
+  for (let s = 0; s < SPOTS; s++) {
+    const pid = slots[`${personId}:${s}`];
+    if (pid) roster.push({ playerId: pid, spotIdx: s });
+  }
+  const idx = roster.findIndex(r => r.spotIdx === spotIdx);
+  lbRoster = roster;
+  lbIndex = idx === -1 ? 0 : idx;
+  showLightboxSlide(personId);
+}
+
+/** Re-render the lightbox for whatever lbIndex now points at. */
+function showLightboxSlide(personId) {
+  if (!lbRoster || !lbRoster.length) return;
+  const { playerId } = lbRoster[lbIndex];
   const p = byId(playerId);
-  const url = p ? bigPhotoUrl(p) : null;
-  if (!url) return toast(p ? `No photo for ${p[COL.NAME]}` : `No photo for #${playerId}`);
   const img = el('db-lightbox-img');
-  img.src = url;
-  img.alt = p[COL.NAME];
-  el('db-lightbox-caption').textContent = `#${playerId} · ${p[COL.NAME]}`;
+  const url = p ? bigPhotoUrl(p) : null;
+  if (url) {
+    img.src = url;
+    img.alt = p[COL.NAME];
+    img.classList.remove('no-photo');
+  } else {
+    img.src = '';
+    img.alt = '';
+    img.classList.add('no-photo');   // CSS shows a placeholder instead of a broken image
+  }
+
+  const rowCoach = coachRows.find(c => c.personId === personId);
+  const coachName = rowCoach?.name || '';
+  // teamNameFor() only resolves a person who's in coaches-config.js. Four
+  // Fall coaches ran the draft as board-only seats (no PERSONS entry, no
+  // login) — the published board still has them under their BOARD-* id, so
+  // this falls back to deriving the same "Team {name}" shape teamNameFor()
+  // would have produced, straight from the name already showing on the row.
+  const team = (personId && teamNameFor(personId))
+    || (coachName ? `Team ${coachName.replace(/^(Coach|Director)\s+/, '')}` : '');
+  const colorName = team && TEAM_COLORS[team]?.name;
+  const colorHex = team && TEAM_COLORS[team]?.hex;
+
+  el('db-lightbox-name').textContent = p ? p[COL.NAME] : `#${playerId}`;
+  el('db-lightbox-sub').innerHTML =
+    `${escHtml(coachName)}` +
+    (colorName
+      ? ` · <span class="db-lightbox-swatch" style="background:${colorHex}"></span>${escHtml(colorName)}`
+      : team ? ` · ${escHtml(team)}` : '');
+
+  // Nothing to step to with just one pick — hide the arrows rather than
+  // show a control that would only ever land back on the same player.
+  const canStep = lbRoster.length > 1;
+  el('db-lightbox-prev').classList.toggle('hidden', !canStep);
+  el('db-lightbox-next').classList.toggle('hidden', !canStep);
+
   el('db-lightbox').classList.remove('hidden');
+  el('db-lightbox').dataset.personId = personId;
+}
+
+function lightboxStep(dir) {
+  if (!lbRoster || lbRoster.length < 2) return;
+  lbIndex = (lbIndex + dir + lbRoster.length) % lbRoster.length;
+  showLightboxSlide(el('db-lightbox').dataset.personId);
 }
 
 function closePlayerPhoto() {
   el('db-lightbox').classList.add('hidden');
   el('db-lightbox-img').src = '';   // stop the download if it's still in flight
+  lbRoster = null;
+  lbIndex = -1;
+}
+
+/**
+ * Swipe left/right on the lightbox to step through the roster, same as the
+ * arrow keys. The frame follows the finger while dragging, then either
+ * completes the step (past a distance threshold or a fast flick) or springs
+ * back — Pointer Events, matching the drag handling used elsewhere on this
+ * board rather than native HTML5 DnD, which doesn't track touch reliably.
+ */
+function wireLightboxSwipe() {
+  const frame = el('db-lightbox-frame');
+  let startX = 0, startT = 0, dx = 0, dragging = false;
+
+  frame.addEventListener('pointerdown', e => {
+    if (!lbRoster || lbRoster.length < 2) return;
+    dragging = true;
+    startX = e.clientX;
+    startT = Date.now();
+    frame.classList.remove('sliding');
+    frame.setPointerCapture(e.pointerId);
+  });
+  frame.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    dx = e.clientX - startX;
+    frame.style.transform = `translateX(${dx}px)`;
+  });
+  function release(e) {
+    if (!dragging) return;
+    dragging = false;
+    const elapsed = Date.now() - startT;
+    const fast = elapsed < 300 && Math.abs(dx) > 40;
+    const far = Math.abs(dx) > frame.getBoundingClientRect().width * 0.22;
+    frame.classList.add('sliding');
+    if (dx < 0 && (fast || far)) {
+      // Slide fully off to the left, then swap the image and recenter —
+      // matches "swipe left brings in the next player."
+      frame.style.transform = 'translateX(-40px)';
+      frame.style.opacity = '0';
+      setTimeout(() => { lightboxStep(1); frame.style.transform = ''; frame.style.opacity = '1'; }, 140);
+    } else if (dx > 0 && (fast || far)) {
+      frame.style.transform = 'translateX(40px)';
+      frame.style.opacity = '0';
+      setTimeout(() => { lightboxStep(-1); frame.style.transform = ''; frame.style.opacity = '1'; }, 140);
+    } else {
+      frame.style.transform = '';   // not far/fast enough — spring back
+    }
+    dx = 0;
+  }
+  frame.addEventListener('pointerup', release);
+  frame.addEventListener('pointercancel', release);
 }
 
 // ── Seeding ──────────────────────────────────────────────────────────────────
@@ -1379,11 +1489,21 @@ function wireStatic() {
   el('scrim').addEventListener('click', e => { if (e.target === el('scrim')) closeDialog(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDialog(); });
 
-  // Photo lightbox: click anywhere on it, or Escape, to dismiss.
-  el('db-lightbox').addEventListener('click', closePlayerPhoto);
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closePlayerPhoto();
+  // Photo lightbox: click the backdrop (not the photo/arrows/caption), the
+  // close button, or Escape to dismiss. Left/Right walk the roster.
+  el('db-lightbox').addEventListener('click', e => {
+    if (e.target === el('db-lightbox')) closePlayerPhoto();
   });
+  el('db-lightbox-close').addEventListener('click', closePlayerPhoto);
+  el('db-lightbox-prev').addEventListener('click', () => lightboxStep(-1));
+  el('db-lightbox-next').addEventListener('click', () => lightboxStep(1));
+  document.addEventListener('keydown', e => {
+    if (el('db-lightbox').classList.contains('hidden')) return;
+    if (e.key === 'Escape') closePlayerPhoto();
+    if (e.key === 'ArrowLeft') lightboxStep(-1);
+    if (e.key === 'ArrowRight') lightboxStep(1);
+  });
+  wireLightboxSwipe();
 
   el('live-btn').addEventListener('click', toggleLive);
   el('add-coach').addEventListener('click', addCoach);

@@ -4773,8 +4773,19 @@ body.editing-coaches .coach-cell .grip { display: none; }
 /* Photo modes. Portrait matches the 0.602 tryout crop. */
 body.view-tall .board-grid .slot { min-height: 78px; flex-direction: row; gap: 6px; padding: 4px 5px; }
 body.view-tall .slot.filled { justify-content: flex-start; }
-.slot-ava-tall { width: 38px; aspect-ratio: 0.602; border-radius: 4px; flex-shrink: 0; object-fit: cover; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.65rem; }
-.tall-meta { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+/* The photo fills half the cell's width and the cell's full height — cell
+   size never changes, so a taller/narrower crop of the same photo shows
+   instead of the whole portrait; object-fit:cover crops from the bottom
+   since object-position anchors to the top (a face-first crop, not a
+   stretch). flex-basis (not a fixed px width) is what actually makes it
+   scale with the cell instead of sitting at a constant size. */
+.slot-ava-tall {
+  flex: 1 1 50%; align-self: stretch; min-width: 0;
+  border-radius: 4px; object-fit: cover; object-position: center top;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 0.65rem;
+}
+.tall-meta { display: flex; flex-direction: column; flex: 1 1 50%; min-width: 0; line-height: 1.2; }
 /* Photo view shows the full name, which rarely fits the narrow column beside
    the avatar on one line — wrap to a second line instead of ellipsing a
    surname away, overriding the nowrap that Names view relies on. */
@@ -4788,35 +4799,73 @@ body.view-tall .pool-grid, body.view-split .pool-grid { grid-template-columns: r
 .p-card.is-drafted .card-ava-tall { aspect-ratio: auto; height: 26px; font-size: 0.65rem; opacity: 0.5; }
 
 /* ── Draft board player lightbox ──────────────────────────────────────────
-   Tap a drafted tile to see that player's face at full size. The board's
-   own avatars are 38px, which is fine for scanning and useless for actually
-   looking at someone. */
+   Tap a drafted tile to see that player's face at full size, then step
+   through the rest of that coach's roster with the arrow keys or a swipe —
+   left/right arrow buttons sit fixed at the edges (outside the part that
+   slides) so they're always in the same place regardless of which player
+   is showing. */
 #db-lightbox {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0, 0, 0, 0.88);
+  background: rgba(0, 0, 0, 0.9);
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; padding: 24px;
+  padding: 24px; overflow: hidden; touch-action: pan-y;
 }
 #db-lightbox.hidden { display: none; }
-#db-lightbox img {
-  max-width: 88vw; max-height: 82vh;
+.db-lightbox-frame {
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  max-width: 88vw; will-change: transform;
+}
+.db-lightbox-frame.sliding { transition: transform 0.22s ease-out; }
+#db-lightbox-img {
+  max-width: 88vw; max-height: 76vh; min-height: 120px;
   border-radius: 12px; object-fit: contain;
   box-shadow: 0 8px 48px rgba(0, 0, 0, 0.7);
+  background: #1a1d2b;
 }
+/* No Drive photo for this player — show a placeholder tile instead of a
+   broken image icon, same size class as a real photo so the layout holds. */
+#db-lightbox-img.no-photo {
+  width: min(60vw, 320px); aspect-ratio: 0.75;
+  display: flex; align-items: center; justify-content: center;
+}
+#db-lightbox-img.no-photo::before { content: "🏀"; font-size: 3rem; }
 #db-lightbox-caption {
-  position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.7); color: #fff;
-  padding: 8px 20px; border-radius: 20px;
-  font-size: 0.9rem; font-weight: 600; pointer-events: none;
-  max-width: 90vw; text-align: center;
+  margin-top: 14px; color: #fff; text-align: center; max-width: 90vw;
+}
+#db-lightbox-name { font-size: 1.1rem; font-weight: 700; }
+#db-lightbox-sub {
+  margin-top: 3px; font-size: 0.85rem; color: rgba(255,255,255,0.75);
+  display: flex; align-items: center; justify-content: center; gap: 5px; flex-wrap: wrap;
+}
+.db-lightbox-swatch {
+  display: inline-block; width: 11px; height: 11px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.4); vertical-align: -1px;
 }
 #db-lightbox-close {
-  position: fixed; top: 18px; right: 20px;
+  position: fixed; top: 18px; right: 20px; z-index: 2;
   background: rgba(0, 0, 0, 0.55); color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 50%;
   width: 38px; height: 38px; font-size: 1rem; cursor: pointer; line-height: 1;
 }
 #db-lightbox-close:hover { background: rgba(0, 0, 0, 0.8); }
+.db-lightbox-arrow {
+  position: fixed; top: 50%; transform: translateY(-50%); z-index: 2;
+  background: rgba(0, 0, 0, 0.45); color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 50%;
+  width: 46px; height: 46px; font-size: 1.6rem; line-height: 1; cursor: pointer;
+}
+.db-lightbox-arrow:hover { background: rgba(0, 0, 0, 0.75); }
+.db-lightbox-arrow:disabled { opacity: 0.3; cursor: default; }
+#db-lightbox-prev { left: 14px; }
+#db-lightbox-next { right: 14px; }
+@media (max-width: 640px) {
+  /* Narrow screens: the frame and edges are close enough that a fixed round
+     button competes with a thumb doing the swipe it's also meant to do —
+     the swipe already covers stepping, so the buttons step back to being a
+     quiet affordance rather than a target. */
+  .db-lightbox-arrow { width: 38px; height: 38px; font-size: 1.3rem; opacity: 0.6; }
+}
+
 /* A filled tile is clickable even when the board is locked, so say so —
    the grab cursor only applies when it can actually be dragged. */
 .slot.filled { cursor: pointer; }

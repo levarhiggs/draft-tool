@@ -157,11 +157,19 @@
   <div id="toast" role="status" aria-live="polite"></div>
 
   <!-- Player photo lightbox — click any drafted tile to see the face big.
-       Same shape as the one on draft-results.html. -->
+       Left/Right arrow keys or a swipe walk that coach's roster in seed
+       order, wrapping at either end. -->
   <div id="db-lightbox" class="hidden" role="dialog" aria-modal="true" aria-label="Player photo">
     <button id="db-lightbox-close" aria-label="Close">✕</button>
-    <img id="db-lightbox-img" src="" alt="" />
-    <div id="db-lightbox-caption"></div>
+    <button id="db-lightbox-prev" class="db-lightbox-arrow" aria-label="Previous player">‹</button>
+    <div id="db-lightbox-frame" class="db-lightbox-frame">
+      <img id="db-lightbox-img" src="" alt="" />
+      <div id="db-lightbox-caption">
+        <div id="db-lightbox-name"></div>
+        <div id="db-lightbox-sub"></div>
+      </div>
+    </div>
+    <button id="db-lightbox-next" class="db-lightbox-arrow" aria-label="Next player">›</button>
   </div>
 
   <!-- Generic dialog -->
