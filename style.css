@@ -4785,7 +4785,15 @@ body.view-tall .slot.filled { justify-content: flex-start; }
    fixed px width) is what makes the photo scale with the cell at all. */
 .slot-ava-tall {
   flex: 1 1 50%; align-self: stretch; min-width: 0; height: 100%;
-  border-radius: 4px; object-fit: cover; object-position: center top;
+  border-radius: 4px; object-fit: cover;
+  /* object-position is a percentage of the CROPPABLE range, not the raw
+     image — 0% crops entirely off the bottom (top of the photo pinned to
+     the top of the box), 100% entirely off the top. "center top" (0%) was
+     showing hairstyles, not faces, on a portrait photo this short. Faces
+     sit a bit below the top of the frame, so the window should too: 20%
+     off the top and 30% off the bottom is a 40% offset into that range
+     (20 / (20+30)), not 20% — a common mix-up with this property. */
+  object-position: center 40%;
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 700; font-size: 0.65rem;
 }
