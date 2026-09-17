@@ -67,15 +67,6 @@
           <button class="btn btn-dark" id="view-photos" aria-pressed="false">Photos</button>
           <button class="btn btn-dark" id="view-split"  aria-pressed="false">Split</button>
         </div>
-        <button class="wheel-trigger" id="wheel-open" title="Random Coach Pick Wheel"
-                aria-label="Open the random coach pick wheel">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="9"/>
-            <line x1="12" y1="3" x2="12" y2="12"/>
-            <line x1="12" y1="12" x2="18" y2="16"/>
-            <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
-          </svg>
-        </button>
         <button class="live-toggle hidden" id="live-btn" aria-pressed="false">
           <span class="dot" aria-hidden="true"></span>
           <span id="live-label">Live Draft Off</span>
@@ -112,6 +103,15 @@
       <section class="panel">
         <div class="panel-head">
           <h2 class="panel-title">Draft Board</h2>
+          <button class="wheel-trigger" id="wheel-open" title="Random Coach Pick Wheel"
+                  aria-label="Open the random coach pick wheel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="9"/>
+              <line x1="12" y1="3" x2="12" y2="12"/>
+              <line x1="12" y1="12" x2="18" y2="16"/>
+              <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+            </svg>
+          </button>
           <span class="panel-sub" id="board-sub">8 roster spots · snake order runs down each column</span>
         </div>
         <div class="panel-body">
