@@ -4837,6 +4837,20 @@ body.view-tall .pool-grid, body.view-split .pool-grid { grid-template-columns: r
   display: flex; align-items: center; justify-content: center;
 }
 #db-lightbox-img.no-photo::before { content: "🏀"; font-size: 3rem; }
+#db-lightbox-media { position: relative; display: flex; }
+/* Same red/grey badge language as the directory cards, just bigger and
+   actually clickable here instead of decorative. */
+.db-lightbox-video-btn {
+  position: absolute; bottom: 14px; left: 14px; z-index: 1;
+  width: 44px; height: 30px; font-size: 1rem; border: 0; cursor: pointer;
+  pointer-events: auto;   /* .card-video-badge is normally decorative-only */
+}
+.db-lightbox-video-btn:hover { background: #d64332; }
+.db-lightbox-video {
+  width: min(88vw, 640px); aspect-ratio: 16/9; max-height: 76vh;
+  border-radius: 12px; border: 0; background: #000;
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.7);
+}
 #db-lightbox-caption {
   margin-top: 14px; color: #fff; text-align: center; max-width: 90vw;
 }

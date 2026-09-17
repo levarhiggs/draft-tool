@@ -9,7 +9,7 @@
 //
 // Live draft is a CHANNEL SWITCH, not a state mutation: it changes which
 // board renders, it never destroys a coach's sandbox.
-import { escHtml, COL, photoUrl } from './app.js';
+import { escHtml, COL, photoUrl, videoUrl } from './app.js';
 import { fetchPlayers, buildDriveIndex, SEASON_CODE } from './players-data.js';
 import { getCurrentCoach } from './coach-login.js';
 import {
@@ -763,6 +763,12 @@ function showLightboxSlide(personId) {
   if (!lbRoster || !lbRoster.length) return;
   const { playerId } = lbRoster[lbIndex];
   const p = byId(playerId);
+
+  // A video playing for the PREVIOUS player must not carry over onto this
+  // one — always land back on the photo when the slide changes, whether
+  // that's an arrow/swipe step or the lightbox just opening.
+  stopLightboxVideo();
+
   const img = el('db-lightbox-img');
   const url = p ? bigPhotoUrl(p) : null;
   if (url) {
@@ -774,6 +780,11 @@ function showLightboxSlide(personId) {
     img.alt = '';
     img.classList.add('no-photo');   // CSS shows a placeholder instead of a broken image
   }
+
+  const video = p ? videoUrl(p) : null;
+  const videoBtn = el('db-lightbox-video-btn');
+  videoBtn.classList.toggle('hidden', !video);
+  videoBtn.dataset.videoUrl = video || '';
 
   const rowCoach = coachRows.find(c => c.personId === personId);
   const coachName = rowCoach?.name || '';
@@ -804,6 +815,33 @@ function showLightboxSlide(personId) {
   el('db-lightbox').dataset.personId = personId;
 }
 
+/** Swap the photo for an inline video player, in the same frame. */
+function playLightboxVideo() {
+  const url = el('db-lightbox-video-btn').dataset.videoUrl;
+  if (!url) return;
+  const media = el('db-lightbox-media');
+  media.innerHTML = `<iframe class="db-lightbox-video" src="${url}" allowfullscreen allow="autoplay"></iframe>`;
+}
+
+/** The video button lives inside the swipeable frame — without this, a tap
+ *  on it would also register as the start of a swipe drag. */
+function wireLightboxVideoBtn() {
+  const btn = el('db-lightbox-video-btn');
+  btn.addEventListener('pointerdown', e => e.stopPropagation());
+  btn.addEventListener('click', e => { e.stopPropagation(); playLightboxVideo(); });
+}
+
+/** Back to the photo — same media box, whatever was in it before. */
+function stopLightboxVideo() {
+  const media = el('db-lightbox-media');
+  if (!media || !media.querySelector('iframe')) return;
+  media.innerHTML =
+    `<img id="db-lightbox-img" src="" alt="" />` +
+    `<button id="db-lightbox-video-btn" class="card-video-badge db-lightbox-video-btn hidden"
+             title="Watch tryout video">▶</button>`;
+  wireLightboxVideoBtn();
+}
+
 function lightboxStep(dir) {
   if (!lbRoster || lbRoster.length < 2) return;
   lbIndex = (lbIndex + dir + lbRoster.length) % lbRoster.length;
@@ -812,6 +850,7 @@ function lightboxStep(dir) {
 
 function closePlayerPhoto() {
   el('db-lightbox').classList.add('hidden');
+  stopLightboxVideo();   // torn down before the image lookup below, so it's back
   el('db-lightbox-img').src = '';   // stop the download if it's still in flight
   lbRoster = null;
   lbIndex = -1;
@@ -830,6 +869,11 @@ function wireLightboxSwipe() {
 
   frame.addEventListener('pointerdown', e => {
     if (!lbRoster || lbRoster.length < 2) return;
+    // A playing video's iframe swallows pointer capture, so a drag started
+    // over it would end up stuck mid-swipe. The badge is still clickable —
+    // stopLightboxVideo() already returns to the photo on any real step, so
+    // this doesn't block getting to the next player, just from a video frame.
+    if (el('db-lightbox-media').querySelector('iframe')) return;
     dragging = true;
     startX = e.clientX;
     startT = Date.now();
@@ -1477,6 +1521,7 @@ function wireStatic() {
   el('db-lightbox-close').addEventListener('click', closePlayerPhoto);
   el('db-lightbox-prev').addEventListener('click', () => lightboxStep(-1));
   el('db-lightbox-next').addEventListener('click', () => lightboxStep(1));
+  wireLightboxVideoBtn();
   document.addEventListener('keydown', e => {
     if (el('db-lightbox').classList.contains('hidden')) return;
     if (e.key === 'Escape') closePlayerPhoto();
