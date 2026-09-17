@@ -12,9 +12,72 @@
 // seeds 2,3,6,7,10,11) converge at the Semifinals (Thu Sep 3), which feed the
 // Championship (Wed Sep 9).
 import { TEAM_COLORS, TEAMS } from './coaches-config.js';
-import { buildIconIndex, buildDriveIndex, iconUrl, photoUrl, fetchPlayers, COL as PLAYER_COL } from './players-data.js';
+import { buildIconIndex, buildDriveIndex, iconUrl } from './players-data.js';
 import { fetchSchedule, COL as SCHED_COL } from './schedule-data.js';
-import { getAllScheduleGames, getCompositeRank } from './firebase.js';
+import { getAllScheduleGames } from './firebase.js';
+
+// ── Summer 2026 (26.2) Championship rosters — pinned, not live ──────────────
+// This whole page is a frozen record of a season that's already over
+// (status: 'complete' in season-config.js), but fetchPlayers()/photoUrl()/
+// getCompositeRank() all resolve against CURRENT_SEASON, which has since
+// moved to Fall (26.3). Calling them here silently pulled FALL's roster and
+// matched it against SUMMER team/coach names, which never overlap — the
+// Championship roster cards rendered nothing at all, with no error, because
+// rosterCardHtml's own "no roster found" bail-out (line ~174) looks
+// identical to "the season moved on." Pinning the two finalists' actual
+// Summer rosters here — ids/names straight from the archived TEAMS block in
+// draft-results.html — is simpler and more correct than parameterizing the
+// live data pipeline by season for two teams that will never change again.
+const SUMMER_PHOTOS_FOLDER_ID = '1oJCTtCalNQTcQbMsZaOAa4VyAnJr35EV';
+const SUMMER_DRIVE_API_KEY = 'AIzaSyAoIlK4ncTUeJjPeOYJLXuj2GoWnMge3X8';
+
+const SUMMER_ROSTERS = {
+  // Team Mike C. / "Black" — seed 3, Champions.
+  'Team Mike C.': [
+    { id: '90', name: 'Bryce Cabrera' },
+    { id: '7',  name: 'Chance Densmore' },
+    { id: '91', name: 'Dylan Cabrera' },
+    { id: '73', name: 'Ayden Gutierrez' },
+    { id: '25', name: 'Sebastian Gutierrez' },
+    { id: '64', name: 'Alec Amisial' },
+    { id: '89', name: 'Timmy Priester' },
+    { id: '72', name: 'Carter Bleus' },
+  ],
+  // Team Kevin / "Gold" — seed 4, runner-up.
+  'Team Kevin': [
+    { id: '36', name: 'Sade Katib' },
+    { id: '34', name: 'Joshua Su' },
+    { id: '80', name: 'Ryan Dashoush' },
+    { id: '19', name: 'David Martin' },
+    { id: '27', name: 'Blake Burden' },
+    { id: '4',  name: 'Asher Parker' },
+    { id: '3',  name: 'Louie Pachon' },
+    { id: '54', name: 'Angel Forero' },
+  ],
+};
+
+let summerPhotoIndex = {};   // id -> Drive file id
+
+async function loadSummerPhotoIndex() {
+  try {
+    const url = `https://www.googleapis.com/drive/v3/files` +
+      `?q=${encodeURIComponent(`'${SUMMER_PHOTOS_FOLDER_ID}' in parents`)}` +
+      `&fields=files(id,name)&pageSize=1000&key=${SUMMER_DRIVE_API_KEY}`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    (data.files || []).forEach(({ id, name }) => {
+      summerPhotoIndex[name.replace(/\.[^/.]+$/, '').trim()] = id;
+    });
+  } catch (err) {
+    console.error('loadSummerPhotoIndex error:', err);
+  }
+}
+
+function summerPhotoUrl(id, size = 'w400') {
+  const fileId = summerPhotoIndex[String(id)];
+  return fileId ? `https://drive.google.com/thumbnail?id=${fileId}&sz=${size}` : null;
+}
 
 // Referenced from an inline onerror= attribute (see rosterPlayerTileHtml) —
 // a broken/unreachable Drive image would otherwise leave the browser's
@@ -98,37 +161,18 @@ async function loadSeasonStats() {
 }
 
 // ── Team rosters, for the "who's on each Championship team" list ───────────
-// Same source-of-truth resolution Gameboard's buildRosterSide() uses: a
-// player's ACTUAL team is Firestore's players/{id}.team if set (post-draft
-// admin assignment), falling back to the sheet's own TEAM column — never the
-// sheet column alone, since team assignment happens in-app after the draft.
+// Pinned to SUMMER_ROSTERS above (see the comment on that constant) — a
+// completed season's Championship game has exactly two teams, and they will
+// never change, so there's no live lookup to do here at all.
 let teamRosters = {};
 
 async function loadTeamRosters() {
-  try {
-    const players = await fetchPlayers();
-    const withTeam = await Promise.all(players.map(async p => {
-      const data = await getCompositeRank(p[PLAYER_COL.ID]);
-      return { ...p, _teamFB: data.team || '' };
-    }));
-
-    const rosters = {};
-    TEAMS.filter(t => t !== 'Undrafted').forEach(t => { rosters[t] = []; });
-    withTeam.forEach(p => {
-      const team = p._teamFB || p[PLAYER_COL.TEAM] || '';
-      if (rosters[team]) rosters[team].push(p);
-    });
-    Object.values(rosters).forEach(roster => {
-      roster.sort((a, b) => firstNameOf(a[PLAYER_COL.NAME]).localeCompare(firstNameOf(b[PLAYER_COL.NAME])));
-    });
-    teamRosters = rosters;
-  } catch (err) {
-    // Same "supporting context, not the point of the page" rationale as
-    // loadSeasonStats — the bracket/championship card still render fine
-    // without a roster list if the sheet/Firestore is unreachable.
-    console.error('loadTeamRosters error:', err);
-    teamRosters = {};
-  }
+  const rosters = {};
+  Object.entries(SUMMER_ROSTERS).forEach(([team, roster]) => {
+    rosters[team] = roster.slice().sort((a, b) =>
+      firstNameOf(a.name).localeCompare(firstNameOf(b.name)));
+  });
+  teamRosters = rosters;
 }
 
 function firstNameOf(fullName) {
@@ -136,8 +180,8 @@ function firstNameOf(fullName) {
 }
 
 function rosterPlayerTileHtml(p) {
-  const first = firstNameOf(p[PLAYER_COL.NAME]);
-  const photo = photoUrl(p);
+  const first = firstNameOf(p.name);
+  const photo = summerPhotoUrl(p.id);
   // If the image genuinely fails to load (Drive unreachable/rate-limited —
   // an observed real scenario, not hypothetical), swap it for the same
   // placeholder a player with no known photo gets, instead of leaving the
@@ -527,10 +571,34 @@ function renderMobileLadder() {
     </div>`;
 }
 
+// Full profile photo (not the cropped-circle avatar the contender cards
+// use) for each Champions roster tile — shows the whole tryout portrait.
+function champRosterTileHtml(p) {
+  const photo = summerPhotoUrl(p.id, 'w400');
+  const media = photo
+    ? `<img src="${photo}" alt="" class="pg-champ-photo" loading="lazy" onerror="this.outerHTML='<div class=&quot;pg-champ-photo-placeholder&quot;>&#127936;</div>'" />`
+    : `<div class="pg-champ-photo-placeholder">&#127936;</div>`;
+  return `
+    <div class="pg-champ-tile">
+      ${media}
+      <span class="pg-champ-name">${firstNameOf(p.name)}</span>
+    </div>`;
+}
+
+function renderChampRoster() {
+  const grid = document.getElementById('pg-champ-roster-grid');
+  if (!grid) return;
+  const roster = teamRosters['Team Mike C.'] || [];
+  grid.innerHTML = roster.map(champRosterTileHtml).join('');
+}
+
 async function init() {
-  await Promise.all([buildIconIndex(), buildDriveIndex(), loadSeasonStats(), loadTeamRosters()]);
+  await Promise.all([
+    buildIconIndex(), buildDriveIndex(), loadSeasonStats(), loadTeamRosters(), loadSummerPhotoIndex(),
+  ]);
   renderDesktopBracket();
   renderMobileLadder();
+  renderChampRoster();
 }
 
 init();
