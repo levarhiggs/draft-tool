@@ -1,4 +1,4 @@
-const CACHE = 'csbc-draft-v54';
+const CACHE = 'csbc-draft-v55';
 const SHELL = [
   '/draft-tool/',
   '/draft-tool/index.html',

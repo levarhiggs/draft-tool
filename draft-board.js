@@ -1862,9 +1862,55 @@ function finishWheelSpin(winnerName) {
   if (wheelActive().length === 0) {
     againBtn.disabled = true;
     againBtn.title = 'Everyone has been picked';
+    // The whole point of the lottery is to set the draft order — once every
+    // coach has a position, offer to actually use it rather than leaving
+    // the result to be copied down by hand.
+    promptApplyWheelOrder();
   } else {
     againBtn.addEventListener('click', spinWheel);
   }
+}
+
+/**
+ * Offers to reorder the real draft board's coach rows to match the sequence
+ * the wheel just drew. Only touches non-admin rows — the commissioner
+ * doesn't hold a team and was never a candidate for the wheel (see
+ * buildWheelRoster), so their row (if they somehow have one) stays put
+ * rather than being silently dropped by a reorder built from a list that
+ * never included them.
+ */
+function promptApplyWheelOrder() {
+  showDialog(
+    'Apply this order to the draft board?',
+    `The wheel drew ${wheelDrawOrder.length} coach${wheelDrawOrder.length === 1 ? '' : 's'} in this order:<br>` +
+      `<ol style="margin:8px 0 0;padding-left:20px;font-weight:600">` +
+      wheelDrawOrder.map(n => `<li>${escHtml(n)}</li>`).join('') +
+      `</ol>`,
+    applyWheelOrderToBoard,
+    'Apply order', 'Not now',
+  );
+}
+
+function applyWheelOrderToBoard() {
+  if (draftFinished()) {
+    showDialog('Coach order is locked',
+      'This draft is finished and the board is the published result — coach order can\'t be changed.');
+    return;
+  }
+
+  // Rebuild coachRows in the wheel's sequence, but only reshuffle the rows
+  // the wheel actually drew from (non-admins). An admin's row, if present,
+  // keeps its current position rather than being displaced by a reorder
+  // that was never drawn from a list including them.
+  const byName = new Map(coachRows.map(c => [c.name, c]));
+  const drawnRows = wheelDrawOrder.map(name => byName.get(name)).filter(Boolean);
+  let drawnIdx = 0;
+  coachRows = coachRows.map(c =>
+    TEAM_ADMINS.includes(c.name) ? c : drawnRows[drawnIdx++]);
+
+  persist();
+  render();
+  toast('Draft order updated', 'The board now follows the wheel\'s draw order');
 }
 
 function resetWheel() {
