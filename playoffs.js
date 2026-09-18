@@ -172,8 +172,7 @@ let teamRosters = {};
 async function loadTeamRosters() {
   const rosters = {};
   Object.entries(SUMMER_ROSTERS).forEach(([team, roster]) => {
-    rosters[team] = roster.slice().sort((a, b) =>
-      firstNameOf(a.name).localeCompare(firstNameOf(b.name)));
+    rosters[team] = roster.slice().sort((a, b) => (a.pick ?? 99) - (b.pick ?? 99));
   });
   teamRosters = rosters;
 }
@@ -591,12 +590,9 @@ function champRosterTileHtml(p) {
 function renderChampRoster() {
   const grid = document.getElementById('pg-champ-roster-grid');
   if (!grid) return;
-  // teamRosters is shared with the contender cards below the bracket, which
-  // stay alphabetical by first name — sort a copy here instead of changing
-  // the shared data, since only this grid should read left-to-right,
-  // top-to-bottom in DRAFT pick order (1-8), not the playoff bracket seed.
-  const roster = (teamRosters['Team Mike C.'] || []).slice()
-    .sort((a, b) => (a.pick ?? 99) - (b.pick ?? 99));
+  // teamRosters (loadTeamRosters, above) is already in draft pick order —
+  // left to right, top to bottom here follows pick 1-8.
+  const roster = teamRosters['Team Mike C.'] || [];
   grid.innerHTML = roster.map(champRosterTileHtml).join('');
 }
 

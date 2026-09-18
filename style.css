@@ -4180,11 +4180,13 @@ main {
 }
 .pg-roster-card-icon > span { position: relative; font-size: 1rem; font-weight: 800; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
 .pg-roster-card-name { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.03em; }
+/* 2 columns x 4 rows, left to right / top to bottom in draft pick order
+   (see loadTeamRosters in playoffs.js) — was a single column, one player
+   per row. */
 .pg-roster-card-players {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 10px;
   width: 100%;
 }
 .pg-roster-tile {
@@ -4192,13 +4194,17 @@ main {
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 .pg-roster-avatar { width: 58px; height: 58px; flex-shrink: 0; }
+/* Squircle, not the circle crop this used to be — a squircle reads cleanly
+   on a square avatar (unlike the taller Championship Roster photos above,
+   which need a smaller radius so it doesn't look like a pill). */
 .pg-roster-avatar-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 50%;
+  border-radius: 30%;
 }
 .pg-roster-avatar-placeholder {
   display: flex;
@@ -4206,6 +4212,7 @@ main {
   justify-content: center;
   background: var(--clr-surface);
   font-size: 1.5rem;
+  /* border-radius comes from .pg-roster-avatar-img, applied jointly */
 }
 .pg-roster-name {
   font-size: 0.78rem;
@@ -4379,10 +4386,8 @@ main {
 }
 .pg-champ-roster-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-  max-width: 420px;
-  margin: 0 auto;
 }
 .pg-champ-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
 /* Squircle, not the circle-cropped look used elsewhere on this page — a
@@ -4415,7 +4420,9 @@ main {
   text-align: center;
 }
 @media (max-width: 640px) {
-  .pg-champ-roster-grid { max-width: 320px; gap: 10px; }
+  /* 4-across gets too tight for a portrait photo on a phone screen — 2
+     columns (so 4 rows instead of 2) keeps each tile a readable size. */
+  .pg-champ-roster-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .pg-champ-name { font-size: 0.7rem; }
 }
 
