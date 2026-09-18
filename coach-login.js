@@ -19,7 +19,7 @@ function clearCurrentCoach() {
   sessionStorage.removeItem(SESSION_KEY);
 }
 
-// ── UI wiring (runs on both index.html and player.html) ──────────────────────
+// ── UI wiring (runs on every page that loads coach-login.js) ─────────────────
 
 function updateBadge() {
   const coach = getCurrentCoach();
@@ -92,10 +92,12 @@ async function attemptLogin() {
   closeLoginModal();
   updateBadge();
 
-  // Straight to the ranking page — that's the coach's real destination after
-  // logging in, not wherever they happened to click "Coach Login" from.
-  if (!window.location.pathname.endsWith('/player.html')) {
-    window.location.href = 'player.html';
+  // Straight to the draft board — that's the coach's real destination after
+  // logging in now that the draft's happened, not wherever they clicked
+  // "Coach Login" from. Used to be player.html (the ranking list), back
+  // when ranking players before the draft was the point.
+  if (!window.location.pathname.endsWith('/draft-board.html')) {
+    window.location.href = 'draft-board.html';
   }
 }
 
