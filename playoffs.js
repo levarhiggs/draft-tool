@@ -31,28 +31,31 @@ import { getAllScheduleGames } from './firebase.js';
 const SUMMER_PHOTOS_FOLDER_ID = '1oJCTtCalNQTcQbMsZaOAa4VyAnJr35EV';
 const SUMMER_DRIVE_API_KEY = 'AIzaSyAoIlK4ncTUeJjPeOYJLXuj2GoWnMge3X8';
 
+// `pick` is the snake-draft pick order from the archived TEAMS block in
+// draft-results.html (1-8) — NOT the playoff bracket seed mentioned in the
+// comments below, a completely different number for a different purpose.
 const SUMMER_ROSTERS = {
-  // Team Mike C. / "Black" — seed 3, Champions.
+  // Team Mike C. / "Black" — playoff seed 3, Champions.
   'Team Mike C.': [
-    { id: '90', name: 'Bryce Cabrera' },
-    { id: '7',  name: 'Chance Densmore' },
-    { id: '91', name: 'Dylan Cabrera' },
-    { id: '73', name: 'Ayden Gutierrez' },
-    { id: '25', name: 'Sebastian Gutierrez' },
-    { id: '64', name: 'Alec Amisial' },
-    { id: '89', name: 'Timmy Priester' },
-    { id: '72', name: 'Carter Bleus' },
+    { id: '90', name: 'Bryce Cabrera', pick: 1 },
+    { id: '7',  name: 'Chance Densmore', pick: 2 },
+    { id: '91', name: 'Dylan Cabrera', pick: 3 },
+    { id: '73', name: 'Ayden Gutierrez', pick: 4 },
+    { id: '25', name: 'Sebastian Gutierrez', pick: 5 },
+    { id: '64', name: 'Alec Amisial', pick: 6 },
+    { id: '89', name: 'Timmy Priester', pick: 7 },
+    { id: '72', name: 'Carter Bleus', pick: 8 },
   ],
-  // Team Kevin / "Gold" — seed 4, runner-up.
+  // Team Kevin / "Gold" — playoff seed 4, runner-up.
   'Team Kevin': [
-    { id: '36', name: 'Sade Katib' },
-    { id: '34', name: 'Joshua Su' },
-    { id: '80', name: 'Ryan Dashoush' },
-    { id: '19', name: 'David Martin' },
-    { id: '27', name: 'Blake Burden' },
-    { id: '4',  name: 'Asher Parker' },
-    { id: '3',  name: 'Louie Pachon' },
-    { id: '54', name: 'Angel Forero' },
+    { id: '36', name: 'Sade Katib', pick: 1 },
+    { id: '34', name: 'Joshua Su', pick: 2 },
+    { id: '80', name: 'Ryan Dashoush', pick: 3 },
+    { id: '19', name: 'David Martin', pick: 4 },
+    { id: '27', name: 'Blake Burden', pick: 5 },
+    { id: '4',  name: 'Asher Parker', pick: 6 },
+    { id: '3',  name: 'Louie Pachon', pick: 7 },
+    { id: '54', name: 'Angel Forero', pick: 8 },
   ],
 };
 
@@ -588,7 +591,12 @@ function champRosterTileHtml(p) {
 function renderChampRoster() {
   const grid = document.getElementById('pg-champ-roster-grid');
   if (!grid) return;
-  const roster = teamRosters['Team Mike C.'] || [];
+  // teamRosters is shared with the contender cards below the bracket, which
+  // stay alphabetical by first name — sort a copy here instead of changing
+  // the shared data, since only this grid should read left-to-right,
+  // top-to-bottom in DRAFT pick order (1-8), not the playoff bracket seed.
+  const roster = (teamRosters['Team Mike C.'] || []).slice()
+    .sort((a, b) => (a.pick ?? 99) - (b.pick ?? 99));
   grid.innerHTML = roster.map(champRosterTileHtml).join('');
 }
 

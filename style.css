@@ -4379,22 +4379,28 @@ main {
 }
 .pg-champ-roster-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  max-width: 420px;
+  margin: 0 auto;
 }
 .pg-champ-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+/* Squircle, not the circle-cropped look used elsewhere on this page — a
+   superellipse-ish rounding rather than a true circle, which on a tall
+   portrait photo (aspect-ratio 0.6) would otherwise read as a pill/capsule
+   if pushed as far as a percentage-based radius. */
 .pg-champ-photo {
   width: 100%;
   aspect-ratio: 0.6;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: 32px;
   border: 1px solid var(--clr-border);
   background: var(--clr-surface);
 }
 .pg-champ-photo-placeholder {
   width: 100%;
   aspect-ratio: 0.6;
-  border-radius: 10px;
+  border-radius: 32px;
   border: 1px solid var(--clr-border);
   background: var(--clr-surface);
   display: flex;
@@ -4409,7 +4415,7 @@ main {
   text-align: center;
 }
 @media (max-width: 640px) {
-  .pg-champ-roster-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .pg-champ-roster-grid { max-width: 320px; gap: 10px; }
   .pg-champ-name { font-size: 0.7rem; }
 }
 
