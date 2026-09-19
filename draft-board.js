@@ -72,6 +72,22 @@ const isAdmin = () => { const c = coach(); return !!c && TEAM_ADMINS.includes(c.
 const myPersonId = () => coach()?.personId || personByName(coach()?.name)?.id || null;
 
 /**
+ * Is this board column the logged-in coach's own?
+ *
+ * Compares by display name rather than id. A coach added directly on the board
+ * gets a synthetic BOARD-* id that never matches their C### login id, so an id
+ * comparison silently fails for exactly those four coaches (Ken, Kingston,
+ * Micah, Paul) — which is how the contact number went missing for Micah.
+ */
+function isMyColumn(personId) {
+  const me = coach();
+  if (!me || !personId) return false;
+  if (personId === myPersonId()) return true;
+  const row = coachRows.find(c => c.personId === personId);
+  return !!row && !!me.name && row.name === me.name;
+}
+
+/**
  * Sandbox = your own board. Live = the commissioner's, read-only unless
  * admin. Finished = the published result, read-only for everyone — it's the
  * season's record now, and a stray drag shouldn't be able to rewrite it.
@@ -801,12 +817,16 @@ function showLightboxSlide(personId) {
   // git history on this line) if it's still needed then.
   el('db-lightbox-sub').textContent = coachName;
 
-  // Parent phone, but only on the viewing coach's OWN column. These are
-  // contact details for minors, so the check is against person id directly
-  // rather than a resolved team name — the column already knows whose it is.
+  // Parent phone, but only on the viewing coach's OWN column. Contact details
+  // for minors, so the gate stays narrow.
+  //
+  // Matching on personId alone is NOT enough: four coaches were created
+  // straight from the board and hold synthetic BOARD-* ids, while their login
+  // accounts are C022-C025 (see coaches-config.js). Their board id and their
+  // person id are deliberately different, so the column is matched by NAME —
+  // the one identity both halves share.
   const phoneEl = el('db-lightbox-phone');
-  const phone = (personId && personId === myPersonId())
-    ? contactFor(SEASON_CODE, playerId) : '';
+  const phone = isMyColumn(personId) ? contactFor(SEASON_CODE, playerId) : '';
   if (phone) {
     phoneEl.innerHTML =
       `<a href="tel:${escHtml(phone.replace(/[^0-9]/g, ''))}" title="Call ${escHtml(phone)}">` +

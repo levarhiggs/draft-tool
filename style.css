@@ -5236,3 +5236,20 @@ body:not(.draft-final) .slot.filled { cursor: grab; }
   font-size: 0.95rem;
 }
 .bio-modal-phone:hover { text-decoration: underline; }
+
+
+/* ── Parent phone on a directory tile ───────────────────────────────────────
+   Shown only on a coach's own players (myPlayerPhone in app.js) so reaching
+   a parent is zero clicks from the directory. tel: link; the tap is stopped
+   from bubbling so it dials instead of opening the card. */
+.player-card-phone {
+  display: inline-block;
+  margin: 2px 0 1px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #7fb2f0;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.player-card-phone:hover { text-decoration: underline; }

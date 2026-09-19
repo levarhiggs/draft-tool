@@ -9,6 +9,26 @@ import { priorSeasons } from './player-identity.js';
 import { getSeason } from './season-config.js';
 import { missedTryout } from './tryout-attendance.js';
 import { hasVideoSet } from './video-availability.js';
+import { contactFor } from './player-contacts.js';
+import { personByName, teamNameFor } from './coaches-config.js';
+
+/**
+ * Parent phone for a player, shown only to that player's own coach.
+ *
+ * Contact details for minors, so the gate is narrow: the viewer must be
+ * logged in, resolve to a person who holds a team, and that team must match
+ * the player's. Everyone else gets nothing rendered at all.
+ */
+function myPlayerPhone(p) {
+  const c = getCurrentCoach();
+  if (!c) return '';
+  const person = personByName(c.name);
+  const myTeam = person && teamNameFor(person.id);
+  if (!myTeam) return '';
+  const team = p._teamFB || p[COL.TEAM] || '';
+  if (team !== myTeam) return '';
+  return contactFor(SEASON_CODE, String(p[COL.ID]));
+}
 
 const MISSED_TRYOUT = missedTryout(SEASON_CODE);
 // PRE-DRAFT (Fall 2026): powers the Has Video filter/sort while videos are
@@ -380,11 +400,21 @@ function playerCardHTML(p, isLoggedIn) {
     ? `<span class="card-video-badge" title="Watch tryout video">▶</span>`
     : `<span class="card-video-badge disabled" title="No video available">▶</span>`;
 
+  // Phone straight on the tile for a coach's own players — reaching a parent
+  // shouldn't cost two taps through a popup. stopPropagation keeps a tap on
+  // the number from also navigating the card behind it.
+  const phone = myPlayerPhone(p);
+  const phoneHtml = phone
+    ? `<a class="player-card-phone" href="tel:${escHtml(phone.replace(/[^0-9]/g, ''))}"
+          onclick="event.stopPropagation()" title="Call ${escHtml(phone)}">${escHtml(phone)}</a>`
+    : '';
+
   const cardInner = `
     <span class="player-card-thumb">${imgHtml}${videoBadge}</span>
     <div class="player-card-info">
       <div class="player-card-name"><span class="pc-id">${escHtml(id)}</span><span class="pc-sep"> · </span>${escHtml(name)}</div>
       <div class="player-card-meta">Grade ${escHtml(grade)} · Age ${escHtml(age)}</div>
+      ${phoneHtml}
       ${priorHtml}
       ${scoreHtml}
       ${teamHtml}
