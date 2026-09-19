@@ -4960,6 +4960,16 @@ button.db-lightbox-video-btn:hover { background: #d64332; }
 #db-lightbox-sub {
   margin-top: 3px; font-size: 0.85rem; color: rgba(255,255,255,0.75);
 }
+/* Parent phone under the caption. Rendered only on the viewing coach's own
+   column (see showLightboxSlide) — a tel: link so it dials from a phone. */
+#db-lightbox-phone { margin-top: 4px; font-size: 0.9rem; }
+#db-lightbox-phone a {
+  color: #8fc4ff;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+#db-lightbox-phone a:hover { text-decoration: underline; }
 /* .db-lightbox-swatch (a team-color dot) is unused for now — team name and
    color are suppressed in draft-board.js until Fall's real colors land. */
 #db-lightbox-close {

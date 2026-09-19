@@ -12,6 +12,7 @@
 import { escHtml, COL, photoUrl, videoUrl } from './app.js';
 import { fetchPlayers, buildDriveIndex, SEASON_CODE } from './players-data.js';
 import { getCurrentCoach } from './coach-login.js';
+import { contactFor } from './player-contacts.js';
 import {
   getActiveCoaches, personByName, teamNameFor, TEAM_ADMINS,
 } from './coaches-config.js';
@@ -799,6 +800,22 @@ function showLightboxSlide(personId) {
   // has the fallback for the four board-only coaches worked out (see the
   // git history on this line) if it's still needed then.
   el('db-lightbox-sub').textContent = coachName;
+
+  // Parent phone, but only on the viewing coach's OWN column. These are
+  // contact details for minors, so the check is against person id directly
+  // rather than a resolved team name — the column already knows whose it is.
+  const phoneEl = el('db-lightbox-phone');
+  const phone = (personId && personId === myPersonId())
+    ? contactFor(SEASON_CODE, playerId) : '';
+  if (phone) {
+    phoneEl.innerHTML =
+      `<a href="tel:${escHtml(phone.replace(/[^0-9]/g, ''))}" title="Call ${escHtml(phone)}">` +
+      `${escHtml(phone)}</a>`;
+    phoneEl.classList.remove('hidden');
+  } else {
+    phoneEl.textContent = '';
+    phoneEl.classList.add('hidden');
+  }
 
   // Nothing to step to with just one pick — hide the arrows rather than
   // show a control that would only ever land back on the same player.
