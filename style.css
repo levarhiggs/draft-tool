@@ -4450,6 +4450,76 @@ main {
    right. Replaces the old one-player-per-page profile view — see
    PROJECT_STATUS.md. Age/Birthday/Grade + badges live behind the photo tile
    (modal-bio) rather than inline, to keep each row compact at 87 players. */
+
+/* ── Coach Ranking View banner ────────────────────────────────────────────────
+   Sits inside <header>, which is already position:sticky — so this banner
+   (and the sort/filter drawer below it) stay visible together while a coach
+   scrolls past 80+ rows, rather than only the login bar staying pinned. */
+.ranking-view-banner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 4px 20px 14px;
+}
+.ranking-view-banner-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+.ranking-view-banner-blurb {
+  font-size: 0.85rem;
+  color: var(--clr-muted);
+  line-height: 1.5;
+  max-width: 780px;
+}
+.ranking-view-banner-link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+@media (max-width: 640px) {
+  .ranking-view-banner { padding: 2px 12px 10px; }
+  .ranking-view-banner-title { font-size: 0.95rem; }
+  .ranking-view-banner-blurb { font-size: 0.8rem; }
+}
+
+/* ── Instructions modal body ─────────────────────────────────────────────────
+   Longer-form version of the banner blurb above, opened via "Full
+   Instructions" — same content a coach would otherwise only see pasted once
+   into the WhatsApp group. */
+.instructions-body p { margin-bottom: 12px; line-height: 1.55; font-size: 0.92rem; }
+.instructions-body p:last-child { margin-bottom: 0; }
+.instructions-note {
+  color: var(--clr-warning);
+  font-weight: 600;
+  border-top: 1px solid var(--clr-border);
+  padding-top: 12px;
+}
+
+/* ── Coach-only gate notice (player.html, logged out) ────────────────────────
+   Shown in place of the row list when a logged-out visitor reaches this page
+   directly, just before redirecting to the directory. */
+.coach-gate-notice {
+  max-width: 480px;
+  margin: 80px auto;
+  padding: 28px 24px;
+  text-align: center;
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+}
+.coach-gate-notice p { font-size: 1rem; margin-bottom: 8px; }
+.coach-gate-sub { color: var(--clr-muted); font-size: 0.85rem !important; }
+
+/* While the gate notice is showing, hide the coach-only banner/drawer too —
+   see the gate at the bottom of player.js. Nothing in this chrome makes
+   sense to a visitor who is about to be redirected away. */
+body.coach-gate-active .ranking-view-banner,
+body.coach-gate-active .header-drawer,
+body.coach-gate-active .btn-drawer-toggle {
+  display: none;
+}
+
 .player-rank-list {
   max-width: 1400px;
   margin: 0 auto;

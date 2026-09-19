@@ -20,7 +20,12 @@
 
   <header>
     <div class="header-inner">
-      <a href="directory.html" class="back-link">← Back to Directory</a>
+      <div class="header-left">
+        <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <a href="directory.html" class="back-link">← Directory</a>
+      </div>
       <div class="header-controls">
         <div id="coach-badge" class="coach-badge hidden">
           <button id="btn-change-pin" class="btn-sm">Change PIN</button>
@@ -28,13 +33,143 @@
           <button id="btn-logout" class="btn-sm">Log Out</button>
         </div>
         <button id="btn-login" class="btn-primary">Coach Login</button>
+        <button id="btn-drawer-toggle" class="btn-drawer-toggle" aria-label="Toggle filters">
+          <span id="drawer-toggle-icon">▾ Filters</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Coach Ranking View banner: sticky along with the rest of <header>
+         (see style.css "position: sticky" on header), so it stays visible
+         while a coach scrolls through 80+ rows. Short blurb here; the
+         "Full Instructions" link opens the longer version in a modal. -->
+    <div class="ranking-view-banner">
+      <div class="ranking-view-banner-title">🏀 Coach Ranking View</div>
+      <p class="ranking-view-banner-blurb">
+        Rank every player 1–8, add a Strong/Mid/Low modifier, and leave notes for
+        the other coaches. Everyone's seeds are averaged into the Composite Seed.
+        Use the sort/filter bar below to jump to your team, a grade, or players
+        you've favorited.
+      </p>
+      <button id="btn-instructions" class="btn-link ranking-view-banner-link">📋 Full Instructions</button>
+    </div>
+
+    <!-- Collapsible drawer: sort + search + filters. Identical markup to
+         directory.html's drawer on purpose — player-list-controls.js wires
+         both by the same element ids, so the two pages share one sort/filter
+         mechanism rather than two copies that could drift apart. -->
+    <div id="header-drawer" class="header-drawer">
+      <!-- Sort bar -->
+      <div class="sort-bar">
+        <span class="bar-label">Sort:</span>
+        <button class="sort-btn" data-sort="alpha">A – Z</button>
+        <button class="sort-btn" data-sort="id">ID #</button>
+        <button class="sort-btn" data-sort="birthday">Age</button>
+        <button class="sort-btn" data-sort="hasvideo">Has Video</button>
+        <button class="sort-btn active" data-sort="team">Team</button>
+      </div>
+
+      <!-- Search bar -->
+      <div class="search-bar">
+        <input id="player-search" type="search" placeholder="Search players…" autocomplete="off" />
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar">
+        <div class="filter-row">
+          <span class="bar-label">Filter:</span>
+          <button class="filter-chip filter-notryout" id="filter-notryout">✕ No Tryout</button>
+          <button class="filter-chip filter-hasvideo" id="filter-hasvideo">▶ Has Video</button>
+          <button class="filter-chip filter-fav" id="filter-favorites">♥ Favorites</button>
+          <div id="filter-grades" class="filter-group"></div>
+        </div>
+        <div class="filter-row hidden">
+          <span class="bar-label">Seed:</span>
+          <div id="filter-seeds" class="filter-group"></div>
+        </div>
+        <div class="filter-row">
+          <span class="bar-label">Team:</span>
+          <div id="filter-teams" class="filter-group"></div>
+        </div>
       </div>
     </div>
   </header>
 
-  <main id="player-list" class="player-rank-list">
-    <div class="loading">Loading players…</div>
+  <!-- Side menu -->
+  <div id="side-menu-overlay" class="side-menu-overlay hidden"></div>
+  <nav id="side-menu" class="side-menu" aria-label="Main menu">
+    <div class="side-menu-header">
+      <span>Menu</span>
+      <button id="btn-menu-close" class="btn-menu-close" aria-label="Close menu">✕</button>
+    </div>
+    <a href="directory.html" class="side-menu-link">🏀 Player Directory</a>
+    <!-- Coach-only: side-menu.js intercepts this click while logged out and
+         shows a notice instead of navigating (see side-menu.js). -->
+    <a href="player.html" class="side-menu-link active" id="nav-player-ranking">📝 Coach Rankings</a>
+    <a href="draft-board.html" class="side-menu-link">📋 Draft Board</a>
+    <a href="draft-results.html" class="side-menu-link">🏆 Draft Results</a>
+    <a href="schedules.html" class="side-menu-link">📅 Schedules</a>
+    <a href="gameboard.html" class="side-menu-link">🎯 Gameboard</a>
+    <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
+    <a href="standings.html" class="side-menu-link">📊 Standings</a>
+    <a href="playoffs.html" class="side-menu-link">🥇 Playoffs</a>
+  </nav>
+
+  <main>
+    <!-- Result count. Hidden until the first render so it doesn't flash "0". -->
+    <div id="result-count" class="result-count hidden" aria-live="polite"></div>
+    <div id="player-list" class="player-rank-list">
+      <div class="loading">Loading players…</div>
+    </div>
   </main>
+
+  <!-- Full Instructions Modal -->
+  <div id="modal-instructions" class="modal-overlay hidden">
+    <div class="modal-box modal-box-lg">
+      <h2>🏀 Coach Ranking View — Instructions</h2>
+      <div class="instructions-body">
+        <p><strong>What this page is for.</strong> Every player is listed here so you
+          can rank them and leave notes ahead of the draft (or the mid-season
+          re-rank). Your seeds combine with every other coach's into one
+          Composite Seed, which is what drives the draft board.</p>
+
+        <p><strong>Seed (1–8).</strong> Tap a number to rate how you'd rank that
+          player relative to the whole player pool — 1 is your top pick, 8 is
+          your lowest. Every player should eventually get a seed from you.</p>
+
+        <p><strong>Modifier (Strong / Mid / Low).</strong> A finer read within the
+          same seed number — e.g. two players might both be a "4" to you, but one
+          is a Strong 4 (closer to a 3) and the other a Low 4 (closer to a 5).
+          Optional, but it helps break ties in the composite.</p>
+
+        <p><strong>Notes.</strong> Free text, visible to every coach. Use it for
+          what you saw at tryouts or in games — strengths, concerns, position fit.
+          Keep it respectful; these are public to the whole coaching group.</p>
+
+        <p><strong>Composite Seed.</strong> The average of every coach's submitted
+          seed for that player. Tap it to see the individual breakdown. If a
+          single ballot looks off to you, flag it to the commissioner rather than
+          adjusting your own seed to compensate — see below.</p>
+
+        <p><strong>Sort &amp; filter.</strong> The bar above the list is the same
+          one on the Player Directory. Sort by Team to see your own roster
+          grouped together, or by Has Video to review only players with tryout
+          footage. Filter chips (Grade, Team, Favorites, etc.) narrow the list;
+          the search box matches by name.</p>
+
+        <p><strong>Favorites.</strong> Tap the heart on a player's photo to
+          bookmark them — useful for shortlisting players you want to revisit,
+          independent of your seed for them.</p>
+
+        <p class="instructions-note">Rank honestly, as an assessment of the player
+          — not as a draft-order wishlist. The composite only means what it's
+          supposed to if everyone's numbers reflect ability.</p>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-instructions-close" class="btn-primary">Got it</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Video Modal -->
   <div id="modal-video" class="modal-overlay hidden">
@@ -127,5 +262,9 @@
 
   <script type="module" src="player.js"></script>
   <script type="module" src="coach-login.js"></script>
+  <script type="module" src="side-menu.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/draft-tool/sw.js');
+  </script>
 </body>
 </html>

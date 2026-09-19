@@ -1,18 +1,26 @@
-// player.js — all-players ranking view: every player on one continuously
-// scrolling page so a coach can rank on the fly while scrolling instead of
-// paging through "Next Player". Each row live-subscribes to its own
-// Firestore doc so composite seeds update instantly as any coach saves.
+// player.js — Coach Ranking View: every player on one continuously scrolling
+// page so a coach can rank on the fly while scrolling instead of paging
+// through "Next Player". Each row live-subscribes to its own Firestore doc
+// so composite seeds update instantly as any coach saves.
+//
+// Coach-only: never shown to a logged-out visitor (see the gate at the
+// bottom of this file). Sort/filter/search is the same engine and the same
+// markup as directory.html, shared via player-list-controls.js, so a coach
+// moving between "browse" and "rank" doesn't relearn a second set of
+// controls — see PRODUCT_SPEC / the 2026-09-19 mid-season ranking request.
 import { escHtml, COL, photoUrl, videoUrl } from './app.js';
 import { fetchPlayers, buildDriveIndex, ageDisplay, SEASON_CODE } from './players-data.js';
 import { priorSeasons } from './player-identity.js';
 import { getSeason } from './season-config.js';
-import { missedTryout } from './tryout-attendance.js';
-import { subscribePlayer, getPriorPlayerData, saveRanking, deleteRanking, saveNote, deleteNote, decodeRanking, saveFavorites, getFavorites } from './firebase.js';
+import { subscribePlayer, getPriorPlayerData, saveRanking, deleteRanking, saveNote, deleteNote, decodeRanking } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import { personByName, teamNameFor } from './coaches-config.js';
 import { contactFor } from './player-contacts.js';
-
-const MISSED_TRYOUT = missedTryout(SEASON_CODE);
+import {
+  activeFilters, currentSort, favorites, loadFavorites,
+  toggleFavorite as toggleFavoriteShared, applySort, applyFilters,
+  renderResultCount, initListControls, buildTeamChips, isMissedTryout,
+} from './player-list-controls.js';
 
 /**
  * A note/ranking's stored coach name is whatever that coach was called AT
@@ -39,7 +47,6 @@ let allPlayers = [];
 // live[id] = latest Firestore doc data for that player (see firebase.js buildComposite)
 const live = {};
 const unsubs = {};
-let pageFavorites = new Set(JSON.parse(sessionStorage.getItem('favorites') || '[]'));
 
 async function init() {
   try {
@@ -50,14 +57,7 @@ async function init() {
       return 0;
     });
 
-    const coach = getCurrentCoach();
-    if (coach) {
-      try {
-        const saved = await getFavorites(coach.name);
-        pageFavorites = new Set(saved);
-        sessionStorage.setItem('favorites', JSON.stringify([...pageFavorites]));
-      } catch { /* fall back to session */ }
-    }
+    await loadFavorites();
 
     // Prior-season data (composite + per-coach rankings/notes), per returning
     // player. Composite feeds the directory-style badge (app.js has the same
@@ -77,7 +77,9 @@ async function init() {
     }));
 
     renderList();
+    initListControls(() => allPlayers, renderList);
     wireModals();
+    wireInstructionsModal();
     subscribeAll();
 
     document.addEventListener('coachChanged', () => {
@@ -107,25 +109,74 @@ function cssId(id) { return String(id).replace(/[^a-zA-Z0-9_-]/g, '_'); }
 
 // ── Live Firestore subscriptions — one per player, all at once ────────────────
 
+// Rebuilding the team-filter chips is cheap once, wasteful 87 times in a row —
+// which is what would happen if it ran straight off every snapshot, since all
+// 87 subscriptions resolve within the same handful of milliseconds on load.
+// Debounced so a burst of snapshots (initial load, or a coach re-assigning
+// several players' teams) collapses into one rebuild.
+let teamChipsTimer = null;
+function scheduleTeamChipsRebuild() {
+  clearTimeout(teamChipsTimer);
+  teamChipsTimer = setTimeout(() => buildTeamChips(() => allPlayers, renderList), 150);
+}
+
 function subscribeAll() {
   allPlayers.forEach(p => {
     const id = String(p[COL.ID]);
     if (unsubs[id]) return; // already subscribed
     unsubs[id] = subscribePlayer(id, data => {
       live[id] = data;
+      // Mirror composite/team onto the player record itself, so the SHARED
+      // sort/filter engine (applySort/applyFilters/buildTeamChips, all of
+      // which read p._composite / p._teamFB) sees the same shape it gets
+      // from the directory's batch enrichment — this page just fills those
+      // fields from live subscriptions instead of one upfront fetch.
+      const teamChanged = p._teamFB !== (data.team || '');
+      p._composite = data.composite;
+      p._teamFB    = data.team || '';
+      if (teamChanged) scheduleTeamChipsRebuild();
       renderRowLive(id);
     });
   });
 }
 
 // ── Render: full list shell (built once; live bits patched in separately) ────
+// Uses the SAME sort/filter engine as the directory grid (player-list-
+// controls.js) — a coach moving between the two pages sees the same "Team"
+// button, the same chips, the same result count, applied to the same
+// underlying player set.
 
 function renderList() {
   const container = document.getElementById('player-list');
   const coach = getCurrentCoach();
-  container.innerHTML = allPlayers.map(p => rowHTML(p, !!coach)).join('');
+  const sorted  = applySort(allPlayers);
+  const visible = applyFilters(sorted);
 
-  allPlayers.forEach(p => wireRow(p));
+  renderResultCount(visible.length, allPlayers.length);
+
+  if (!visible.length) {
+    container.innerHTML = '<div class="loading">No players match the current filters.</div>';
+    return;
+  }
+
+  if (currentSort === 'team') {
+    // Group by team — same "Team X" header row the directory grid shows.
+    let lastTeam = null;
+    const parts = [];
+    for (const p of visible) {
+      const team = p._teamFB || p[COL.TEAM] || 'Unassigned';
+      if (team !== lastTeam) {
+        parts.push(`<div class="team-group-header">${escHtml(team)}</div>`);
+        lastTeam = team;
+      }
+      parts.push(rowHTML(p, !!coach));
+    }
+    container.innerHTML = parts.join('');
+  } else {
+    container.innerHTML = visible.map(p => rowHTML(p, !!coach)).join('');
+  }
+
+  visible.forEach(p => wireRow(p));
 }
 
 function rowHTML(p, isLoggedIn) {
@@ -133,7 +184,7 @@ function rowHTML(p, isLoggedIn) {
   const name  = p[COL.NAME] || 'Unknown';
   const photo = photoUrl(p);
   const video = videoUrl(p);
-  const isFav = pageFavorites.has(id);
+  const isFav = favorites.has(id);
 
   const photoHtml = photo
     ? `<img src="${photo}" alt="${escHtml(name)}" loading="lazy" class="rank-row-photo-img" />`
@@ -348,22 +399,14 @@ function renderRowLive(id) {
 
 // ── Favorites ─────────────────────────────────────────────────────────────────
 
-async function toggleFavorite(id) {
-  if (pageFavorites.has(id)) pageFavorites.delete(id);
-  else pageFavorites.add(id);
-  const isFav = pageFavorites.has(id);
-
+function toggleFavorite(id) {
+  const isFav = toggleFavoriteShared(id);
   const btn = document.querySelector(`#player-row-${cssId(id)} [data-action="favorite"]`);
   if (btn) {
     btn.classList.toggle('active', isFav);
     btn.title = isFav ? 'Remove from favorites' : 'Add to favorites';
   }
-
-  sessionStorage.setItem('favorites', JSON.stringify([...pageFavorites]));
-  const coach = getCurrentCoach();
-  if (coach) {
-    try { await saveFavorites(coach.name, [...pageFavorites]); } catch { /* silent */ }
-  }
+  if (activeFilters.favorites) renderList();
 }
 
 /**
@@ -410,7 +453,7 @@ function openBioModal(p) {
         pr.count === 1 ? '' : 'es'}">Prev. Rank: ${pr.composite.toFixed(1)}</span>`);
     }
   }
-  if (MISSED_TRYOUT.has(id)) {
+  if (isMissedTryout(id)) {
     badges.push('<span class="player-card-missed" title="Did not attend Fall 2026 tryouts">✕ Missed Tryout</span>');
   }
   const data = live[id];
@@ -606,6 +649,23 @@ function closeVideoModal() {
   document.getElementById('video-modal-body').innerHTML = ''; // stop playback
 }
 
+// ── Instructions modal (sticky-header "Full Instructions" link) ──────────────
+// Longer version of the sticky header's short blurb — same content a coach
+// would get pasted into the WhatsApp group, just always available on the
+// page instead of scrolled past in a chat history.
+
+function wireInstructionsModal() {
+  document.getElementById('btn-instructions')?.addEventListener('click', () => {
+    document.getElementById('modal-instructions')?.classList.remove('hidden');
+  });
+  document.getElementById('btn-instructions-close')?.addEventListener('click', () => {
+    document.getElementById('modal-instructions')?.classList.add('hidden');
+  });
+  document.getElementById('modal-instructions')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.add('hidden');
+  });
+}
+
 // ── Modal wiring (close buttons + backdrop click) ─────────────────────────────
 
 function wireModals() {
@@ -635,4 +695,25 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/draft-tool/sw.js');
 }
 
-init();
+// ── Coach-only gate ────────────────────────────────────────────────────────────
+// This page is never shown to a logged-out visitor — rankings and notes are
+// for coaches, not public reading. A direct hit on this URL (typed, bookmarked,
+// an old shared link) with no session gets a notice and is sent to the
+// directory instead of an empty ranking list. The side-menu link on every
+// page performs the same check before navigating here at all (see
+// side-menu.js) so a logged-out click never even leaves the current page.
+if (getCurrentCoach()) {
+  init();
+} else {
+  // Hide the ranking banner and the sort/filter drawer too, not just the row
+  // list — a logged-out visitor is being sent away, so the coach-only chrome
+  // (which references seeds/notes/Composite Seed) shouldn't flash on screen
+  // behind the notice while that happens.
+  document.body.classList.add('coach-gate-active');
+  document.getElementById('player-list').innerHTML = `
+    <div class="coach-gate-notice">
+      <p>Coach must log in first to view player rankings.</p>
+      <p class="coach-gate-sub">Taking you to the Player Directory…</p>
+    </div>`;
+  setTimeout(() => { window.location.href = 'directory.html'; }, 1800);
+}

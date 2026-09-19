@@ -1,5 +1,8 @@
-// app.js — player directory: data loading, rendering, sort, filter, favorites
-import { getCompositeRank, getPriorComposite, saveFavorites, getFavorites } from './firebase.js';
+// app.js — player directory: data loading, grid rendering, favorites wiring.
+// Sort/filter/search state and chip-building live in player-list-controls.js,
+// shared with player.js (the coach ranking page) so the two never drift into
+// separate copies of the same "which players, in what order" logic.
+import { getCompositeRank, getPriorComposite } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
 import {
   COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID, SEASON_CODE,
@@ -7,10 +10,13 @@ import {
 } from './players-data.js';
 import { priorSeasons } from './player-identity.js';
 import { getSeason } from './season-config.js';
-import { missedTryout } from './tryout-attendance.js';
-import { hasVideoSet } from './video-availability.js';
 import { contactFor } from './player-contacts.js';
 import { personByName, teamNameFor, TEAM_ADMINS } from './coaches-config.js';
+import {
+  activeFilters, favorites, currentSort, toggleFavorite as toggleFavoriteShared,
+  loadFavorites, applySort, applyFilters, renderResultCount,
+  initListControls, buildTeamChips, isMissedTryout,
+} from './player-list-controls.js';
 
 /** True when the logged-in coach is a commissioner/admin. */
 function viewerIsAdmin() {
@@ -36,41 +42,10 @@ function myPlayerPhone(p) {
   return contactFor(SEASON_CODE, String(p[COL.ID]));
 }
 
-const MISSED_TRYOUT = missedTryout(SEASON_CODE);
-// PRE-DRAFT (Fall 2026): powers the Has Video filter/sort while videos are
-// still being matched and uploaded. Once every clip is on Drive the Drive scan
-// in players-data.js is the source of truth and this can go.
-const HAS_VIDEO = hasVideoSet(SEASON_CODE);
-
 let allPlayers  = [];
-// Team is the default for the rest of the season -- once the draft is done,
-// "who is on my team" is the question coaches actually open the directory to
-// answer. A ?sort= URL param still overrides it.
-let currentSort = 'team';
-
-// Active filters — each is a Set of selected values; empty Set = no filter
-const activeFilters = {
-  grades:    new Set(),   // e.g. {6, 7}
-  seeds:     new Set(),   // floor integers 1–8
-  teams:     new Set(),   // team name strings
-  favorites: false,       // boolean toggle
-  noTryout:  false,       // TEMPORARY (Fall 2026 draft): missed tryouts
-  hasVideo:  false,       // PRE-DRAFT (Fall 2026): has a tryout video
-};
-
-// Favorites: Set of player ID strings
-let favorites   = new Set(JSON.parse(sessionStorage.getItem('favorites') || '[]'));
-let searchQuery = '';
 
 async function init() {
   try {
-    // Read URL params set by team tile links on player profile pages
-    const params = new URLSearchParams(window.location.search);
-    const urlTeam = params.get('team');
-    const urlSort = params.get('sort');
-    if (urlTeam) activeFilters.teams.add(urlTeam);
-    if (urlSort) currentSort = urlSort;
-
     const [players] = await Promise.all([
       fetchPlayers(),
       buildDriveIndex(),
@@ -81,12 +56,12 @@ async function init() {
     await loadFavorites();
 
     renderGrid();
-    setupControls();
+    initListControls(() => allPlayers, renderGrid);
     wirePlayerModal();
 
     // Enrich with Firebase data then re-render and rebuild team chips
     await enrichWithFirebase(allPlayers);
-    buildTeamChips();
+    buildTeamChips(() => allPlayers, renderGrid);
     renderGrid();
   } catch (err) {
     const grid = document.getElementById('player-grid');
@@ -97,53 +72,15 @@ async function init() {
 
 // ── Favorites ─────────────────────────────────────────────────────────────────
 
-async function loadFavorites() {
-  const coach = getCurrentCoach();
-  if (!coach) return;
-  try {
-    const saved = await getFavorites(coach.name);
-    favorites = new Set(saved);
-    sessionStorage.setItem('favorites', JSON.stringify([...favorites]));
-  } catch { /* fall back to session favorites */ }
-}
-
-async function persistFavorites() {
-  sessionStorage.setItem('favorites', JSON.stringify([...favorites]));
-  const coach = getCurrentCoach();
-  if (!coach) return;
-  try { await saveFavorites(coach.name, [...favorites]); } catch { /* silent */ }
-}
-
 function toggleFavorite(playerId, e) {
   e.preventDefault();
   e.stopPropagation();
-  if (favorites.has(playerId)) {
-    favorites.delete(playerId);
-  } else {
-    favorites.add(playerId);
-  }
-  persistFavorites();
+  const isFav = toggleFavoriteShared(playerId);
   // Update just the heart on this card without full re-render
   const btn = document.querySelector(`.heart-btn[data-id="${playerId}"]`);
-  if (btn) btn.classList.toggle('active', favorites.has(playerId));
+  if (btn) btn.classList.toggle('active', isFav);
   // If favorites filter is active, re-render to remove/add card
   if (activeFilters.favorites) renderGrid();
-}
-
-/**
- * "32 results" above the grid, so it's obvious how much a filter narrowed
- * things. Says "All 87 players" when nothing is filtering, since a bare count
- * there reads as if something were applied.
- */
-function renderResultCount(shown, total) {
-  const el = document.getElementById('result-count');
-  if (!el) return;
-  const filtering = shown !== total;
-  el.textContent = filtering
-    ? `${shown} result${shown === 1 ? '' : 's'} of ${total}`
-    : `All ${total} players`;
-  el.classList.toggle('filtered', filtering);
-  el.classList.remove('hidden');
 }
 
 // ── Firebase enrichment ───────────────────────────────────────────────────────
@@ -169,94 +106,8 @@ async function enrichWithFirebase(players) {
   }));
 }
 
-// ── Sort & Filter ─────────────────────────────────────────────────────────────
-
-function applySort(players) {
-  const arr = [...players];
-  if (currentSort === 'alpha') {
-    return arr.sort((a, b) => (a[COL.NAME] || '').localeCompare(b[COL.NAME] || ''));
-  }
-  if (currentSort === 'id') {
-    return arr.sort((a, b) => parseInt(a[COL.ID] || 0) - parseInt(b[COL.ID] || 0));
-  }
-  if (currentSort === 'birthday') {
-    return arr.sort((a, b) => {
-      const parse = s => { const [m, d, y] = (s || '').split('/'); return new Date(y, m - 1, d); };
-      return parse(a[COL.AGE]) - parse(b[COL.AGE]);
-    });
-  }
-  // PRE-DRAFT (Fall 2026): players with a tryout video first, then by id.
-  if (currentSort === 'hasvideo') {
-    const has = p => (HAS_VIDEO.has(String(p[COL.ID])) || videoUrl(p)) ? 0 : 1;
-    return arr.sort((a, b) =>
-      has(a) - has(b) || parseInt(a[COL.ID] || 0) - parseInt(b[COL.ID] || 0));
-  }
-  if (currentSort === 'rank') {
-    return arr.sort((a, b) => {
-      const ra = a._composite != null ? a._composite : 99;
-      const rb = b._composite != null ? b._composite : 99;
-      return ra - rb;
-    });
-  }
-  if (currentSort === 'team') {
-    return arr.sort((a, b) => {
-      const ta = a._teamFB || a[COL.TEAM] || 'Unassigned';
-      const tb = b._teamFB || b[COL.TEAM] || 'Unassigned';
-      if (ta !== tb) return ta.localeCompare(tb);
-      // Within a team, sort by seed ascending (unseeded last)
-      const sa = a._composite != null ? Math.floor(a._composite) : 99;
-      const sb = b._composite != null ? Math.floor(b._composite) : 99;
-      return sa - sb;
-    });
-  }
-  return arr;
-}
-
-function applyFilters(players) {
-  return players.filter(p => {
-    // Search filter
-    if (searchQuery) {
-      const name = (p[COL.NAME] || '').toLowerCase();
-      if (!name.includes(searchQuery)) return false;
-    }
-
-    // Favorites filter
-    if (activeFilters.favorites && !favorites.has(String(p[COL.ID]))) return false;
-
-    // TEMPORARY (Fall 2026 draft): missed-tryout filter. Replaced the old
-    // admin-only "No Shows" chip -- this is attendance, derived from whether
-    // a tryout photo was captured, rather than a hand-set flag. Remove with
-    // the chip after the draft.
-    if (activeFilters.noTryout && !MISSED_TRYOUT.has(String(p[COL.ID]))) return false;
-
-    // PRE-DRAFT (Fall 2026): has-video filter. Checks the known list first,
-    // then the Drive index, so it stays correct as clips finish uploading.
-    if (activeFilters.hasVideo &&
-        !(HAS_VIDEO.has(String(p[COL.ID])) || videoUrl(p))) return false;
-
-    // Grade filter
-    if (activeFilters.grades.size > 0) {
-      const g = parseInt(p[COL.GRADE]);
-      if (!activeFilters.grades.has(g)) return false;
-    }
-
-    // Seed filter (floor of composite)
-    if (activeFilters.seeds.size > 0) {
-      const seed = p._composite != null ? Math.floor(p._composite) : null;
-      if (seed === null || !activeFilters.seeds.has(seed)) return false;
-    }
-
-    // Team filter
-    if (activeFilters.teams.size > 0) {
-      const team = p._teamFB || p[COL.TEAM] || '';
-      if (!activeFilters.teams.has(team)) return false;
-    }
-
-    return true;
-  });
-}
-
 // ── Grid rendering ────────────────────────────────────────────────────────────
+// applySort/applyFilters/renderResultCount now live in player-list-controls.js.
 
 function renderGrid() {
   const grid    = document.getElementById('player-grid');
@@ -397,7 +248,7 @@ function playerCardHTML(p, isLoggedIn) {
   }
   // Missed-tryout badge: no Fall photo was taken, which is how attendance was
   // determined (see _local/PENDING_ROSTER_CHANGES.md).
-  if (MISSED_TRYOUT.has(String(id))) {
+  if (isMissedTryout(id)) {
     badges.push('<span class="player-card-missed" title="Did not attend Fall 2026 tryouts">✕ Missed Tryout</span>');
   }
   const priorHtml = badges.length
@@ -452,113 +303,19 @@ function playerCardHTML(p, isLoggedIn) {
 }
 
 // ── Controls setup ────────────────────────────────────────────────────────────
+// Sort bar, search, and grade/seed/team/favorites/noTryout/hasVideo chips are
+// all wired by initListControls() (player-list-controls.js), called from
+// init() above. Only what's specific to the grid stays here.
 
-function setupControls() {
-  // Sort buttons — sync active state with currentSort (may be pre-set from URL)
-  document.querySelectorAll('.sort-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.sort === currentSort);
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentSort = btn.dataset.sort;
-      renderGrid();
-    });
-  });
-
-  // Build dynamic filter chips from player data
-  buildFilterChips();
-
-  // Favorites toggle
-  document.getElementById('filter-favorites')?.addEventListener('click', e => {
-    activeFilters.favorites = !activeFilters.favorites;
-    e.currentTarget.classList.toggle('active', activeFilters.favorites);
-    renderGrid();
-  });
-
-  // TEMPORARY (Fall 2026 draft): missed-tryout toggle. Public -- no login
-  // gate, unlike the admin no-shows chip. Remove after the draft.
-  document.getElementById('filter-notryout')?.addEventListener('click', e => {
-    activeFilters.noTryout = !activeFilters.noTryout;
-    e.currentTarget.classList.toggle('active', activeFilters.noTryout);
-    renderGrid();
-  });
-
-  // PRE-DRAFT (Fall 2026): has-video toggle.
-  document.getElementById('filter-hasvideo')?.addEventListener('click', e => {
-    activeFilters.hasVideo = !activeFilters.hasVideo;
-    e.currentTarget.classList.toggle('active', activeFilters.hasVideo);
-    renderGrid();
-  });
-
-  // Search input
-  document.getElementById('player-search')?.addEventListener('input', e => {
-    searchQuery = e.target.value.trim().toLowerCase();
-    renderGrid();
-  });
-
+document.addEventListener('coachChanged', () => {
   // Cards swap between a link (coach) and a tap-to-play div (public), so a
-  // login change has to re-render the grid.
-  document.addEventListener('coachChanged', () => renderGrid());
-}
-
-function buildFilterChips() {
-  buildGradeChips();
-  buildSeedChips();
-  buildTeamChips();
-}
-
-function buildGradeChips() {
-  const container = document.getElementById('filter-grades');
-  if (!container) return;
-  const grades = [...new Set(allPlayers.map(p => parseInt(p[COL.GRADE])).filter(Boolean))].sort((a,b)=>a-b);
-  container.innerHTML = grades.map(g => `
-    <button class="filter-chip" data-type="grade" data-value="${g}">Grade ${g}</button>
-  `).join('');
-  container.querySelectorAll('.filter-chip').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const val = parseInt(btn.dataset.value);
-      activeFilters.grades.has(val) ? activeFilters.grades.delete(val) : activeFilters.grades.add(val);
-      btn.classList.toggle('active', activeFilters.grades.has(val));
-      renderGrid();
-    });
-  });
-}
-
-function buildSeedChips() {
-  const container = document.getElementById('filter-seeds');
-  if (!container) return;
-  container.innerHTML = [1,2,3,4,5,6,7,8].map(n => `
-    <button class="filter-chip" data-type="seed" data-value="${n}">${n}</button>
-  `).join('');
-  container.querySelectorAll('.filter-chip').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const val = parseInt(btn.dataset.value);
-      activeFilters.seeds.has(val) ? activeFilters.seeds.delete(val) : activeFilters.seeds.add(val);
-      btn.classList.toggle('active', activeFilters.seeds.has(val));
-      renderGrid();
-    });
-  });
-}
-
-function buildTeamChips() {
-  const container = document.getElementById('filter-teams');
-  if (!container) return;
-  const teams = [...new Set(
-    allPlayers.map(p => p._teamFB || p[COL.TEAM] || '').filter(Boolean)
-  )].sort();
-  if (!teams.length) { container.innerHTML = '<span class="filter-empty">No teams assigned yet</span>'; return; }
-  container.innerHTML = teams.map(t => `
-    <button class="filter-chip" data-type="team" data-value="${escHtml(t)}">${escHtml(t)}</button>
-  `).join('');
-  container.querySelectorAll('.filter-chip').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const val = btn.dataset.value;
-      activeFilters.teams.has(val) ? activeFilters.teams.delete(val) : activeFilters.teams.add(val);
-      btn.classList.toggle('active', activeFilters.teams.has(val));
-      renderGrid();
-    });
-  });
-}
+  // login change has to re-render the grid. Guarded: app.js is imported by
+  // player.js too (for escHtml/COL/photoUrl/videoUrl), and this listener is
+  // registered at module scope regardless of which page loaded it — without
+  // the guard, logging in from player.html threw here (#player-grid does
+  // not exist on that page) every time this listener fired.
+  if (document.getElementById('player-grid')) renderGrid();
+});
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -575,26 +332,5 @@ export { COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID, photoUrl, video
 // roster a second time and then throwing on the missing #player-grid. Only
 // run it on the page that actually owns that grid.
 if (document.getElementById('player-grid')) init();
-
-// ── Mobile drawer ─────────────────────────────────────────────────────────────
-(function wireDrawer() {
-  const toggle = document.getElementById('btn-drawer-toggle');
-  const drawer = document.getElementById('header-drawer');
-  if (!toggle || !drawer) return;
-
-  function setOpen(open) {
-    drawer.classList.toggle('open', open);
-    toggle.classList.toggle('active', open);
-    document.getElementById('drawer-toggle-icon').textContent = open ? '▴ Filters' : '▾ Filters';
-  }
-
-  toggle.addEventListener('click', () => setOpen(!drawer.classList.contains('open')));
-
-  // Auto-collapse on scroll down, restore on scroll up
-  let lastY = window.scrollY;
-  window.addEventListener('scroll', () => {
-    const y = window.scrollY;
-    if (y > lastY + 10 && drawer.classList.contains('open')) setOpen(false);
-    lastY = y;
-  }, { passive: true });
-})();
+// Mobile drawer (the sort/filter bar's collapse behaviour) is wired inside
+// initListControls() now, shared with player.html.
