@@ -1959,15 +1959,35 @@ function closeWheel() {
   el('wheel-overlay').classList.remove('open');
 }
 
+/**
+ * Close, but never lose a draw in progress by accident.
+ *
+ * openWheel() rebuilds the roster from scratch, so closing IS a reset — the
+ * draw order is not persisted anywhere. A stray click used to wipe a
+ * half-finished lottery with no warning, which is the one thing this modal
+ * must not do. Confirm only when there's something to lose; with no picks yet
+ * there's nothing to protect and the prompt would just be noise.
+ */
+function requestCloseWheel() {
+  if (wheelSpinning) return;              // mid-spin: ignore, the result is landing
+  if (wheelDrawOrder.length) {
+    const n = wheelDrawOrder.length;
+    const ok = confirm(
+      `Close the wheel and reset it?
+
+${n} pick${n === 1 ? '' : 's'} ` +
+      `already made will be cleared — the draw order is not saved.`);
+    if (!ok) return;
+  }
+  closeWheel();
+}
+
 function wireWheel() {
   el('wheel-open').addEventListener('click', openWheel);
-  el('wheel-close').addEventListener('click', closeWheel);
-  el('wheel-overlay').addEventListener('click', e => {
-    if (e.target === el('wheel-overlay')) closeWheel();
-  });
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && el('wheel-overlay').classList.contains('open')) closeWheel();
-  });
+  // The close button is the ONLY way out — backdrop click and Escape are
+  // deliberately not wired, so a mis-tap beside the modal can't reset a
+  // lottery that's underway.
+  el('wheel-close').addEventListener('click', requestCloseWheel);
   el('wheel-spin').addEventListener('click', spinWheel);
   el('wheel-hub').addEventListener('click', spinWheel);
   el('wheel-reset').addEventListener('click', resetWheel);
