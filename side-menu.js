@@ -27,7 +27,7 @@ import { getCurrentCoach } from './coach-login.js';
   document.getElementById('nav-player-ranking')?.addEventListener('click', e => {
     if (!getCurrentCoach()) {
       e.preventDefault();
-      alert('Coach must log in first to view player rankings.');
+      alert('Coaches must login to view and set player rankings.');
     }
   });
 })();

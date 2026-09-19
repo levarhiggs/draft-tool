@@ -712,7 +712,7 @@ if (getCurrentCoach()) {
   document.body.classList.add('coach-gate-active');
   document.getElementById('player-list').innerHTML = `
     <div class="coach-gate-notice">
-      <p>Coach must log in first to view player rankings.</p>
+      <p>Coaches must login to view and set player rankings.</p>
       <p class="coach-gate-sub">Taking you to the Player Directory…</p>
     </div>`;
   setTimeout(() => { window.location.href = 'directory.html'; }, 1800);
