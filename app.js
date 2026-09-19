@@ -10,7 +10,13 @@ import { getSeason } from './season-config.js';
 import { missedTryout } from './tryout-attendance.js';
 import { hasVideoSet } from './video-availability.js';
 import { contactFor } from './player-contacts.js';
-import { personByName, teamNameFor } from './coaches-config.js';
+import { personByName, teamNameFor, TEAM_ADMINS } from './coaches-config.js';
+
+/** True when the logged-in coach is a commissioner/admin. */
+function viewerIsAdmin() {
+  const c = getCurrentCoach();
+  return !!c && TEAM_ADMINS.includes(c.name);
+}
 
 /**
  * Parent phone for a player, shown only to that player's own coach.
@@ -347,9 +353,17 @@ function playerCardHTML(p, isLoggedIn) {
   const composite = p._composite ?? null;
   const isFav     = favorites.has(String(id));
 
-  // Seed only shown when logged in
+  // Composite seed is ADMIN-ONLY for now.
+  //
+  // One coach ranked by the order he intended to draft players rather than by
+  // ability, so his 1s aren't 1s and the average is badly skewed. The number
+  // is still computed and still visible to the commissioner; it's just not
+  // put in front of coaches as if it meant what it used to.
+  //
+  // Revisit once there's a way to handle this properly — a commissioner
+  // override, or excluding an outlier ballot from the average.
   let scoreHtml = '';
-  if (isLoggedIn) {
+  if (isLoggedIn && viewerIsAdmin()) {
     if (composite !== null) {
       const dec = composite % 1;
       const flames = dec < 0.2 ? '🔥🔥🔥' : dec < 0.7 ? '🔥🔥' : '🔥';

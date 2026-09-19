@@ -66,6 +66,7 @@ let suppressClick = false;
 let poolMode = 'personal';
 
 const el = id => document.getElementById(id);
+
 const byId = id => allPlayers.find(p => String(p[COL.ID]) === String(id));
 const coach = () => getCurrentCoach();
 const isAdmin = () => { const c = coach(); return !!c && TEAM_ADMINS.includes(c.name); };
@@ -396,12 +397,16 @@ function render() {
 
   const done = draftFinished();
 
-  // The pool is a ranking tool — it's for coaches, and it's meaningless once
-  // the draft is over. Hidden (never removed) so logging in brings it back.
-  el('pool-panel').classList.toggle('hidden', !c);
+  // The pool, Split and the Unranked strip are all ranking tools, and the
+  // draft is over — nobody is in the pool. Admin-only for the rest of the
+  // season so the commissioner can still look; hidden (never removed) for
+  // everyone else, so next season brings them straight back.
+  const poolVisible = !!c && isAdmin();
+  el('pool-panel').classList.toggle('hidden', !poolVisible);
   // Split exists to show the board and the pool together; with the pool
   // hidden it's just Photos with extra steps, so it goes too.
-  el('view-split').classList.toggle('hidden', !c);
+  el('view-split').classList.toggle('hidden', !poolVisible);
+  el('unranked-shell').classList.toggle('hidden', !poolVisible);
 
   el('mode-chip').textContent = isLive ? 'LIVE DRAFT' : done ? 'FINAL' : 'Sandbox';
   el('mode-chip').classList.toggle('live', isLive);
@@ -1621,6 +1626,10 @@ function updateStickyOffset() {
 }
 
 function setView(v) {
+  // Split shows board + pool side by side. With the pool hidden for
+  // non-admins that's a two-pane layout with one empty pane, so fall back to
+  // Photos — including for anyone who was already in Split when this landed.
+  if (v === 'split' && !(coach() && isAdmin())) v = 'photos';
   view = v;
   ['names', 'photos', 'split'].forEach(k =>
     el('view-' + k).setAttribute('aria-pressed', String(k === v)));
