@@ -8,8 +8,8 @@
 // (_local/26.3 Media/_inbox/scanned_roster_*.jpeg). Not present in the
 // published sheet or Firestore, so this file is the only source.
 //
-// Known gaps: 78, 87 and 88 were added to the roster after that printout and
-// have no number yet. 10/11 (Gitlan) and 40/41 (Frais) legitimately share a
+// Known gaps: 87 and 88 were added after that printout and have no number
+// yet. 78 was missing from the scanned copy but supplied by the commissioner. 10/11 (Gitlan) and 40/41 (Frais) legitimately share a
 // number each -- sibling pairs.
 
 export const CONTACTS_BY_SEASON = {
@@ -33,7 +33,7 @@ export const CONTACTS_BY_SEASON = {
     '65': '954-618-7381', '66': '954-263-3666', '67': '646-269-6250', '68': '561-239-2967',
     '69': '561-809-4203', '70': '754-368-5158', '71': '954-309-6285', '72': '954-873-2429',
     '73': '347-564-0897', '74': '954-701-5629', '75': '954-471-0135', '76': '754-366-1253',
-    '77': '954-410-9897', '79': '954-444-9410', '80': '954-415-4320', '81': '817-205-5398',
+    '77': '954-410-9897', '78': '979-633-0702', '79': '954-444-9410', '80': '954-415-4320', '81': '817-205-5398',
     '82': '954-639-3904', '83': '614-893-4348', '84': '847-528-0014', '85': '786-333-1572',
     '86': '954-707-0021',
   },
