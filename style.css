@@ -5212,3 +5212,17 @@ body:not(.draft-final) .slot.filled { cursor: grab; }
   margin-left: 22px; width: calc(100% - 22px);
 }
 .add-modes select:disabled { opacity: 0.5; }
+
+
+/* ── Parent contact tile (player bio modal) ─────────────────────────────────
+   Shown ONLY to the coach whose team the player is on -- see myPlayerContact()
+   in player.js. Rendered as a tel: link so it dials from a phone. */
+.bio-modal-contact .stat-label { white-space: nowrap; }
+.bio-modal-phone {
+  color: #7fb2f0;
+  text-decoration: none;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: 0.95rem;
+}
+.bio-modal-phone:hover { text-decoration: underline; }

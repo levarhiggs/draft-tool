@@ -9,7 +9,8 @@ import { getSeason } from './season-config.js';
 import { missedTryout } from './tryout-attendance.js';
 import { subscribePlayer, getPriorPlayerData, saveRanking, deleteRanking, saveNote, deleteNote, decodeRanking, saveFavorites, getFavorites } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
-import { personByName } from './coaches-config.js';
+import { personByName, teamNameFor } from './coaches-config.js';
+import { contactFor } from './player-contacts.js';
 
 const MISSED_TRYOUT = missedTryout(SEASON_CODE);
 
@@ -365,6 +366,26 @@ async function toggleFavorite(id) {
   }
 }
 
+/**
+ * Parent phone for a player, but ONLY for the coach whose team he's on.
+ *
+ * These are contact details for minors, so the gate is deliberately narrow:
+ * a coach must be logged in, must resolve to a person with a team, and that
+ * team must match the player's. Everyone else -- logged out, another team's
+ * coach, an admin who didn't draft -- gets nothing.
+ */
+function myPlayerContact(p) {
+  const coach = getCurrentCoach();
+  if (!coach) return '';
+  const person = personByName(coach.name);
+  const myTeam = person && teamNameFor(person.id);
+  if (!myTeam) return '';
+  const id = String(p[COL.ID]);
+  const playerTeam = live[id]?.team || p[COL.TEAM] || '';
+  if (playerTeam !== myTeam) return '';
+  return contactFor(SEASON_CODE, id);
+}
+
 // ── Bio modal: Age / Birthday / Grade + badges ─────────────────────────────────
 
 function openBioModal(p) {
@@ -411,6 +432,15 @@ function openBioModal(p) {
       <div class="stat-value">${data?.composite != null ? data.composite.toFixed(1) : '—'}</div>
     </div>` : '';
 
+  // Only ever populated for this player's own coach — see myPlayerContact().
+  const phone = myPlayerContact(p);
+  const phoneHtml = phone ? `
+    <div class="stat-box bio-modal-contact">
+      <div class="stat-label">Parent Contact</div>
+      <a class="stat-value bio-modal-phone" href="tel:${escHtml(phone.replace(/[^0-9]/g, ''))}"
+         title="Call ${escHtml(phone)}">${escHtml(phone)}</a>
+    </div>` : '';
+
   const video = videoUrl(p);
   const videoTileHtml = video
     ? `<button class="rank-row-video-btn player-modal-video-tile" data-action="video" title="Watch tryout video">▶<span>VIDEO</span></button>`
@@ -443,6 +473,7 @@ function openBioModal(p) {
         <div class="stat-value">${escHtml(grade)}</div>
       </div>
       ${compositeHtml}
+      ${phoneHtml}
       ${videoTileHtml}
     </div>
     ${badgesHtml}

@@ -17,7 +17,10 @@ const MISSED_TRYOUT = missedTryout(SEASON_CODE);
 const HAS_VIDEO = hasVideoSet(SEASON_CODE);
 
 let allPlayers  = [];
-let currentSort = 'id';
+// Team is the default for the rest of the season -- once the draft is done,
+// "who is on my team" is the question coaches actually open the directory to
+// answer. A ?sort= URL param still overrides it.
+let currentSort = 'team';
 
 // Active filters — each is a Set of selected values; empty Set = no filter
 const activeFilters = {
