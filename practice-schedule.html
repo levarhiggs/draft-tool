@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Schedules — CSBC 2026 SJV Summer Directory</title>
-  <meta property="og:title" content="Schedules — CSBC 2026 SJV Summer Directory" />
-  <meta property="og:description" content="Season game schedule, scores, and results for CSBC SJV Summer 2026 teams." />
-  <meta name="description" content="Season game schedule, scores, and results for CSBC SJV Summer 2026 teams." />
+  <title>Weekly Coaching Schedule — CSBC 2026 SJV Summer Directory</title>
+  <meta property="og:title" content="Weekly Coaching Schedule — CSBC 2026 SJV Summer Directory" />
+  <meta property="og:description" content="Weekly practice court schedule for CSBC coaches." />
+  <meta name="description" content="Weekly practice court schedule for CSBC coaches." />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="practice-schedule.css" />
   <link rel="icon" href="favicon.png" type="image/png" />
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#0f1117" />
@@ -15,6 +16,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="CSBC Draft" />
   <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter+Tight:wght@400;500;600;700&display=swap">
 </head>
 <body>
 
@@ -24,7 +27,7 @@
         <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Open menu" aria-expanded="false">
           <span></span><span></span><span></span>
         </button>
-        <h1>Schedules</h1>
+        <h1>Weekly Coaching Schedule</h1>
       </div>
       <div class="header-controls">
         <div id="coach-badge" class="coach-badge hidden">
@@ -47,8 +50,8 @@
     <a href="player.html" class="side-menu-link" id="nav-player-ranking">📝 Coach Rankings</a>
     <a href="draft-board.html" class="side-menu-link">📋 Draft Board</a>
     <a href="draft-results.html" class="side-menu-link">🏆 Draft Results</a>
-    <a href="schedules.html" class="side-menu-link active">📅 Schedules</a>
-    <a href="practice-schedule.html" class="side-menu-link">🏟️ Practice Schedule</a>
+    <a href="schedules.html" class="side-menu-link">📅 Schedules</a>
+    <a href="practice-schedule.html" class="side-menu-link active">🏟️ Practice Schedule</a>
     <a href="gameboard.html" class="side-menu-link">🎯 Gameboard</a>
     <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
     <a href="standings.html" class="side-menu-link">📊 Standings</a>
@@ -57,27 +60,12 @@
   </nav>
 
   <main>
-    <div class="sched-page">
-
-      <!-- PENDING (Fall 2026): the schedule sheet and team colors haven't
-           been published yet, and colors are reassigned every season, so
-           there's nothing real to show here until they land. Restore the
-           toolbar/table/calendar markup below (removed 2026-09-17, see git
-           history on this file) once schedule.js has real data to read. -->
-      <div class="season-pending">
-        <div class="season-pending-icon">📅</div>
-        <h2>Schedule Coming Soon</h2>
-        <p>The Fall 2026 game schedule and team colors haven't been published
-           yet. Check back in about a week.</p>
-        <p>In the meantime, see who's on each team on the
-           <a href="draft-results.html">Draft Results</a> page.</p>
+    <div class="psched-page">
+      <div class="psched-grid-scroll">
+        <table id="psched-table"></table>
       </div>
-
     </div>
   </main>
-
-  <!-- Game info popover (single click/tap on a game slot) -->
-  <div id="sched-popover" class="sched-popover hidden"></div>
 
   <!-- Coach Login Modal -->
   <div id="modal-login" class="modal-overlay hidden">
@@ -99,10 +87,7 @@
     </div>
   </div>
 
-  <!-- schedule.js and its score-entry modal are unloaded for now — the page
-       has nothing left for either to attach to while the schedule is
-       pending (see the season-pending panel above). Restore both alongside
-       the table/calendar markup once there's a real schedule to show. -->
+  <script type="module" src="practice-schedule.js"></script>
   <script type="module" src="coach-login.js"></script>
   <script type="module" src="side-menu.js"></script>
   <script>

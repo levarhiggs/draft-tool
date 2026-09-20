@@ -223,7 +223,23 @@ async function listDriveFolder(folderId) {
 
 function stripExtension(f) { return f.replace(/\.[^/.]+$/, '').trim(); }
 
+// ── Promoted media override (user-submitted, admin-approved) ─────────────────
+// An admin can promote an approved submission to be a player's profile picture
+// or primary video. That override sits at the TOP of the precedence chain
+// below; everything after it is unchanged:
+//
+//   promoted submission → sheet PHOTO/VIDEO column → Drive index → null
+//
+// Both lookups are synchronous (the promotion map is loaded once by
+// loadPromotions(), same lifecycle as buildDriveIndex) so every existing
+// caller of photoUrl()/videoUrl() keeps working untouched. If promotions were
+// never loaded the map is empty and these return null, degrading to exactly
+// the previous behaviour. See media-promotions.js.
+import { promotedPhotoUrl, promotedVideoUrl } from './media-promotions.js';
+
 export function photoUrl(player) {
+  const promoted = promotedPhotoUrl(player[COL.ID]);
+  if (promoted) return promoted;
   const override = player[COL.PHOTO];
   if (override?.trim()) return driveFileUrl(extractDriveId(override), 'img');
   const entry = driveIndex[String(player[COL.ID])];
@@ -232,6 +248,8 @@ export function photoUrl(player) {
 }
 
 export function videoUrl(player) {
+  const promoted = promotedVideoUrl(player[COL.ID]);
+  if (promoted) return promoted;
   const override = player[COL.VIDEO];
   if (override?.trim()) return driveFileUrl(extractDriveId(override), 'video');
   const entry = driveIndex[String(player[COL.ID])];

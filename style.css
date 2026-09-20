@@ -5323,3 +5323,373 @@ body:not(.draft-final) .slot.filled { cursor: grab; }
   white-space: nowrap;
 }
 .player-card-phone:hover { text-decoration: underline; }
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   USER-SUBMITTED MEDIA
+   The submit sheet (media-submit.js), opened by double-clicking / double-
+   tapping a profile picture. Same dim-overlay/centered-box pattern as
+   .modal-overlay/.modal-box, sized as a bottom-sheet on mobile since that is
+   where this feature is actually used — a parent in a gym on a phone.
+   See _local/MEDIA_SUBMISSION_SPEC.md.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.media-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 600;          /* above .modal-overlay (500) — can open from a modal */
+  padding: 20px;
+}
+.media-sheet-overlay.hidden { display: none; }
+
+.media-sheet {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 400px;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.media-sheet-head { display: flex; gap: 11px; align-items: center; margin-bottom: 15px; }
+.media-sheet-ava {
+  width: 46px; height: 46px; border-radius: 22%; flex-shrink: 0;
+  background: linear-gradient(145deg, #2c3150, #22263a);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1rem; color: #fff;
+}
+.media-sheet-title { font-size: 0.98rem; font-weight: 700; line-height: 1.25; }
+.media-sheet-title .pid { color: var(--clr-accent); font-variant-numeric: tabular-nums; }
+.media-sheet-sub { font-size: 0.73rem; color: var(--clr-muted); margin-top: 2px; }
+.media-sheet-x {
+  margin-left: auto; align-self: flex-start;
+  background: none; border: 0; color: var(--clr-muted);
+  font-size: 1.4rem; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+.media-sheet-x:hover { color: var(--clr-text); }
+
+/* The review notice. Repeated at three points in the flow on purpose: a
+   parent must never believe a submission appears instantly. */
+.media-review-note {
+  display: flex; gap: 9px; align-items: flex-start;
+  background: rgba(224,167,92,0.1);
+  border: 1px solid rgba(224,167,92,0.32);
+  border-radius: 7px; padding: 10px 11px; margin-bottom: 14px;
+}
+.media-review-t { font-size: 0.76rem; font-weight: 700; color: #e6c28a; line-height: 1.35; }
+.media-review-b { font-size: 0.71rem; color: #c9b892; margin-top: 3px; line-height: 1.4; }
+
+/* Counts show what is LIVE IN THE APP. They never block submitting — the cap
+   is enforced at approval time instead (see media-config.js). */
+.media-quota-lab {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--clr-muted); margin-bottom: 7px;
+}
+.media-quota-row { display: flex; gap: 8px; margin-bottom: 15px; }
+.media-quota {
+  flex: 1; background: var(--clr-bg); border: 1px solid var(--clr-border);
+  border-radius: 7px; padding: 8px 10px;
+}
+.media-quota-k {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--clr-muted);
+}
+.media-quota-v { font-size: 0.95rem; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.media-quota-v .used { color: var(--clr-text); }
+.media-quota-v .cap { color: var(--clr-muted); font-size: 0.78rem; }
+.media-quota.full .media-quota-v .used { color: var(--clr-warning); }
+.media-quota-bar {
+  height: 3px; border-radius: 99px; background: var(--clr-border);
+  margin-top: 6px; overflow: hidden;
+}
+.media-quota-bar i { display: block; height: 100%; background: var(--clr-accent); border-radius: 99px; }
+.media-quota.full .media-quota-bar i { background: var(--clr-warning); }
+.media-quota-foot { font-size: 0.66rem; color: var(--clr-muted); margin: -6px 0 15px; line-height: 1.4; }
+
+.media-pick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.media-pick {
+  background: var(--clr-card); border: 1px solid var(--clr-border);
+  border-radius: 8px; padding: 14px 10px; font: inherit; color: var(--clr-text);
+  cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; gap: 5px; text-align: center;
+}
+.media-pick:hover { border-color: var(--clr-accent); }
+.media-pick-ico { font-size: 1.3rem; line-height: 1; }
+.media-pick-lab { font-size: 0.78rem; font-weight: 600; }
+.media-pick-hint { font-size: 0.63rem; color: var(--clr-muted); }
+
+.media-chosen {
+  display: flex; gap: 10px; align-items: center;
+  background: var(--clr-bg); border: 1px solid var(--clr-border);
+  border-radius: 7px; padding: 9px 10px; margin-bottom: 4px;
+}
+.media-chosen-thumb {
+  width: 52px; height: 52px; border-radius: 6px; flex-shrink: 0;
+  object-fit: cover; background: var(--clr-card);
+  display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+}
+.media-chosen-meta { min-width: 0; flex: 1; }
+.media-chosen-name {
+  font-size: 0.78rem; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.media-chosen-facts {
+  font-size: 0.68rem; color: var(--clr-muted); margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.media-field { margin-top: 13px; }
+.media-field > label {
+  display: block; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--clr-muted); margin-bottom: 5px;
+}
+.media-field input, .media-field textarea {
+  width: 100%; background: var(--clr-bg); border: 1px solid var(--clr-border);
+  color: var(--clr-text); border-radius: 6px; padding: 8px 10px;
+  font: inherit; font-size: 0.82rem;
+}
+.media-field textarea { resize: vertical; min-height: 54px; }
+.media-optional { color: #5d6478; font-weight: 600; text-transform: none; font-size: 0.66rem; }
+.media-hint { font-size: 0.7rem; color: var(--clr-muted); margin: 8px 0 0; }
+
+/* Validation failure — a file rejected BEFORE any upload starts. */
+.media-reject {
+  border-left: 3px solid var(--clr-danger);
+  background: rgba(224,92,92,0.09);
+  border-radius: 0 6px 6px 0; padding: 10px 12px;
+}
+.media-reject-t { font-size: 0.78rem; font-weight: 700; color: #f0a4a4; }
+.media-reject-b { font-size: 0.72rem; color: #d9b3b3; margin-top: 3px; line-height: 1.45; }
+
+.media-err {
+  font-size: 0.75rem; color: #f0a4a4; margin: 10px 0 0;
+  background: rgba(224,92,92,0.09); border-radius: 6px; padding: 8px 10px;
+}
+.media-err[hidden] { display: none; }
+
+/* Real progress, not a spinner: a 38 MB clip on gym wifi takes a minute, and
+   an indeterminate spinner reads as broken at that duration. */
+.media-prog { margin-top: 15px; }
+.media-prog[hidden] { display: none; }
+.media-prog-top { display: flex; justify-content: space-between; font-size: 0.72rem; margin-bottom: 6px; }
+.media-prog-pct { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--clr-accent); }
+.media-prog-track { height: 6px; background: var(--clr-border); border-radius: 99px; overflow: hidden; }
+.media-prog-fill { height: 100%; width: 0%; background: var(--clr-accent); border-radius: 99px; transition: width 0.25s ease; }
+
+.media-actions { display: flex; gap: 8px; margin-top: 16px; }
+.media-actions .btn-primary { flex: 1; }
+
+.media-done { text-align: center; padding: 18px 8px 4px; }
+.media-done-ico {
+  width: 46px; height: 46px; border-radius: 50%; margin: 0 auto 12px;
+  background: rgba(78,207,135,0.15); border: 1px solid rgba(78,207,135,0.4);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.25rem; color: var(--clr-success);
+}
+.media-done-t { font-size: 0.98rem; font-weight: 700; }
+.media-done-b { font-size: 0.79rem; color: var(--clr-muted); margin-top: 6px; line-height: 1.5; }
+.media-done-b b { color: var(--clr-text); }
+
+/* ── Long-press feedback ───────────────────────────────────────────────────
+   Touch opens the submit sheet with a ~500ms press, not a double-tap: on a
+   phone, double-tap is the browser's own zoom gesture, and it gives no
+   feedback until it fires. A press can show progress — which is what makes an
+   otherwise invisible trigger discoverable, since someone who presses and
+   hesitates watches the ring fill and learns the gesture exists.
+
+   -webkit-touch-callout is the iOS half of suppressing the native image menu;
+   the contextmenu handler in media-submit.js is the other half, and on iOS
+   neither works alone. Scoped to submit targets only, so every other image in
+   the app keeps its normal press-and-hold behaviour. */
+.media-submit-target {
+  cursor: pointer;
+  position: relative;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* The ring. A conic-gradient sweep is one element and one animation — no SVG,
+   no extra markup in six different render paths. */
+.media-submit-target.media-pressing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 3;
+  background: conic-gradient(rgba(79,142,247,0.55) var(--media-press-deg, 0deg),
+                             rgba(0,0,0,0.28) 0deg);
+  animation: media-press-fill 500ms linear forwards;
+}
+
+/* Animating a custom property needs @property for it to interpolate at all;
+   without it the value jumps. Browsers that don't support @property fall back
+   to the dimming overlay alone, which still reads as "something is happening."  */
+@property --media-press-deg {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes media-press-fill {
+  from { --media-press-deg: 0deg; }
+  to   { --media-press-deg: 360deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-submit-target.media-pressing::after {
+    animation: none;
+    background: rgba(0,0,0,0.28);
+  }
+}
+
+@media (max-width: 480px) {
+  .media-sheet-overlay { padding: 0; align-items: flex-end; }
+  .media-sheet {
+    max-width: none; max-height: 92vh;
+    border-radius: var(--radius) var(--radius) 0 0;
+    border-bottom: 0;
+  }
+}
+
+
+/* ── Media admin inbox (media-admin.html) ─────────────────────────────────── */
+
+.media-admin-page { max-width: 1000px; margin: 0 auto; }
+
+.media-retain-note {
+  display: flex; gap: 9px; align-items: flex-start;
+  background: var(--clr-surface); border: 1px solid var(--clr-border);
+  border-left: 3px solid var(--clr-accent);
+  border-radius: 0 7px 7px 0; padding: 11px 13px; margin-bottom: 16px;
+}
+.media-retain-t { font-size: 0.79rem; font-weight: 700; }
+.media-retain-b { font-size: 0.74rem; color: var(--clr-muted); margin-top: 3px; line-height: 1.45; }
+.media-retain-b b { color: #aab2c8; font-weight: 600; }
+
+.media-adm-bar {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding-bottom: 13px; margin-bottom: 15px; border-bottom: 1px solid var(--clr-border);
+}
+.media-adm-count {
+  font-size: 0.73rem; color: var(--clr-muted);
+  margin-left: auto; font-variant-numeric: tabular-nums;
+}
+.chip-n {
+  display: inline-block; margin-left: 5px; padding: 1px 6px; border-radius: 99px;
+  background: var(--clr-card); color: var(--clr-muted);
+  font-size: 0.64rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.chip[aria-pressed="true"] .chip-n { background: rgba(255,255,255,0.22); color: #fff; }
+
+.media-q-list { display: flex; flex-direction: column; gap: 9px; }
+.media-q-item {
+  display: flex; gap: 12px; background: var(--clr-surface);
+  border: 1px solid var(--clr-border); border-radius: 8px;
+  padding: 11px; align-items: flex-start;
+}
+.media-q-thumb {
+  width: 78px; height: 78px; flex-shrink: 0; border-radius: 6px;
+  background: var(--clr-card); cursor: pointer; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+}
+.media-q-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.media-q-dur {
+  position: absolute; bottom: 4px; right: 4px;
+  font-size: 0.6rem; font-weight: 700; background: rgba(0,0,0,0.72);
+  color: #fff; padding: 2px 5px; border-radius: 3px; font-variant-numeric: tabular-nums;
+}
+.media-q-body { flex: 1; min-width: 0; }
+.media-q-top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.media-q-player { font-size: 0.88rem; font-weight: 700; }
+.media-q-player .pid { color: var(--clr-accent); font-variant-numeric: tabular-nums; }
+.media-q-meta { font-size: 0.72rem; color: var(--clr-muted); margin-top: 4px; }
+.media-q-cap { font-size: 0.75rem; margin-top: 5px; color: #c3c9dc; font-style: italic; }
+.media-q-acts { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; align-items: center; }
+.media-q-acts a.btn { text-decoration: none; display: inline-block; }
+
+.pill {
+  font-size: 0.56rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 3px 7px; border-radius: 99px; border: 1px solid transparent;
+}
+.pill-pending  { color: #e6c28a; background: rgba(224,167,92,0.16); border-color: rgba(224,167,92,0.4); }
+.pill-approved { color: #8fd6a8; background: rgba(78,207,135,0.14); border-color: rgba(78,207,135,0.38); }
+.pill-rejected { color: #e9a9a2; background: rgba(224,92,92,0.14); border-color: rgba(224,92,92,0.38); }
+.pill-promoted { color: #9fc4ef; background: rgba(79,142,247,0.16); border-color: rgba(79,142,247,0.42); }
+
+.btn-ok { border-color: rgba(78,207,135,0.45); color: #8fd6a8; }
+.btn-ok:hover:not(:disabled) { background: rgba(78,207,135,0.14); border-color: var(--clr-success); }
+.btn-no { border-color: rgba(224,92,92,0.42); color: #e9a9a2; }
+.btn-no:hover:not(:disabled) { background: rgba(224,92,92,0.13); border-color: var(--clr-danger); }
+.btn-promote { border-color: rgba(79,142,247,0.45); color: #9fc4ef; }
+.btn-promote:hover:not(:disabled) { background: rgba(79,142,247,0.14); border-color: var(--clr-accent); }
+
+/* The cap notice. Shown on a pending item whose player is already full —
+   Approve is disabled, Reject is not. */
+.media-cap-block {
+  font-size: 0.71rem; color: #e6c28a; margin: 8px 0 0; padding: 7px 9px;
+  background: rgba(224,167,92,0.09); border-left: 2px solid rgba(224,167,92,0.5);
+  border-radius: 0 5px 5px 0; line-height: 1.4;
+}
+
+.media-ord-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; flex-wrap: wrap; margin: 26px 0 11px;
+}
+.media-ord-h { font-size: 0.9rem; font-weight: 700; }
+.media-ord-hint { font-size: 0.72rem; color: var(--clr-muted); }
+.media-ord-list { display: flex; flex-direction: column; gap: 6px; }
+.media-ord-row {
+  display: flex; gap: 10px; align-items: center; background: var(--clr-surface);
+  border: 1px solid var(--clr-border); border-radius: 7px; padding: 8px 10px; cursor: grab;
+}
+.media-ord-row.dragging { opacity: 0.4; }
+.media-ord-row.drop-ok { outline: 1px dashed var(--clr-accent); background: rgba(79,142,247,0.09); }
+.media-ord-grip { color: var(--clr-muted); font-size: 0.9rem; flex-shrink: 0; }
+.media-ord-n {
+  width: 22px; height: 22px; border-radius: 5px; background: var(--clr-card); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.7rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--clr-muted);
+}
+.media-ord-th {
+  width: 34px; height: 34px; border-radius: 5px; background: var(--clr-card); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 0.95rem; overflow: hidden;
+}
+.media-ord-th img { width: 100%; height: 100%; object-fit: cover; }
+.media-ord-name { font-size: 0.78rem; font-weight: 600; flex: 1; min-width: 0; }
+.media-ord-name small {
+  display: block; color: var(--clr-muted); font-weight: 400;
+  font-size: 0.68rem; margin-top: 1px;
+}
+
+.media-lightbox {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 700;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.media-lightbox.hidden { display: none; }
+.media-lightbox-inner { max-width: 900px; width: 100%; position: relative; }
+.media-lightbox-inner img,
+.media-lightbox-inner video {
+  max-width: 100%; max-height: 78vh; display: block; margin: 0 auto;
+  border-radius: 8px; background: #000;
+}
+.media-lightbox-x {
+  position: absolute; top: -34px; right: 0; background: none; border: 0;
+  color: #fff; font-size: 1.2rem; cursor: pointer; padding: 4px 8px;
+}
+.media-lightbox-cap {
+  text-align: center; color: var(--clr-muted); font-size: 0.78rem; margin-top: 12px;
+}
+
+@media (max-width: 560px) {
+  .media-q-item { flex-direction: column; }
+  .media-q-thumb { width: 100%; height: 150px; }
+}

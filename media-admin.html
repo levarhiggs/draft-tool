@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Schedules — CSBC 2026 SJV Summer Directory</title>
-  <meta property="og:title" content="Schedules — CSBC 2026 SJV Summer Directory" />
-  <meta property="og:description" content="Season game schedule, scores, and results for CSBC SJV Summer 2026 teams." />
-  <meta name="description" content="Season game schedule, scores, and results for CSBC SJV Summer 2026 teams." />
+  <title>Media Inbox — CSBC Draft Tool</title>
+  <meta name="description" content="Review, approve and order user-submitted player media." />
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="favicon.png" type="image/png" />
   <link rel="manifest" href="manifest.json" />
@@ -24,7 +22,7 @@
         <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Open menu" aria-expanded="false">
           <span></span><span></span><span></span>
         </button>
-        <h1>Schedules</h1>
+        <h1>Media Inbox</h1>
       </div>
       <div class="header-controls">
         <div id="coach-badge" class="coach-badge hidden">
@@ -47,37 +45,66 @@
     <a href="player.html" class="side-menu-link" id="nav-player-ranking">📝 Coach Rankings</a>
     <a href="draft-board.html" class="side-menu-link">📋 Draft Board</a>
     <a href="draft-results.html" class="side-menu-link">🏆 Draft Results</a>
-    <a href="schedules.html" class="side-menu-link active">📅 Schedules</a>
+    <a href="schedules.html" class="side-menu-link">📅 Schedules</a>
     <a href="practice-schedule.html" class="side-menu-link">🏟️ Practice Schedule</a>
     <a href="gameboard.html" class="side-menu-link">🎯 Gameboard</a>
     <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
     <a href="standings.html" class="side-menu-link">📊 Standings</a>
     <a href="playoffs.html" class="side-menu-link">🥇 Playoffs</a>
-    <a href="media-admin.html" class="side-menu-link" id="nav-media-admin">📸 Media Inbox</a>
+    <a href="media-admin.html" class="side-menu-link active" id="nav-media-admin">📸 Media Inbox</a>
   </nav>
 
   <main>
-    <div class="sched-page">
+    <div class="media-admin-page">
 
-      <!-- PENDING (Fall 2026): the schedule sheet and team colors haven't
-           been published yet, and colors are reassigned every season, so
-           there's nothing real to show here until they land. Restore the
-           toolbar/table/calendar markup below (removed 2026-09-17, see git
-           history on this file) once schedule.js has real data to read. -->
-      <div class="season-pending">
-        <div class="season-pending-icon">📅</div>
-        <h2>Schedule Coming Soon</h2>
-        <p>The Fall 2026 game schedule and team colors haven't been published
-           yet. Check back in about a week.</p>
-        <p>In the meantime, see who's on each team on the
-           <a href="draft-results.html">Draft Results</a> page.</p>
+      <!-- Admin gate. Filled by media-admin.js when the viewer isn't an
+           admin; the queue below stays hidden in that case. -->
+      <div id="media-gate" class="season-pending hidden">
+        <div class="season-pending-icon">🔒</div>
+        <h2>Admins only</h2>
+        <p id="media-gate-msg">Log in as a league admin to review submitted media.</p>
+      </div>
+
+      <div id="media-admin-main" class="hidden">
+        <div class="media-retain-note">
+          <span aria-hidden="true">🗄️</span>
+          <div>
+            <div class="media-retain-t">Rejecting never deletes anything</div>
+            <div class="media-retain-b">
+              Rejected media keeps its file and its record — the <b>Rejected</b> tab is
+              the archive, and re-approving restores an item with no extra step.
+              Permanent deletion happens only through
+              <code>_local/archive_media.py</code>, which verifies a local copy first.
+            </div>
+          </div>
+        </div>
+
+        <div class="media-adm-bar">
+          <button class="chip media-filter" data-status="pending"  aria-pressed="true">Pending <span class="chip-n" id="n-pending">0</span></button>
+          <button class="chip media-filter" data-status="approved" aria-pressed="false">Approved <span class="chip-n" id="n-approved">0</span></button>
+          <button class="chip media-filter" data-status="rejected" aria-pressed="false">Rejected <span class="chip-n" id="n-rejected">0</span></button>
+          <button class="btn btn-sm" id="btn-export-csv" title="Metadata and direct links — no media files">⤓ Export list (CSV)</button>
+          <span class="media-adm-count" id="media-adm-count"></span>
+        </div>
+
+        <div id="media-queue" class="media-q-list">
+          <div class="loading">Loading submissions…</div>
+        </div>
+
+        <section id="media-order-section" class="hidden">
+          <div class="media-ord-head">
+            <div>
+              <div class="media-ord-h" id="media-ord-title">Order</div>
+              <div class="media-ord-hint">Drag to set the order shown on the player's profile.</div>
+            </div>
+            <button class="btn btn-sm" id="btn-close-order">Close</button>
+          </div>
+          <div id="media-order-list" class="media-ord-list"></div>
+        </section>
       </div>
 
     </div>
   </main>
-
-  <!-- Game info popover (single click/tap on a game slot) -->
-  <div id="sched-popover" class="sched-popover hidden"></div>
 
   <!-- Coach Login Modal -->
   <div id="modal-login" class="modal-overlay hidden">
@@ -99,12 +126,18 @@
     </div>
   </div>
 
-  <!-- schedule.js and its score-entry modal are unloaded for now — the page
-       has nothing left for either to attach to while the schedule is
-       pending (see the season-pending panel above). Restore both alongside
-       the table/calendar markup once there's a real schedule to show. -->
+  <!-- Media lightbox -->
+  <div id="media-lightbox" class="media-lightbox hidden">
+    <div class="media-lightbox-inner">
+      <button id="media-lightbox-close" class="media-lightbox-x" aria-label="Close">✕</button>
+      <div id="media-lightbox-body"></div>
+      <div id="media-lightbox-cap" class="media-lightbox-cap"></div>
+    </div>
+  </div>
+
   <script type="module" src="coach-login.js"></script>
   <script type="module" src="side-menu.js"></script>
+  <script type="module" src="media-admin.js"></script>
   <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/draft-tool/sw.js');
   </script>

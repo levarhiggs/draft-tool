@@ -11,6 +11,8 @@
 // board renders, it never destroys a coach's sandbox.
 import { escHtml, COL, photoUrl, videoUrl } from './app.js';
 import { fetchPlayers, buildDriveIndex, SEASON_CODE } from './players-data.js';
+import { attachMediaSubmit } from './media-submit.js';
+import { loadPromotions } from './media-promotions.js';
 import { getCurrentCoach } from './coach-login.js';
 import { contactFor } from './player-contacts.js';
 import {
@@ -238,7 +240,9 @@ function persist() {
 // ── Boot ─────────────────────────────────────────────────────────────────────
 async function init() {
   try {
-    const [players] = await Promise.all([fetchPlayers(), buildDriveIndex()]);
+    const [players] = await Promise.all([
+      fetchPlayers(), buildDriveIndex(), loadPromotions(),
+    ]);
     allPlayers = players.slice();
     allPlayers.sort((a, b) => {
       const na = parseFloat(a[COL.ID]), nb = parseFloat(b[COL.ID]);
@@ -528,6 +532,14 @@ function renderBoard(np) {
           if (suppressClick) return;
           openPlayerPhoto(c.personId, s);
         });
+        // Media submit rides the SAME double-click, but only when the board
+        // isn't editable — an editing admin's double-click already means
+        // "send this player back to the pool" (above), and that meaning wins
+        // on the board. For everyone else (the public, a coach browsing a
+        // finalized board) the slot is inert on double-click, so it's free.
+        if (!canEdit() && p) {
+          attachMediaSubmit(slot, { id: p[COL.ID], name: p[COL.NAME] });
+        }
       } else if (canEdit()) {
         slot.innerHTML =
           `<input class="slot-input" inputmode="numeric" autocomplete="off" maxlength="3"

@@ -16,6 +16,8 @@ import { subscribePlayer, getPriorPlayerData, saveRanking, deleteRanking, saveNo
 import { getCurrentCoach } from './coach-login.js';
 import { personByName, teamNameFor } from './coaches-config.js';
 import { contactFor } from './player-contacts.js';
+import { attachMediaSubmit } from './media-submit.js';
+import { loadPromotions } from './media-promotions.js';
 import {
   activeFilters, currentSort, favorites, loadFavorites,
   toggleFavorite as toggleFavoriteShared, applySort, applyFilters,
@@ -50,7 +52,12 @@ const unsubs = {};
 
 async function init() {
   try {
-    const [players] = await Promise.all([fetchPlayers(), buildDriveIndex()]);
+    // loadPromotions() must resolve before the first render: photoUrl() reads
+    // the promotion map synchronously, so rendering first would show the Drive
+    // original and then silently swap. Never throws (see media-promotions.js).
+    const [players] = await Promise.all([
+      fetchPlayers(), buildDriveIndex(), loadPromotions(),
+    ]);
     allPlayers = players.slice().sort((a, b) => {
       const na = parseFloat(a[COL.ID]), nb = parseFloat(b[COL.ID]);
       if (!isNaN(na) && !isNaN(nb)) return na - nb;
@@ -271,8 +278,17 @@ function wireRow(p) {
   row.querySelector('[data-action="favorite"]')
     ?.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); toggleFavorite(id); });
 
-  row.querySelector('[data-action="bio"]')
-    ?.addEventListener('click', () => openBioModal(p));
+  // The photo carries BOTH actions: single tap opens the bio popup, double
+  // tap opens the media submit sheet. The single-click handler is passed into
+  // attachMediaSubmit rather than bound separately — that is what lets the
+  // 250ms debounce cancel the bio popup when a second tap lands in time.
+  // Binding them independently would flash the bio modal open on every
+  // double-tap (the click/click/dblclick trap documented in schedule.js:461).
+  const bioEl = row.querySelector('[data-action="bio"]');
+  if (bioEl) {
+    attachMediaSubmit(bioEl, { id: p[COL.ID], name: p[COL.NAME] },
+                      { onSingleClick: () => openBioModal(p) });
+  }
 
   row.querySelector('[data-action="composite"]')
     ?.addEventListener('click', () => openRankingsModal(id));

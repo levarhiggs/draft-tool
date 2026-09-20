@@ -747,3 +747,83 @@ export async function deleteRotationConfig(coachName, configId) {
   const ref = doc(db, 'rotationConfigs', sid(coachName), 'configs', configId);
   await deleteDoc(ref);
 }
+
+// ── Practice Schedule (weekly coaching court-slot grid) ─────────────────────
+// Deliberately NOT season-scoped (no sid()) — this is the recurring weekly
+// practice-slot assignment, not season-specific roster/ranking data. It
+// persists across the whole season and just gets edited in place as coaches
+// change, per the user's framing when this feature was built (2026-09-20).
+// If a future season ever needs its own separate slate, revisit this.
+//
+// Lives in the EXISTING `coaches` collection (already has a published
+// wide-open Firestore rule) rather than a new top-level collection, for the
+// same reason draftBoard/roster/pin overrides do (see those comments above,
+// and gotcha #3 in PROJECT_STATUS.md): a brand-new collection has no rule
+// until one is manually published in the Console, and an unpublished rule
+// denies writes SILENTLY. `schedule_practice` can never collide with a
+// season-prefixed favorites doc or any other reserved key in this collection.
+//
+// Doc shape:
+// {
+//   slots: {
+//     "Sunday|4-5|mullins|0": { coach: "Kev", tbd: false, loc: "East" },
+//     ...
+//   },
+//   updatedAt: timestamp,
+//   updatedBy: string (coach name) | null,
+// }
+// Key scheme "{day}|{hour}|{loc}|{idx}" mirrors practice-schedule.js's own
+// in-memory addressing for a slot — see that file for the full day/hour/
+// loc/idx model (which days and hours exist, which Mullins slot is West vs.
+// East, how many slots each day/hour has) — none of that shape lives here,
+// only the mutable coach/tbd state per slot.
+function practiceScheduleRef() {
+  return doc(db, 'coaches', 'schedule_practice');
+}
+
+export function subscribePracticeSchedule(callback) {
+  return onSnapshot(practiceScheduleRef(), snap => {
+    callback(snap.exists() ? (snap.data().slots || {}) : null);
+  }, err => {
+    console.error('subscribePracticeSchedule error:', err);
+    callback(null);
+  });
+}
+
+/**
+ * Seeds the doc if (and only if) it doesn't already exist — safe to call on
+ * every page load. Never overwrites real data with the hardcoded fixture.
+ */
+export async function seedPracticeScheduleIfEmpty(seedSlots) {
+  const ref = practiceScheduleRef();
+  const snap = await getDoc(ref);
+  if (snap.exists()) return false;
+  await setDoc(ref, { slots: seedSlots, updatedAt: serverTimestamp(), updatedBy: null });
+  return true;
+}
+
+/**
+ * Writes one slot's coach/tbd fields via a dotted field path — never a
+ * read-modify-write of the whole `slots` map (see saveDraftSlots's own
+ * comment above for the exact stale-merge bug that pattern caused there).
+ */
+export async function savePracticeSlot(slotKey, coach, tbd, updatedBy) {
+  await updateDoc(practiceScheduleRef(), {
+    [`slots.${slotKey}.coach`]: coach,
+    [`slots.${slotKey}.tbd`]: !!tbd,
+    updatedAt: serverTimestamp(),
+    updatedBy,
+  });
+}
+
+/** Swap two slots' coach/tbd fields in one atomic write (drag-and-drop). */
+export async function swapPracticeSlots(slotKeyA, coachA, tbdA, slotKeyB, coachB, tbdB, updatedBy) {
+  await updateDoc(practiceScheduleRef(), {
+    [`slots.${slotKeyA}.coach`]: coachA,
+    [`slots.${slotKeyA}.tbd`]: !!tbdA,
+    [`slots.${slotKeyB}.coach`]: coachB,
+    [`slots.${slotKeyB}.tbd`]: !!tbdB,
+    updatedAt: serverTimestamp(),
+    updatedBy,
+  });
+}

@@ -1,0 +1,227 @@
+/* practice-schedule.css — Weekly Coaching Schedule grid.
+   Read-only MVP: view for everyone, no admin/drag-drop wired yet (see
+   PRACTICE_SCHEDULE_SPEC.md — admin power-user features are a follow-up).
+   This app is dark-only (no light/dark toggle in style.css), so these are
+   fixed values, not light/dark custom-property pairs like the artifact had. */
+
+:root {
+  --psched-surface-2: #232838;
+  --psched-border-day: #454b63;
+  --psched-accent: #7fb3e0;
+  --psched-accent-soft: #1c3550;
+  --psched-accent-filled: #0f2032;
+  --psched-accent-2: #e8a35c;
+  --psched-accent-2-soft: #4a2f16;
+  --psched-accent-2-filled: #2e1b0a;
+  --psched-tbd: #f0cc6a;
+  --psched-tbd-soft: #4a3d15;
+  --psched-nodata: #2a2e40;
+  --psched-break-bg: #1b1e2b;
+  --psched-chip-shadow: 0 1px 3px rgba(0,0,0,0.45);
+}
+
+.psched-page {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 20px 16px 36px;
+  font-family: 'Inter Tight', 'Segoe UI', system-ui, sans-serif;
+}
+
+.psched-grid-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--clr-border);
+  border-radius: 10px;
+  background: var(--clr-card);
+}
+
+#psched-table {
+  border-collapse: collapse;
+  width: auto;
+  table-layout: fixed;
+  font-size: 0.86rem;
+  color: var(--clr-text);
+}
+#psched-table colgroup col.time-col { width: 56px; }
+#psched-table colgroup col.friday-col { width: 34px; }
+#psched-table colgroup col.wide-day { width: 232px; }
+#psched-table colgroup col.narrow-day { width: 118px; }
+
+#psched-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--psched-surface-2);
+  color: var(--clr-text);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--clr-border);
+  border-left: 2px solid var(--psched-border-day);
+  white-space: nowrap;
+  text-align: center;
+}
+#psched-table thead th:first-child {
+  border-left: none;
+  text-align: left;
+  padding-left: 10px;
+}
+#psched-table thead th.friday-head {
+  writing-mode: vertical-rl;
+  font-size: 0.62rem;
+  padding: 6px 2px;
+  color: var(--clr-muted);
+}
+
+#psched-table tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--psched-surface-2);
+  color: var(--clr-muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
+  padding: 2px 10px;
+  border-bottom: 1px solid var(--clr-border);
+  border-right: 1px solid var(--clr-border);
+  white-space: nowrap;
+  text-align: left;
+}
+
+#psched-table td {
+  border-left: 2px solid var(--psched-border-day);
+  padding: 1px 5px;
+  vertical-align: middle;
+  height: 24px;
+  background: var(--clr-card);
+}
+#psched-table tr.slot-row td { border-bottom: 1px solid var(--clr-border); }
+#psched-table tr.hour-start td, #psched-table tr.hour-start th {
+  border-top: 1px solid var(--clr-border);
+}
+#psched-table td.friday-cell {
+  background: repeating-linear-gradient(135deg, var(--psched-nodata) 0px, var(--psched-nodata) 4px, transparent 4px, transparent 8px);
+  background-color: var(--psched-surface-2);
+}
+#psched-table td.nodata-cell {
+  background: var(--psched-surface-2);
+  opacity: 0.5;
+}
+#psched-table tbody tr:last-child td, #psched-table tbody tr:last-child th {
+  border-bottom: none;
+}
+
+.psched-tile {
+  position: relative;
+  border-radius: 5px;
+  height: 24px;
+  width: 108px;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+}
+.psched-tile.mullins.open-slot { background: var(--psched-accent-soft); }
+.psched-tile.glades.open-slot { background: var(--psched-accent-2-soft); }
+.psched-tile.mullins:not(.open-slot) { background: var(--psched-accent-filled); }
+.psched-tile.glades:not(.open-slot) { background: var(--psched-accent-2-filled); }
+
+.psched-tile.mullins.west::before, .psched-tile.mullins.east::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--psched-accent-2);
+}
+.psched-tile.mullins.west::before { left: 2px; }
+.psched-tile.mullins.east::before { right: 2px; }
+.psched-tile.mullins:not(.open-slot).west::before,
+.psched-tile.mullins:not(.open-slot).east::before {
+  background: var(--psched-accent-soft);
+}
+.psched-tile.mullins.open-slot::before { opacity: 0.55; }
+
+.psched-open-label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--clr-muted);
+  white-space: nowrap;
+}
+
+.psched-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 92px;
+  max-width: 100%;
+  background: var(--clr-surface);
+  color: var(--clr-text);
+  border: 1px solid var(--clr-border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1.5;
+  box-shadow: var(--psched-chip-shadow);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.psched-chip.tbd-chip {
+  color: var(--psched-tbd);
+  border-color: var(--psched-tbd);
+  border-style: dashed;
+  background: var(--psched-tbd-soft);
+  font-style: italic;
+}
+
+#psched-table tr.break-row td {
+  height: 14px;
+  background: var(--psched-break-bg);
+  border-left: 1px solid var(--clr-border);
+  padding: 0;
+}
+#psched-table tr.break-row th {
+  height: 14px;
+  background: var(--psched-break-bg);
+  color: var(--clr-muted);
+  font-size: 0.62rem;
+  font-style: italic;
+  font-weight: 500;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+#psched-table tr.loc-header-row td, #psched-table tr.loc-header-row th {
+  background: var(--psched-surface-2);
+  border-bottom: 1px solid var(--clr-border);
+  padding: 5px;
+}
+.psched-loc-label {
+  width: 108px;
+  max-width: 100%;
+  text-align: center;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.psched-loc-label.mullins { color: var(--psched-accent); }
+.psched-loc-label.glades { color: var(--psched-accent-2); }
+
+.psched-loading {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--clr-muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 600px) {
+  #psched-table { font-size: 0.76rem; }
+}

@@ -17,6 +17,27 @@ import {
   loadFavorites, applySort, applyFilters, renderResultCount,
   initListControls, buildTeamChips, isMissedTryout,
 } from './player-list-controls.js';
+import { attachMediaSubmit } from './media-submit.js';
+import { loadPromotions } from './media-promotions.js';
+
+/**
+ * Attach the media-submit double-tap to every card photo in the grid.
+ *
+ * Kept as its own function (rather than inline in renderGrid) because
+ * renderGrid runs on every sort, filter, login and Firebase enrichment —
+ * attachMediaSubmit is idempotent per element, but the intent is clearer
+ * named than as a loop buried in the render path.
+ */
+function wireMediaSubmit(grid, visible) {
+  const byId = new Map(visible.map(p => [String(p[COL.ID]), p]));
+  grid.querySelectorAll('.player-card-wrap').forEach(wrap => {
+    const thumb = wrap.querySelector('.player-card-thumb');
+    const id = wrap.querySelector('.heart-btn')?.dataset.id;
+    const player = byId.get(String(id));
+    if (!thumb || !player) return;
+    attachMediaSubmit(thumb, { id: player[COL.ID], name: player[COL.NAME] });
+  });
+}
 
 /** True when the logged-in coach is a commissioner/admin. */
 function viewerIsAdmin() {
@@ -49,6 +70,10 @@ async function init() {
     const [players] = await Promise.all([
       fetchPlayers(),
       buildDriveIndex(),
+      // Promoted media overrides the Drive headshot in photoUrl()/videoUrl().
+      // Must resolve BEFORE the first render or promoted photos would flash
+      // the Drive original first. Never throws — see media-promotions.js.
+      loadPromotions(),
     ]);
     allPlayers = players;
 
@@ -144,6 +169,15 @@ function renderGrid() {
     btn.addEventListener('click', e => toggleFavorite(btn.dataset.id, e));
   });
 
+  // Double-tap a card's photo to submit media for that player.
+  //
+  // Attached to the THUMB, not the card: a logged-in card is an <a href>, and
+  // a double-click on a link navigates on the first click before the second
+  // ever lands. Suppressing the default on the thumb keeps the rest of the
+  // card behaving exactly as before — single-tapping the name/meta still
+  // opens the ranking page (coach) or the video (public).
+  wireMediaSubmit(grid, visible);
+
   // Logged-out cards are plain divs (see playerCardHTML) — tapping one plays
   // that player's tryout video.
   grid.querySelectorAll('[data-action="open-video"]').forEach(el => {
@@ -227,9 +261,16 @@ function playerCardHTML(p, isLoggedIn) {
   const teamHtml = team
     ? `<div class="player-card-team">${escHtml(team)}</div>` : '';
 
-  // Badge row. All of this sits IN FRONT of the login gate this season --
-  // coach pins aren't distributed yet, so coaches need to evaluate from the
-  // public link. Move it back behind getCurrentCoach() once pins go out.
+  // Badge row.
+  //
+  // NO RANKING DATA IS EVER STATED PUBLICLY. Nothing that names or numbers a
+  // seed, rank or composite renders outside the coach login gate — not the
+  // current composite (handled above), and not a prior season's. A non-coach
+  // can still infer plenty from the draft board or who ended up on which team;
+  // that inference is fine. Publishing a number about a specific child is not.
+  //
+  // "Returning" stays public: it states that a kid played before, which is a
+  // fact about participation, not an evaluation of them.
   //
   // Returning-player badge: ids are season-scoped and change every season, so
   // "has this kid played before" comes from the cross-season identity link
@@ -239,8 +280,9 @@ function playerCardHTML(p, isLoggedIn) {
   if (prior.length) {
     const seasons = prior.map(e => escHtml(getSeason(e.season).name)).join(', ');
     badges.push(`<span class="player-card-returning" title="Played in ${seasons}">↩ Returning</span>`);
+    // Prior-season composite: coach-gated, same as the current-season one.
     const pr = p._priorRank;
-    if (pr && pr.composite != null) {
+    if (isLoggedIn && pr && pr.composite != null) {
       badges.push(`<span class="player-card-prevrank" title="${
         escHtml(getSeason(pr.season).name)} composite seed from ${pr.count} coach${
         pr.count === 1 ? '' : 'es'}">Prev. Rank: ${pr.composite.toFixed(1)}</span>`);

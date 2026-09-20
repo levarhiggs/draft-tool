@@ -156,6 +156,191 @@ h1{
 .tba-panel a{color:#4f8ef7;text-decoration:none;font-weight:600}
 .tba-panel a:hover{text-decoration:underline}
 @media(max-width:600px){.tba-panel{margin:36px 14px;padding:30px 20px}}
+
+/* ── Media submit sheet ────────────────────────────────────────────────────
+   This page deliberately does NOT load style.css (gotcha #11), so the sheet's
+   styles cannot come from there. Rather than duplicating the whole block, the
+   sheet's own --clr-* tokens are mapped onto this page's palette and only the
+   rules the sheet actually uses are restated. Keep in sync with the
+   "USER-SUBMITTED MEDIA" section of style.css. */
+#media-sheet{
+  --clr-bg:var(--bg);--clr-surface:var(--surface);--clr-card:var(--card);
+  --clr-border:var(--border);--clr-text:var(--text);--clr-muted:var(--muted);
+  --clr-accent:#4f8ef7;--clr-accent-dk:#3a72d8;
+  --clr-danger:#e05c5c;--clr-success:#4ecf87;--clr-warning:#e0a75c;
+  --shadow:0 4px 24px rgba(0,0,0,.5);
+  position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:600;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+#media-sheet.hidden{display:none}
+#media-sheet .media-sheet{
+  background:var(--clr-surface);border:1px solid var(--clr-border);
+  border-radius:var(--radius);width:100%;max-width:400px;max-height:88vh;
+  overflow-y:auto;box-shadow:var(--shadow);padding:18px;text-align:left;
+}
+#media-sheet .media-sheet-head{display:flex;gap:11px;align-items:center;margin-bottom:15px}
+#media-sheet .media-sheet-ava{
+  width:46px;height:46px;border-radius:22%;flex-shrink:0;
+  background:linear-gradient(145deg,#2c3150,#22263a);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:1rem;color:#fff;
+}
+#media-sheet .media-sheet-title{font-size:.98rem;font-weight:700;line-height:1.25}
+#media-sheet .media-sheet-title .pid{color:var(--clr-accent);font-variant-numeric:tabular-nums}
+#media-sheet .media-sheet-sub{font-size:.73rem;color:var(--clr-muted);margin-top:2px}
+#media-sheet .media-sheet-x{
+  margin-left:auto;align-self:flex-start;background:none;border:0;
+  color:var(--clr-muted);font-size:1.4rem;line-height:1;cursor:pointer;padding:0 2px;
+}
+#media-sheet .media-review-note{
+  display:flex;gap:9px;align-items:flex-start;background:rgba(224,167,92,.1);
+  border:1px solid rgba(224,167,92,.32);border-radius:7px;padding:10px 11px;margin-bottom:14px;
+}
+#media-sheet .media-review-t{font-size:.76rem;font-weight:700;color:#e6c28a;line-height:1.35}
+#media-sheet .media-review-b{font-size:.71rem;color:#c9b892;margin-top:3px;line-height:1.4}
+#media-sheet .media-quota-lab{
+  font-size:.6rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--clr-muted);margin-bottom:7px;
+}
+#media-sheet .media-quota-row{display:flex;gap:8px;margin-bottom:15px}
+#media-sheet .media-quota{
+  flex:1;background:var(--clr-bg);border:1px solid var(--clr-border);
+  border-radius:7px;padding:8px 10px;
+}
+#media-sheet .media-quota-k{
+  font-size:.6rem;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--clr-muted);
+}
+#media-sheet .media-quota-v{font-size:.95rem;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px}
+#media-sheet .media-quota-v .cap{color:var(--clr-muted);font-size:.78rem}
+#media-sheet .media-quota.full .media-quota-v .used{color:var(--clr-warning)}
+#media-sheet .media-quota-bar{height:3px;border-radius:99px;background:var(--clr-border);margin-top:6px;overflow:hidden}
+#media-sheet .media-quota-bar i{display:block;height:100%;background:var(--clr-accent);border-radius:99px}
+#media-sheet .media-quota.full .media-quota-bar i{background:var(--clr-warning)}
+#media-sheet .media-quota-foot{font-size:.66rem;color:var(--clr-muted);margin:-6px 0 15px;line-height:1.4}
+#media-sheet .media-pick-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#media-sheet .media-pick{
+  background:var(--clr-card);border:1px solid var(--clr-border);border-radius:8px;
+  padding:14px 10px;font:inherit;color:var(--clr-text);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;
+}
+#media-sheet .media-pick:hover{border-color:var(--clr-accent)}
+#media-sheet .media-pick-ico{font-size:1.3rem;line-height:1}
+#media-sheet .media-pick-lab{font-size:.78rem;font-weight:600}
+#media-sheet .media-pick-hint{font-size:.63rem;color:var(--clr-muted)}
+#media-sheet .media-chosen{
+  display:flex;gap:10px;align-items:center;background:var(--clr-bg);
+  border:1px solid var(--clr-border);border-radius:7px;padding:9px 10px;margin-bottom:4px;
+}
+#media-sheet .media-chosen-thumb{
+  width:52px;height:52px;border-radius:6px;flex-shrink:0;object-fit:cover;
+  background:var(--clr-card);display:flex;align-items:center;justify-content:center;font-size:1.1rem;
+}
+#media-sheet .media-chosen-meta{min-width:0;flex:1}
+#media-sheet .media-chosen-name{font-size:.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#media-sheet .media-chosen-facts{font-size:.68rem;color:var(--clr-muted);margin-top:2px;font-variant-numeric:tabular-nums}
+#media-sheet .media-field{margin-top:13px}
+#media-sheet .media-field>label{
+  display:block;font-size:.64rem;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--clr-muted);margin-bottom:5px;
+}
+#media-sheet .media-field input,#media-sheet .media-field textarea{
+  width:100%;background:var(--clr-bg);border:1px solid var(--clr-border);
+  color:var(--clr-text);border-radius:6px;padding:8px 10px;font:inherit;font-size:.82rem;
+}
+#media-sheet .media-field textarea{resize:vertical;min-height:54px}
+#media-sheet .media-optional{color:#5d6478;font-weight:600;text-transform:none;font-size:.66rem}
+#media-sheet .media-hint{font-size:.7rem;color:var(--clr-muted);margin:8px 0 0}
+#media-sheet .media-reject{
+  border-left:3px solid var(--clr-danger);background:rgba(224,92,92,.09);
+  border-radius:0 6px 6px 0;padding:10px 12px;
+}
+#media-sheet .media-reject-t{font-size:.78rem;font-weight:700;color:#f0a4a4}
+#media-sheet .media-reject-b{font-size:.72rem;color:#d9b3b3;margin-top:3px;line-height:1.45}
+#media-sheet .media-err{
+  font-size:.75rem;color:#f0a4a4;margin:10px 0 0;
+  background:rgba(224,92,92,.09);border-radius:6px;padding:8px 10px;
+}
+#media-sheet .media-err[hidden]{display:none}
+#media-sheet .media-prog{margin-top:15px}
+#media-sheet .media-prog[hidden]{display:none}
+#media-sheet .media-prog-top{display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:6px}
+#media-sheet .media-prog-pct{font-weight:700;font-variant-numeric:tabular-nums;color:var(--clr-accent)}
+#media-sheet .media-prog-track{height:6px;background:var(--clr-border);border-radius:99px;overflow:hidden}
+#media-sheet .media-prog-fill{height:100%;width:0;background:var(--clr-accent);border-radius:99px;transition:width .25s ease}
+#media-sheet .media-actions{display:flex;gap:8px;margin-top:16px}
+#media-sheet .btn{
+  background:var(--clr-surface);color:var(--clr-text);border:1px solid var(--clr-border);
+  border-radius:6px;padding:9px 14px;font:inherit;font-size:.78rem;font-weight:600;cursor:pointer;
+}
+#media-sheet .btn-primary{background:var(--clr-accent);border-color:var(--clr-accent);color:#fff;flex:1}
+#media-sheet .btn:disabled{opacity:.5;cursor:not-allowed}
+#media-sheet .media-done{text-align:center;padding:18px 8px 4px}
+#media-sheet .media-done-ico{
+  width:46px;height:46px;border-radius:50%;margin:0 auto 12px;
+  background:rgba(78,207,135,.15);border:1px solid rgba(78,207,135,.4);
+  display:flex;align-items:center;justify-content:center;font-size:1.25rem;color:var(--clr-success);
+}
+#media-sheet .media-done-t{font-size:.98rem;font-weight:700}
+#media-sheet .media-done-b{font-size:.79rem;color:var(--clr-muted);margin-top:6px;line-height:1.5}
+#media-sheet .media-done-b b{color:var(--clr-text)}
+/* ── Long-press feedback ───────────────────────────────────────────────────
+   Touch opens the submit sheet with a ~500ms press, not a double-tap: on a
+   phone, double-tap is the browser's own zoom gesture, and it gives no
+   feedback until it fires. A press can show progress — which is what makes an
+   otherwise invisible trigger discoverable, since someone who presses and
+   hesitates watches the ring fill and learns the gesture exists.
+
+   -webkit-touch-callout is the iOS half of suppressing the native image menu;
+   the contextmenu handler in media-submit.js is the other half, and on iOS
+   neither works alone. Scoped to submit targets only, so every other image in
+   the app keeps its normal press-and-hold behaviour. */
+.media-submit-target {
+  cursor: pointer;
+  position: relative;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* The ring. A conic-gradient sweep is one element and one animation — no SVG,
+   no extra markup in six different render paths. */
+.media-submit-target.media-pressing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 3;
+  background: conic-gradient(rgba(79,142,247,0.55) var(--media-press-deg, 0deg),
+                             rgba(0,0,0,0.28) 0deg);
+  animation: media-press-fill 500ms linear forwards;
+}
+
+/* Animating a custom property needs @property for it to interpolate at all;
+   without it the value jumps. Browsers that don't support @property fall back
+   to the dimming overlay alone, which still reads as "something is happening."  */
+@property --media-press-deg {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes media-press-fill {
+  from { --media-press-deg: 0deg; }
+  to   { --media-press-deg: 360deg; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-submit-target.media-pressing::after {
+    animation: none;
+    background: rgba(0,0,0,0.28);
+  }
+}
+@media(max-width:480px){
+  #media-sheet{padding:0;align-items:flex-end}
+  #media-sheet .media-sheet{max-width:none;max-height:92vh;border-radius:var(--radius) var(--radius) 0 0;border-bottom:0}
+}
 </style>
 </head>
 <body>
@@ -182,10 +367,12 @@ h1{
   <a href="draft-board.html" class="side-menu-link">📋 Draft Board</a>
   <a href="draft-results.html" class="side-menu-link active">🏆 Draft Results</a>
   <a href="schedules.html" class="side-menu-link">📅 Schedules</a>
+  <a href="practice-schedule.html" class="side-menu-link">🏟️ Practice Schedule</a>
   <a href="gameboard.html" class="side-menu-link">🎯 Gameboard</a>
   <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
   <a href="standings.html" class="side-menu-link">📊 Standings</a>
   <a href="playoffs.html" class="side-menu-link">🥇 Playoffs</a>
+  <a href="media-admin.html" class="side-menu-link" id="nav-media-admin">📸 Media Inbox</a>
 </nav>
 
 <div id="teams-grid" class="teams-grid">
@@ -402,7 +589,7 @@ function renderTeam(t) {
               onerror="this.outerHTML='<div class=\\'player-photo-placeholder\\'>🏀</div>'" />`
       : `<div class="player-photo-placeholder">🏀</div>`;
     return `
-      <div class="player-tile">
+      <div class="player-tile" data-player-id="${p.id}" data-player-name="${p.name.replace(/"/g, '&quot;')}">
         ${photoHtml}
         <div class="player-name">${p.name}</div>
       </div>`;
@@ -421,6 +608,10 @@ function renderTeam(t) {
 async function init() {
   await buildPhotoIndex();
   document.getElementById('teams-grid').innerHTML = TEAMS.map(renderTeam).join('');
+  // This page's script is NOT a module (it predates the rest of the app), so
+  // it can't import media-submit.js itself. It signals instead, and the small
+  // module script at the bottom of the file does the wiring.
+  document.dispatchEvent(new CustomEvent('rosterRendered'));
 }
 
 function openLightbox(src, name, e) {
@@ -672,5 +863,36 @@ init();
     ── end archived Summer 2026 draft results ──────────────────────────── */
 </script>
 <script type="module" src="side-menu.js"></script>
+<!-- Media submit. A separate module because the main script above is a plain
+     (non-module) script and cannot import. -->
+<script type="module">
+  import { attachMediaSubmit } from './media-submit.js';
+  // Wire whatever is already on the page, then again on each render.
+  //
+  // Listening for the event ALONE is a race that loses on a warm cache: when
+  // buildPhotoIndex() hits its sessionStorage cache it returns without ever
+  // awaiting the network, so init() finishes — and fires rosterRendered —
+  // before this module script has even been evaluated. The listener registers
+  // too late, the event is long gone, and nothing gets wired. Verified: 88
+  // tiles wired on a cold load, 0 on the very next visit. Running once
+  // immediately covers that case; the listener covers the cold one.
+  function wireAll() {
+    document.querySelectorAll('.player-tile[data-player-id]').forEach(tile => {
+      // Attach to the TILE, not the <img>. Each photo carries an inline
+      // onerror that does `this.outerHTML = '<div class=player-photo-placeholder>'`
+      // — which REPLACES the element, silently discarding any listener bound
+      // to it. Every player whose Drive photo fails to load would lose the
+      // double-tap (verified: only 3 of 88 tiles stayed wired when attaching
+      // to the img). The tile wrapper is stable, so it keeps working whether
+      // the photo loads, fails, or was never there.
+      attachMediaSubmit(tile, {
+        id:   tile.dataset.playerId,
+        name: tile.dataset.playerName,
+      });
+    });
+  }
+  document.addEventListener('rosterRendered', wireAll);
+  wireAll();
+</script>
 </body>
 </html>
