@@ -25,6 +25,7 @@
 // A person's displayNames list must keep every historical name they've used
 // (see PRODUCT_SPEC "Coach identity"), or their older rankings/notes under a
 // retired name become unreachable.
+import { scheduleSeason } from './season-config.js';
 
 // ── People (permanent) ───────────────────────────────────────────────────────
 // id: never reused, assigned once, append-only (same discipline as retired
@@ -179,8 +180,9 @@ export function personByName(name) {
  * app already uses everywhere, from the coach's current display name.
  *
  * Deliberately mirrors gameboard.js's existing coach->team string match, so
- * a team assigned at the draft resolves the same way there. Once the real
- * color names land, TEAM_COLORS keys must match what this produced.
+ * a team assigned at the draft resolves the same way there. Once real colors
+ * land for a season, TEAM_COLORS_BY_SEASON[season] keys must match what this
+ * produced for that season's coaches.
  */
 export function teamNameFor(personId) {
   const p = PERSONS.find(x => x.id === personId);
@@ -197,19 +199,40 @@ export function teamNameFor(personId) {
 // menus, the Gameboard team popover title) — `name` is the canonical value
 // and must match the schedule sheet's Visitor/Home color columns verbatim,
 // so it's never shortened at the data level.
-export const TEAM_COLORS = {
-  'Team Humberto':     { name: 'Purple',        hex: '#7B3FA0' },
-  'Team Alex':         { name: 'Deep Orange',   hex: '#C1440E' },
-  'Team Jeff':         { name: 'Carolina Blue', hex: '#B4E1FA' },
-  'Team Daven-Josiah': { name: 'Grey Concrete', hex: '#8C8C8C', shortName: 'Grey' },
-  'Team Ben':          { name: 'Maroon',        hex: '#7A3B2E' },
-  'Team Tati':         { name: 'Neon Yellow',   hex: '#F5EA0A' },
-  'Team Sedat':        { name: 'White',         hex: '#FFFFFF' },
-  'Team Andre':        { name: 'Forest Green',  hex: '#1B5E20' },
-  'Team Alfred-Levar': { name: 'Lime Shock',    hex: '#8BC98A', shortName: 'Lime' },
-  'Team Kevin':        { name: 'Gold',          hex: '#F5A623' },
-  'Team Mike C.':      { name: 'Black',         hex: '#0A0A0A' },
-  'Team Chris':        { name: 'True Red',      hex: '#E30613' },
+//
+// KEYED BY SEASON, same discipline as SLOT_ASSIGNMENTS above and for the
+// same reason: colors are NOT a coach's property. They're reassigned from
+// scratch every season, randomly, to whichever coaches are actually seated
+// once that season's draft finalizes — a coach who was "White" one season
+// has no claim on White (or any color) the next. Team names, similarly,
+// depend on who drafted a team that season (TEAMS_BY_SEASON below), so
+// a new season starts with its OWN empty color map and team list rather
+// than inheriting the previous one. This is the fix for the bug where two
+// returning coaches (Sedat, Humberto) silently kept showing their Summer
+// 2026 colors on Fall pages — see PROJECT_STATUS.md's "Known architecture
+// gap" writeup for the incident.
+const TEAM_COLORS_BY_SEASON = {
+  '26.2': {
+    'Team Humberto':     { name: 'Purple',        hex: '#7B3FA0' },
+    'Team Alex':         { name: 'Deep Orange',   hex: '#C1440E' },
+    'Team Jeff':         { name: 'Carolina Blue', hex: '#B4E1FA' },
+    'Team Daven-Josiah': { name: 'Grey Concrete', hex: '#8C8C8C', shortName: 'Grey' },
+    'Team Ben':          { name: 'Maroon',        hex: '#7A3B2E' },
+    'Team Tati':         { name: 'Neon Yellow',   hex: '#F5EA0A' },
+    'Team Sedat':        { name: 'White',         hex: '#FFFFFF' },
+    'Team Andre':        { name: 'Forest Green',  hex: '#1B5E20' },
+    'Team Alfred-Levar': { name: 'Lime Shock',    hex: '#8BC98A', shortName: 'Lime' },
+    'Team Kevin':        { name: 'Gold',          hex: '#F5A623' },
+    'Team Mike C.':      { name: 'Black',         hex: '#0A0A0A' },
+    'Team Chris':        { name: 'True Red',      hex: '#E30613' },
+  },
+
+  // Fall 2026: colors aren't assigned yet (typically ~1-2 days before the
+  // first game — see SEASON_INTAKE_RECONSTRUCTION.md). Starts empty ON
+  // PURPOSE — do not copy 26.2's map down here "to have something." Fill
+  // this in once the commissioner actually assigns colors, keyed by the
+  // same 'Team {Coach}' names TEAMS_BY_SEASON['26.3'] below already uses.
+  '26.3': {},
 };
 
 // Coaches allowed to view and change Team Assignment and mark No Shows.
@@ -220,26 +243,62 @@ export const TEAM_ADMINS = [
   'Coach Levar',
 ];
 
-// Team names available for assignment.
-//
-// Fall 2026, set from the 2026-09-16 draft board — 11 teams, in board order.
-// Ken, Kingston, Micah and Paul coached the draft without app logins, so they
-// have no PERSONS entry; their team names come straight from the board rather
-// than from teamNameFor(), which only resolves people who do. Summer's teams
-// are gone from this list on purpose: it drives the Team Assignment dropdown,
-// and a stale name there is a way to assign a Fall player to a team that no
-// longer exists.
-export const TEAMS = [
-  'Team Ken',
-  'Team Sedat',
-  'Team Xavier',
-  'Team Mason-Jaylen',
-  'Team Kingston',
-  'Team Craig',
-  'Team Humberto',
-  'Team Micah',
-  'Team Kevin K.',
-  'Team David',
-  'Team Paul',
-  'Undrafted',
-];
+// Team names available for assignment, per season — same season-scoping
+// reasoning as TEAM_COLORS_BY_SEASON above: which teams exist depends on who
+// actually drafted that season, so a new season gets its own list rather
+// than the previous one's names lingering (and being assignable) forever.
+const TEAMS_BY_SEASON = {
+  '26.2': [
+    'Team Alex', 'Team Jeff', 'Team Daven-Josiah', 'Team Ben', 'Team Tati',
+    'Team Sedat', 'Team Andre', 'Team Alfred-Levar', 'Team Kevin',
+    'Team Mike C.', 'Team Chris', 'Team Humberto',
+    'Undrafted',
+  ],
+
+  // Fall 2026, set from the 2026-09-16 draft board — 11 teams, in board
+  // order. Ken, Kingston, Micah and Paul coached the draft without app
+  // logins, so they have no PERSONS entry; their team names come straight
+  // from the board rather than from teamNameFor(), which only resolves
+  // people who do.
+  '26.3': [
+    'Team Ken',
+    'Team Sedat',
+    'Team Xavier',
+    'Team Mason-Jaylen',
+    'Team Kingston',
+    'Team Craig',
+    'Team Humberto',
+    'Team Micah',
+    'Team Kevin K.',
+    'Team David',
+    'Team Paul',
+    'Undrafted',
+  ],
+};
+
+/**
+ * Season-scoped accessor — pass an explicit season code (e.g. from a
+ * ?season= param) to read any season's color map, past or present.
+ * Returns {} for a season with no colors assigned yet, never another
+ * season's map.
+ */
+export function teamColorsFor(season) {
+  return TEAM_COLORS_BY_SEASON[season] || {};
+}
+
+/** Season-scoped accessor — see teamColorsFor() above. */
+export function teamsFor(season) {
+  return TEAMS_BY_SEASON[season] || [];
+}
+
+// ── Default exports for the schedule-driven pages (Schedules, Standings,
+// Gameboard, Rotations, Playoffs) ────────────────────────────────────────────
+// These pages don't (yet) carry their own season selector — they all read
+// whatever season schedule-data.js resolves to (SCHEDULE_SEASON, deliberately
+// decoupled from the roster's CURRENT_SEASON — see season-config.js), so
+// TEAM_COLORS/TEAMS resolve to that SAME season here rather than each of the
+// 5+ consumer files re-deriving it themselves. A page that needs a different
+// season's colors (e.g. a future season switcher) should call teamColorsFor()/
+// teamsFor() directly with its own resolved season instead of importing these.
+export const TEAM_COLORS = teamColorsFor(scheduleSeason().code);
+export const TEAMS = teamsFor(scheduleSeason().code);

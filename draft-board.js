@@ -14,7 +14,7 @@ import { fetchPlayers, buildDriveIndex, SEASON_CODE } from './players-data.js';
 import { getCurrentCoach } from './coach-login.js';
 import { contactFor } from './player-contacts.js';
 import {
-  getActiveCoaches, personByName, teamNameFor, TEAM_ADMINS,
+  getActiveCoaches, personByName, teamNameFor, TEAM_ADMINS, teamColorsFor,
 } from './coaches-config.js';
 import {
   subscribePlayer, saveRanking, deleteRanking, saveFavorites, getFavorites,
@@ -812,15 +812,16 @@ function showLightboxSlide(personId) {
   const coachName = rowCoach?.name || '';
 
   el('db-lightbox-name').textContent = p ? p[COL.NAME] : `#${playerId}`;
-  // Team name and color are suppressed for now: TEAM_COLORS still holds
-  // last season's colors (a fresh set is assigned every season, so Sedat
-  // and Humberto — both returning — would show a color that's simply
-  // wrong), and for every other coach "Team {Name}" directly under a
-  // caption that already says "{Name}" was just the same word twice. Bring
-  // this back once Fall's real colors are assigned; teamNameFor() already
-  // has the fallback for the four board-only coaches worked out (see the
-  // git history on this line) if it's still needed then.
-  el('db-lightbox-sub').textContent = coachName;
+  // Team color, from THIS season's own map (teamColorsFor(SEASON_CODE)) —
+  // never the flat TEAM_COLORS export, which resolves to SCHEDULE_SEASON
+  // (26.2) and would show Sedat/Humberto their now-wrong Summer colors on
+  // the Fall board. Colors are assigned late (~1-2 days before the first
+  // game), so this season's map is {} until then and the color line stays
+  // suppressed rather than show nothing useful; "Team {Name}" alone would
+  // just repeat the caption's own name, so that part stays as coachName.
+  const teamName = rowCoach ? teamNameFor(rowCoach.personId) || coachName : coachName;
+  const colorInfo = teamColorsFor(SEASON_CODE)[teamName];
+  el('db-lightbox-sub').textContent = colorInfo ? `${coachName} — ${colorInfo.name}` : coachName;
 
   // Parent phone, but only on the viewing coach's OWN column. Contact details
   // for minors, so the gate stays narrow.
