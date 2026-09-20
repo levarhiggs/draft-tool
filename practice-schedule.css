@@ -1,23 +1,34 @@
 /* practice-schedule.css — Weekly Coaching Schedule grid.
    Read-only MVP: view for everyone, no admin/drag-drop wired yet (see
    PRACTICE_SCHEDULE_SPEC.md — admin power-user features are a follow-up).
-   This app is dark-only (no light/dark toggle in style.css), so these are
-   fixed values, not light/dark custom-property pairs like the artifact had. */
+
+   The schedule matrix is deliberately its OWN self-contained light palette,
+   matching the original artifact exactly (https://claude.ai/artifact/
+   ULK2FzU8kFx3jpn13ijtTP) — it does NOT inherit this app's global dark
+   --clr-* tokens. The first shipped version reused --clr-card/--clr-border
+   (the app's dark navy palette) and the live page came out looking nothing
+   like the artifact it was ported from; this is the fix. Only the page
+   background OUTSIDE the grid stays dark, matching the rest of the app. */
 
 :root {
-  --psched-surface-2: #232838;
-  --psched-border-day: #454b63;
-  --psched-accent: #7fb3e0;
-  --psched-accent-soft: #1c3550;
-  --psched-accent-filled: #0f2032;
-  --psched-accent-2: #e8a35c;
-  --psched-accent-2-soft: #4a2f16;
-  --psched-accent-2-filled: #2e1b0a;
-  --psched-tbd: #f0cc6a;
-  --psched-tbd-soft: #4a3d15;
-  --psched-nodata: #2a2e40;
-  --psched-break-bg: #1b1e2b;
-  --psched-chip-shadow: 0 1px 3px rgba(0,0,0,0.45);
+  --psched-bg: #f7f6f3;
+  --psched-surface: #ffffff;
+  --psched-surface-2: #f0efea;
+  --psched-border: #e1ded5;
+  --psched-border-day: #989385;
+  --psched-text: #242220;
+  --psched-text-dim: #6b6862;
+  --psched-accent: #1d4d78;
+  --psched-accent-soft: #bfd8ec;
+  --psched-accent-filled: #1b4468;
+  --psched-accent-2: #a2530e;
+  --psched-accent-2-soft: #f2cfa0;
+  --psched-accent-2-filled: #8f4708;
+  --psched-tbd: #8a6410;
+  --psched-tbd-soft: #f0dca0;
+  --psched-nodata: #dedad0;
+  --psched-break-bg: #eae7de;
+  --psched-chip-shadow: 0 1px 2px rgba(36,34,32,0.18);
 }
 
 .psched-page {
@@ -29,9 +40,9 @@
 
 .psched-grid-scroll {
   overflow-x: auto;
-  border: 1px solid var(--clr-border);
+  border: 1px solid var(--psched-border);
   border-radius: 10px;
-  background: var(--clr-card);
+  background: var(--psched-surface);
 }
 
 #psched-table {
@@ -39,7 +50,7 @@
   width: auto;
   table-layout: fixed;
   font-size: 0.86rem;
-  color: var(--clr-text);
+  color: var(--psched-text);
 }
 #psched-table colgroup col.time-col { width: 56px; }
 #psched-table colgroup col.friday-col { width: 34px; }
@@ -51,13 +62,13 @@
   top: 0;
   z-index: 2;
   background: var(--psched-surface-2);
-  color: var(--clr-text);
+  color: var(--psched-text);
   font-weight: 600;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 7px 6px;
-  border-bottom: 1px solid var(--clr-border);
+  border-bottom: 1px solid var(--psched-border);
   border-left: 2px solid var(--psched-border-day);
   white-space: nowrap;
   text-align: center;
@@ -71,7 +82,7 @@
   writing-mode: vertical-rl;
   font-size: 0.62rem;
   padding: 6px 2px;
-  color: var(--clr-muted);
+  color: var(--psched-text-dim);
 }
 
 #psched-table tbody th {
@@ -79,13 +90,13 @@
   left: 0;
   z-index: 1;
   background: var(--psched-surface-2);
-  color: var(--clr-muted);
+  color: var(--psched-text-dim);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   font-size: 0.7rem;
   padding: 2px 10px;
-  border-bottom: 1px solid var(--clr-border);
-  border-right: 1px solid var(--clr-border);
+  border-bottom: 1px solid var(--psched-border);
+  border-right: 1px solid var(--psched-border);
   white-space: nowrap;
   text-align: left;
 }
@@ -95,11 +106,11 @@
   padding: 1px 5px;
   vertical-align: middle;
   height: 24px;
-  background: var(--clr-card);
+  background: var(--psched-surface);
 }
-#psched-table tr.slot-row td { border-bottom: 1px solid var(--clr-border); }
+#psched-table tr.slot-row td { border-bottom: 1px solid var(--psched-border); }
 #psched-table tr.hour-start td, #psched-table tr.hour-start th {
-  border-top: 1px solid var(--clr-border);
+  border-top: 1px solid var(--psched-border);
 }
 #psched-table td.friday-cell {
   background: repeating-linear-gradient(135deg, var(--psched-nodata) 0px, var(--psched-nodata) 4px, transparent 4px, transparent 8px);
@@ -151,7 +162,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--clr-muted);
+  color: var(--psched-text-dim);
   white-space: nowrap;
 }
 
@@ -161,9 +172,9 @@
   justify-content: center;
   width: 92px;
   max-width: 100%;
-  background: var(--clr-surface);
-  color: var(--clr-text);
-  border: 1px solid var(--clr-border);
+  background: var(--psched-surface);
+  color: var(--psched-text);
+  border: 1px solid var(--psched-border);
   border-radius: 4px;
   padding: 1px 6px;
   font-size: 0.66rem;
@@ -185,13 +196,13 @@
 #psched-table tr.break-row td {
   height: 14px;
   background: var(--psched-break-bg);
-  border-left: 1px solid var(--clr-border);
+  border-left: 1px solid var(--psched-border);
   padding: 0;
 }
 #psched-table tr.break-row th {
   height: 14px;
   background: var(--psched-break-bg);
-  color: var(--clr-muted);
+  color: var(--psched-text-dim);
   font-size: 0.62rem;
   font-style: italic;
   font-weight: 500;
@@ -200,7 +211,7 @@
 }
 #psched-table tr.loc-header-row td, #psched-table tr.loc-header-row th {
   background: var(--psched-surface-2);
-  border-bottom: 1px solid var(--clr-border);
+  border-bottom: 1px solid var(--psched-border);
   padding: 5px;
 }
 .psched-loc-label {
@@ -218,7 +229,7 @@
 .psched-loading {
   padding: 40px 20px;
   text-align: center;
-  color: var(--clr-muted);
+  color: var(--psched-text-dim);
   font-size: 0.9rem;
 }
 
