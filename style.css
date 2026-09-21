@@ -5252,11 +5252,15 @@ body:not(.draft-final) .slot.filled { cursor: grab; }
 .player-card-thumb > img,
 .player-card-thumb > .player-card-img-placeholder { width: 100%; display: block; }
 
-/* The badge is now a real <button> and the way into a player's media (it
-   opens the gallery/upload sheet in BOTH states). It sits as a sibling of the
-   card rather than inside it — a <button> nested in an <a href> is invalid
-   HTML and gets hoisted out of the anchor, detaching its listener. So it is
-   positioned against .player-card-wrap, and pointer-events are ON. */
+/* The badge is a <span role="button">, not a real <button> — a <button>
+   nested inside an <a href> is invalid HTML and gets silently hoisted OUT of
+   the anchor by the parser, detaching its listener (verified: the badge went
+   dead for logged-in coaches). A span IS valid inside an anchor, so it lives
+   back INSIDE .player-card-thumb (which has position:relative and wraps just
+   the photo), and bottom/left position correctly against the photo alone —
+   NOT against the whole card, which is what happened when this briefly lived
+   as a sibling of .player-card-wrap and landed on top of the team-name text
+   below the photo. */
 .card-video-badge {
   position: absolute; bottom: 6px; left: 6px; overflow: hidden;
   display: flex; align-items: center; justify-content: center;

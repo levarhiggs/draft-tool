@@ -310,9 +310,9 @@ function playerCardHTML(p, isLoggedIn) {
   // the gallery/upload sheet whether or not a tryout video exists, because the
   // gallery is where ALL of a player's media lives now, tryout clip included.
   const video = videoUrl(p);
-  const videoBadge = `<button class="card-video-badge${video ? '' : ' disabled'}"
-          data-action="open-media" data-id="${escHtml(id)}"
-          title="${video ? 'Tryout video & photos' : 'Photos & clips'}">▶</button>`;
+  const videoBadge = `<span class="card-video-badge${video ? '' : ' disabled'}"
+          data-action="open-media" data-id="${escHtml(id)}" role="button" tabindex="0"
+          title="${video ? 'Tryout video & photos' : 'Photos & clips'}">▶</span>`;
 
   // Phone straight on the tile for a coach's own players — reaching a parent
   // shouldn't cost two taps through a popup. stopPropagation keeps a tap on
@@ -324,7 +324,7 @@ function playerCardHTML(p, isLoggedIn) {
     : '';
 
   const cardInner = `
-    <span class="player-card-thumb">${imgHtml}</span>
+    <span class="player-card-thumb">${imgHtml}${videoBadge}</span>
     <div class="player-card-info">
       <div class="player-card-name"><span class="pc-id">${escHtml(id)}</span><span class="pc-sep"> · </span>${escHtml(name)}</div>
       <div class="player-card-meta">Grade ${escHtml(grade)} · Age ${escHtml(age)}</div>
@@ -347,15 +347,15 @@ function playerCardHTML(p, isLoggedIn) {
     : `<div class="player-card" data-action="open-media"
             data-id="${escHtml(id)}" role="button" tabindex="0">${cardInner}</div>`;
 
-  // The video badge and the heart both sit OUTSIDE the card element. A
-  // <button> nested inside an <a href> is invalid HTML — the parser hoists it
-  // out of the anchor, which silently detaches any listener bound to it, and
-  // the click just navigates instead (verified: clicking the badge while
-  // logged in went straight to player.html). Positioned over the thumb in CSS.
+  // The heart stays OUTSIDE the card element (a <button> nested in an <a
+  // href> is invalid HTML and gets hoisted out by the parser, silently
+  // detaching its listener). The video badge does NOT need the same
+  // treatment: it is a <span role="button">, which IS valid inside an anchor,
+  // so it lives back inside .player-card-thumb where its bottom/left CSS
+  // positions correctly against just the photo, not the whole card.
   return `
     <div class="player-card-wrap">
       ${card}
-      ${videoBadge}
       <button class="heart-btn${isFav ? ' active' : ''}" data-id="${escHtml(id)}"
               title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">♥</button>
     </div>`;
