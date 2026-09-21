@@ -10,29 +10,24 @@
 - Config is set in `firebase-config.js`
 - Project: `csbc-2026-summer-draft`
 
-Firestore rules (paste in Firebase Console → Firestore → Rules → Publish):
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /players/{id} {
-      allow read, write: if true;
-    }
-    match /coaches/{coachName} {
-      allow read, write: if true;
-    }
-    match /scheduleGames/{gameNum} {
-      allow read, write: if true;
-    }
-    match /rotationConfigs/{coachName}/configs/{configId} {
-      allow read, write: if true;
-    }
-  }
-}
-```
-- `coaches/{coachName}` stores each coach's favorites (used by the Player Directory).
-- `scheduleGames/{gameNum}` stores coach-entered game scores (used by the Schedules page). If this collection isn't in the *live* rules yet, score saves will fail with a generic "Save failed" error in the app (Firestore permission-denied under the hood) — check the browser console for the real error if this happens again.
-- `rotationConfigs/{coachName}/configs/{configId}` stores each coach's saved rotation configurations per team (used by the Rotations page's "Save Configuration" feature, triggered automatically by Export Rotation / Apply to Gameboard). Same permission-denied failure mode applies if this nested collection path isn't in the live rules.
+**Firestore rules now live in `firestore.rules` and deploy from the CLI.**
+
+    firebase deploy --only firestore:rules
+
+That file is the source of truth — a deploy OVERWRITES the Console, so never
+edit rules there without copying the change back, or the next deploy silently
+reverts it.
+
+⚠ **The rule list that used to be printed here was incomplete and dangerous.**
+It named only `players`, `coaches`, `scheduleGames` and `rotationConfigs`.
+Probing production on 2026-09-20 found `liveStatLogs` (9 docs) and
+`gameLogNotes` (4 docs) also had live rules that were never written down —
+deploying from this doc's old list would have DELETED them and silently broken
+Gameboard's Live Stat mode. It also found `gameboardGhosts` has **no** rule
+despite `saveGameboardGhosts()` writing to it, so that feature has been failing
+silently; `firestore.rules` now adds it.
+
+See the comments in `firestore.rules` for what each collection holds.
 
 ---
 

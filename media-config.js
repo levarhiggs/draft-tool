@@ -19,8 +19,12 @@
 // readable in client JS. The API SECRET is never in this repo; it lives only
 // on the admin's machine for _local/archive_media.py.
 //
-// Fill these in after running _local/media-preflight.html successfully.
-export const CLOUDINARY_CLOUD_NAME = '';
+// Cloud name only. The API KEY and API SECRET from Cloudinary's credentials
+// screen must NEVER appear in this repo — it is public on GitHub Pages, so
+// anything committed here is readable by anyone. The secret's only use is
+// _local/archive_media.py (the purge/archive script), which runs on the
+// admin's machine and reads it from the environment, never from source.
+export const CLOUDINARY_CLOUD_NAME = 'q7zc6s0s';
 export const CLOUDINARY_PRESET     = 'csbc_media_inbox';
 
 /** True once the values above are filled in. Callers degrade gracefully. */

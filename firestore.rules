@@ -1,0 +1,106 @@
+rules_version = '2';
+
+// CSBC Draft Tool — Firestore security rules.
+//
+// ── WHY THIS FILE EXISTS ─────────────────────────────────────────────────────
+// These rules used to live ONLY in the Firebase Console, which is gotcha #3 in
+// PROJECT_STATUS: "Firestore rules are NOT version-controlled, and a missing
+// rule fails SILENTLY." That has already cost this project twice — PIN
+// overrides and the draft board were both forced into the existing `coaches`
+// collection because a new collection's rule wasn't published and writes died
+// with "Missing or insufficient permissions" on a deadline.
+//
+// Keeping them here makes the current rules readable in the repo and
+// deployable with one command:
+//
+//     firebase deploy --only firestore:rules
+//
+// ⚠ This file is now the SOURCE OF TRUTH. Deploying overwrites whatever is in
+// the Console, so if anyone edits rules there, copy the change back here or
+// the next deploy silently reverts it.
+//
+// ── SECURITY POSTURE ─────────────────────────────────────────────────────────
+// Wide open, deliberately (gotcha #7): a ~12-coach rec league, PIN auth, no
+// Firebase Auth anywhere in the app. Every collection below is readable and
+// writable by anyone with the public site URL. That is a considered tradeoff
+// for this project's stakes, not an oversight — do not "harden" it without
+// also adding real auth, or every existing write path breaks at once.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Rankings, notes, team assignments, no-shows.
+    // Season-scoped by doc-id prefix: players/26.3__12
+    match /players/{id} {
+      allow read, write: if true;
+    }
+
+    // Favorites, PIN overrides (pin_{personId}), the draft board
+    // (draftBoard_{season}), board roster and per-coach sandboxes. Several
+    // unrelated things share this collection precisely because it already had
+    // a published rule — see the note at the top.
+    match /coaches/{coachName} {
+      allow read, write: if true;
+    }
+
+    // Coach-entered game scores and comments.
+    match /scheduleGames/{gameNum} {
+      allow read, write: if true;
+    }
+
+    // Saved lineup rotations (Rotations page) and Gameboard per-game configs.
+    // NOTE this matches the NESTED path only, which is why a collection-level
+    // read of `rotationConfigs` returns permission-denied — that is correct
+    // and matches what is live today, not a missing rule.
+    match /rotationConfigs/{coachName}/configs/{configId} {
+      allow read, write: if true;
+    }
+
+    // ── Gameboard Live Stat mode ─────────────────────────────────────────────
+    // These two were live in the Console but NEVER recorded in SETUP.md.
+    // Probed 2026-09-20 against production before writing this file:
+    // liveStatLogs returned 9 real docs and gameLogNotes 4, both readable —
+    // so rules for them exist and are in active use. Had this file been
+    // deployed from SETUP.md's list alone it would have DELETED both rules and
+    // silently broken Live Stat mode for every coach. Exactly the class of
+    // failure that makes gotcha #3 worth fixing.
+    match /liveStatLogs/{id} {
+      allow read, write: if true;
+    }
+
+    match /gameLogNotes/{id} {
+      allow read, write: if true;
+    }
+
+    // Per-coach, per-team named placeholders for untracked jersey numbers.
+    // This one has NO live rule (probed: permission-denied) even though
+    // firebase.js writes it via saveGameboardGhosts() — so that feature is
+    // failing silently in production right now. Adding the rule here fixes it;
+    // flagged in PROJECT_STATUS rather than left as a surprise.
+    match /gameboardGhosts/{id} {
+      allow read, write: if true;
+    }
+
+    // ── User-submitted media (added 2026-09-20) ──────────────────────────────
+    // See _local/MEDIA_SUBMISSION_SPEC.md.
+    //
+    // Anyone can submit — that is the feature: parents with a highlight clip
+    // are the point, and requiring a login would exclude exactly the people
+    // most likely to have one. Nothing submitted is publicly visible until an
+    // admin approves it, so the approval gate (in media-admin.js), not these
+    // rules, is what controls what reaches the app.
+
+    // Every submission, any status. Holds the Cloudinary publicId that IS the
+    // mapping — never a filename (gotcha #15).
+    match /mediaSubmissions/{id} {
+      allow read, write: if true;
+    }
+
+    // Which approved item currently serves as a player's profile picture or
+    // primary video. One doc per player per season; absent means "use the
+    // original Drive media."
+    match /mediaPromotions/{id} {
+      allow read, write: if true;
+    }
+  }
+}
