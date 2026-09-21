@@ -64,58 +64,27 @@ export function attachMediaSubmit(el, player, { onSingleClick } = {}) {
 
   const open = () => openSubmitSheet(player);
 
-  // ── Desktop: double-click ──────────────────────────────────────────────────
-  let clickTimer = null;
+  // ── Desktop ───────────────────────────────────────────────────────────────
+  // Double-click was REMOVED 2026-09-21. It fought the logged-in directory
+  // card's own <a href> (the first click navigated before the second landed),
+  // needed a navigation-swallowing workaround to function at all, and was
+  // unreliable enough that the user called it buggy. Desktop now opens this
+  // sheet from a plain single click wired by the PAGE — app.js routes both a
+  // logged-out card and the video badge to openMediaSheet() — which is
+  // simpler and does not compete with any other gesture.
+  //
+  // This module keeps only the TOUCH gesture, plus onSingleClick for callers
+  // that still want a click action on the same element.
   // Set by a completed long-press so the synthetic click a touch emits
   // afterwards doesn't also run the single-click action.
   let suppressClick = false;
 
-  // ── Links swallow the double-click ────────────────────────────────────────
-  // When this element sits inside an <a href> — which every directory card is
-  // once a coach logs in — the FIRST click of a double navigates away before
-  // the second ever arrives, so dblclick never fires and the sheet never
-  // opens. preventDefault() on the dblclick handler is far too late.
-  //
-  // So: swallow the navigation at the first click, and re-issue it after the
-  // double-click window closes if no second click came. A single click still
-  // navigates (250ms later, imperceptible); a double click opens the sheet
-  // and never navigates at all.
-  const link = el.closest('a[href]');
-  let navTimer = null;
-  if (link) {
-    el.addEventListener('click', e => {
-      // Touch never produces a dblclick here (long-press is its gesture), so
-      // let the tap navigate immediately rather than sitting on a 250ms delay.
-      if (e.pointerType === 'touch' || isTouchLike()) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (navTimer) clearTimeout(navTimer);
-      navTimer = setTimeout(() => {
-        navTimer = null;
-        window.location.href = link.href;
-      }, DBLCLICK_MS);
-    });
-  }
-  const cancelNav = () => { if (navTimer) { clearTimeout(navTimer); navTimer = null; } };
-
   if (onSingleClick) {
     el.addEventListener('click', e => {
       if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); return; }
-      // A touch tap needs no debounce — long-press is a separate gesture, not
-      // a second tap to wait for — so the action runs immediately there.
-      if (e.pointerType === 'touch' || isTouchLike()) { onSingleClick(e); return; }
-      if (clickTimer) clearTimeout(clickTimer);
-      clickTimer = setTimeout(() => { clickTimer = null; onSingleClick(e); }, DBLCLICK_MS);
+      onSingleClick(e);
     });
   }
-
-  el.addEventListener('dblclick', e => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
-    cancelNav();          // a double never navigates
-    open();
-  });
 
   // ── Touch: long-press ─────────────────────────────────────────────────────
   let pressTimer = null;
@@ -137,7 +106,6 @@ export function attachMediaSubmit(el, player, { onSingleClick } = {}) {
       pressTimer = null;
       el.classList.remove('media-pressing');
       suppressClick = true;
-      cancelNav();
       // Haptic confirmation where supported — the standard "the press took"
       // signal on Android. Silently absent on iOS Safari.
       navigator.vibrate?.(15);
@@ -217,6 +185,16 @@ function closeSheet() {
   activeState = null;
   sheetEl?.classList.add('hidden');
 }
+
+/**
+ * Open the media gallery / upload sheet for a player.
+ *
+ * Exported so a PAGE can open it from whatever gesture suits that page — the
+ * directory wires a plain single click on a logged-out card and on the video
+ * badge. Keeping the sheet's own trigger logic out of the pages is what stops
+ * this from forking into per-page copies.
+ */
+export function openMediaSheet(player) { return openSubmitSheet(player); }
 
 async function openSubmitSheet(player) {
   const id   = String(player.id ?? player.ID ?? '');
@@ -388,13 +366,18 @@ function renderForm(preview, counts) {
       <input id="media-name" type="text" maxlength="60" placeholder="So an admin knows who sent it" />
     </div>
     <div class="media-field">
-      <label for="media-phone">Phone <span class="media-optional">— optional</span></label>
-      <input id="media-phone" type="tel" maxlength="24" placeholder="Only if you want to be reached" />
+      <label for="media-phone">Email/Phone <span class="media-optional">— optional</span></label>
+      <input id="media-phone" type="text" maxlength="60" placeholder="Only if you want to be reached" />
     </div>
     <div class="media-field">
       <label for="media-caption">Caption <span class="media-optional">— optional</span></label>
       <textarea id="media-caption" maxlength="${MAX_CAPTION_CHARS}"
                 placeholder="Game 4 — corner three at the buzzer"></textarea>
+    </div>
+    <div class="media-field">
+      <label for="media-notes">Notes <span class="media-optional">— message admin, not published</span></label>
+      <textarea id="media-notes" maxlength="500"
+                placeholder="mute sound, use first, etc."></textarea>
     </div>
 
     <div class="media-review-note" style="margin-top:14px">
@@ -442,6 +425,7 @@ async function doUpload(counts) {
 
   const submitterPhone = sheetEl.querySelector('#media-phone').value.trim();
   const caption        = sheetEl.querySelector('#media-caption').value.trim();
+  const adminNote      = sheetEl.querySelector('#media-notes')?.value.trim() || '';
   const { file, kind, id, name } = activeState;
 
   const sendBtn = sheetEl.querySelector('#media-send');
@@ -480,7 +464,7 @@ async function doUpload(counts) {
       durationSec: uploaded.duration ?? activeState.durationSec ?? null,
       bytes:    uploaded.bytes,
       format:   uploaded.format,
-      submitterName, submitterPhone, caption,
+      submitterName, submitterPhone, caption, adminNote,
     });
 
     renderDone(name);

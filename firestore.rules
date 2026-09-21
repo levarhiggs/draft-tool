@@ -102,5 +102,13 @@ service cloud.firestore {
     match /mediaPromotions/{id} {
       allow read, write: if true;
     }
+
+    // Contact-admin messages sent from a player's media page (removal
+    // requests, questions). Anyone can write one — that is the point, the
+    // sender is usually a parent with no login — and the admin inbox reads
+    // them.
+    match /mediaMessages/{id} {
+      allow read, write: if true;
+    }
   }
 }

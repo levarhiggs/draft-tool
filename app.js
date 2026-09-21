@@ -17,7 +17,7 @@ import {
   loadFavorites, applySort, applyFilters, renderResultCount,
   initListControls, buildTeamChips, isMissedTryout,
 } from './player-list-controls.js';
-import { attachMediaSubmit } from './media-submit.js';
+import { attachMediaSubmit, openMediaSheet } from './media-submit.js';
 import { loadPromotions } from './media-promotions.js';
 
 /**
@@ -169,26 +169,25 @@ function renderGrid() {
     btn.addEventListener('click', e => toggleFavorite(btn.dataset.id, e));
   });
 
-  // Double-tap a card's photo to submit media for that player.
-  //
-  // Attached to the THUMB, not the card: a logged-in card is an <a href>, and
-  // a double-click on a link navigates on the first click before the second
-  // ever lands. Suppressing the default on the thumb keeps the rest of the
-  // card behaving exactly as before — single-tapping the name/meta still
-  // opens the ranking page (coach) or the video (public).
+  // Long-press on a card photo opens the media sheet on TOUCH. Desktop's
+  // double-click was removed entirely (2026-09-21): it fought the logged-in
+  // card's own <a href>, needed a navigation-swallowing workaround, and a
+  // single click does the job better.
   wireMediaSubmit(grid, visible);
 
-  // Logged-out cards are plain divs (see playerCardHTML) — tapping one plays
-  // that player's tryout video.
-  grid.querySelectorAll('[data-action="open-video"]').forEach(el => {
-    const open = () => {
+  // Everything that opens the media gallery/upload sheet: a logged-out card,
+  // and the video badge in both states.
+  grid.querySelectorAll('[data-action="open-media"]').forEach(el => {
+    const open = e => {
+      e?.preventDefault();
+      e?.stopPropagation();   // the badge sits inside the logged-in card's <a>
       const p = allPlayers.find(pl => String(pl[COL.ID]) === String(el.dataset.id));
-      const url = p && videoUrl(p);
-      if (!url) return toast(`No tryout video for ${p ? p[COL.NAME] : 'this player'}`);
-      openVideoModal(url, p[COL.NAME]);
+      if (p) openMediaSheet({ id: p[COL.ID], name: p[COL.NAME] });
     };
     el.addEventListener('click', open);
-    el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); }
+    });
   });
 }
 
@@ -302,10 +301,13 @@ function playerCardHTML(p, isLoggedIn) {
 
   // Video badge on the thumbnail, same red/grey treatment as the ranking
   // page and draft board so "has footage" reads identically everywhere.
+  // The video badge is now the de facto way into a player's media — it opens
+  // the gallery/upload sheet whether or not a tryout video exists, because the
+  // gallery is where ALL of a player's media lives now, tryout clip included.
   const video = videoUrl(p);
-  const videoBadge = video
-    ? `<span class="card-video-badge" title="Watch tryout video">▶</span>`
-    : `<span class="card-video-badge disabled" title="No video available">▶</span>`;
+  const videoBadge = `<button class="card-video-badge${video ? '' : ' disabled'}"
+          data-action="open-media" data-id="${escHtml(id)}"
+          title="${video ? 'Tryout video & photos' : 'Photos & clips'}">▶</button>`;
 
   // Phone straight on the tile for a coach's own players — reaching a parent
   // shouldn't cost two taps through a popup. stopPropagation keeps a tap on
@@ -317,7 +319,7 @@ function playerCardHTML(p, isLoggedIn) {
     : '';
 
   const cardInner = `
-    <span class="player-card-thumb">${imgHtml}${videoBadge}</span>
+    <span class="player-card-thumb">${imgHtml}</span>
     <div class="player-card-info">
       <div class="player-card-name"><span class="pc-id">${escHtml(id)}</span><span class="pc-sep"> · </span>${escHtml(name)}</div>
       <div class="player-card-meta">Grade ${escHtml(grade)} · Age ${escHtml(age)}</div>
@@ -327,18 +329,28 @@ function playerCardHTML(p, isLoggedIn) {
       ${teamHtml}
     </div>`;
 
-  // Coaches go straight into the full ranking page. For the public, tapping
-  // the card opens the player's video directly — that's the thing a parent
-  // or coach actually wants from a face, and it saves a hop through a popup
-  // that only repeated what the card already showed.
+  // Click model (rewritten 2026-09-21 — double-click is GONE, it fought the
+  // card's own <a> and was unreliable):
+  //   logged out  — a single click on the face opens the media gallery/upload
+  //                 sheet. That sheet leads with the tryout video, so nothing
+  //                 is lost versus the old tap-to-play-video behaviour.
+  //   logged in   — a single click on the face still goes to the ranking page,
+  //                 which is what a coach is actually there for. The video
+  //                 badge is their route into the gallery.
   const card = isLoggedIn
     ? `<a class="player-card" href="player.html?id=${encodeURIComponent(id)}">${cardInner}</a>`
-    : `<div class="player-card${video ? '' : ' pc-novideo'}" data-action="open-video"
+    : `<div class="player-card" data-action="open-media"
             data-id="${escHtml(id)}" role="button" tabindex="0">${cardInner}</div>`;
 
+  // The video badge and the heart both sit OUTSIDE the card element. A
+  // <button> nested inside an <a href> is invalid HTML — the parser hoists it
+  // out of the anchor, which silently detaches any listener bound to it, and
+  // the click just navigates instead (verified: clicking the badge while
+  // logged in went straight to player.html). Positioned over the thumb in CSS.
   return `
     <div class="player-card-wrap">
       ${card}
+      ${videoBadge}
       <button class="heart-btn${isFav ? ' active' : ''}" data-id="${escHtml(id)}"
               title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">♥</button>
     </div>`;

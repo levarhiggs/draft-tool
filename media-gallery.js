@@ -13,10 +13,15 @@
 // Ranking data is never shown here — see PRODUCT_SPEC "Rankings are never
 // stated publicly". A gallery is about the kid, not their seed.
 
-import { getApprovedMedia, getAllPromotions, isPromoted } from './media-data.js';
+import {
+  getApprovedMedia, getAllPromotions, isPromoted, removeSubmission, promote,
+} from './media-data.js';
 import {
   thumbUrl, fullUrl, videoUrl, videoPosterUrl, formatDuration,
 } from './media-config.js';
+import { canRemoveFor, canPromote } from './media-permissions.js';
+import { refreshPromotions } from './media-promotions.js';
+import { getCurrentCoach } from './coach-login.js';
 
 /**
  * Render a player's approved media into `container`.
@@ -28,9 +33,16 @@ import {
  * @param {boolean} opts.compact     true inside the submit sheet (smaller grid)
  * @param {Function} opts.onEmpty    called when there is nothing to show, so
  *                                   the caller can hide a heading it drew
+ * @param {string}  opts.tryoutVideo Drive URL of the league's own tryout clip.
+ *                  Pinned as the FIRST tile and never removable or reorderable:
+ *                  it lives in Google Drive, not Cloudinary, so the app has no
+ *                  delete path for it, and it is league-captured footage rather
+ *                  than a submission.
+ * @param {object}  opts.player      roster record, for the remove permission check
  */
 export async function renderGallery(container, playerId, opts = {}) {
-  const { playerName = 'this player', compact = false, onEmpty } = opts;
+  const { playerName = 'this player', compact = false, onEmpty,
+          tryoutVideo = null, player = null } = opts;
   if (!container) return { count: 0 };
 
   container.innerHTML = `<div class="media-gal-loading">Loading…</div>`;
@@ -49,19 +61,35 @@ export async function renderGallery(container, playerId, opts = {}) {
     return { count: 0, error: err };
   }
 
-  if (!items.length) {
+  if (!items.length && !tryoutVideo) {
     onEmpty?.();
     container.innerHTML = emptyHTML(playerName, compact);
     return { count: 0 };
   }
 
+  const perm = canRemoveFor(player);
+  const tiles = [];
+
+  // Tryout video leads, when one exists. Synthesised as a pseudo-item so the
+  // lightbox can page through it alongside real submissions — it is flagged
+  // isTryout so nothing offers to remove or promote it.
+  if (tryoutVideo) {
+    tiles.push({
+      id: '__tryout', isTryout: true, kind: 'video',
+      driveUrl: tryoutVideo, playerId, playerName,
+      caption: 'Tryout video', submitterName: '',
+    });
+  }
+  tiles.push(...items);
+
   container.innerHTML = `
     <div class="media-gal-grid${compact ? ' compact' : ''}">
-      ${items.map(s => itemHTML(s, promotions)).join('')}
+      ${tiles.map(s => itemHTML(s, promotions, perm, compact)).join('')}
     </div>`;
 
-  wireLightbox(container, items);
-  return { count: items.length };
+  wireLightbox(container, tiles);
+  wireControls(container, tiles, playerId, () => renderGallery(container, playerId, opts));
+  return { count: tiles.length };
 }
 
 function emptyHTML(playerName, compact) {
@@ -80,27 +108,89 @@ function emptyHTML(playerName, compact) {
     </div>`;
 }
 
-function itemHTML(s, promotions) {
+function itemHTML(s, promotions, perm, compact) {
   const isPhoto = s.kind === 'photo';
-  const thumb = isPhoto ? thumbUrl(s.publicId) : videoPosterUrl(s.publicId);
-  const promotedAs = isPromoted(promotions, s.playerId, s.id);
+
+  // The tryout clip is a Drive file, not a Cloudinary asset — no transform
+  // URLs, and Drive gives no poster frame, so the tile shows a film glyph.
+  const thumb = s.isTryout ? null
+    : (isPhoto ? thumbUrl(s.publicId) : videoPosterUrl(s.publicId));
+  const promotedAs = s.isTryout ? null : isPromoted(promotions, s.playerId, s.id);
+
+  // Controls are never offered on the tryout video: it cannot be removed (it
+  // lives in Drive) and a video cannot be a profile picture.
+  const showRemove  = !s.isTryout && perm?.ok && !compact;
+  const showPromote = !s.isTryout && isPhoto && canPromote() && !compact && !promotedAs;
+
+  const controls = (showRemove || showPromote) ? `
+      <span class="media-gal-ctl">
+        ${showPromote ? `<button class="media-gal-btn promote" data-act="promote"
+                  data-id="${escHtml(s.id)}" title="Use as profile picture">★</button>` : ''}
+        ${showRemove ? `<button class="media-gal-btn remove" data-act="remove"
+                  data-id="${escHtml(s.id)}" title="Remove from the app">✕</button>` : ''}
+      </span>` : '';
 
   return `
-    <button class="media-gal-item${promotedAs ? ' is-promoted' : ''}"
-            data-id="${escHtml(s.id)}"
-            aria-label="${escHtml(isPhoto ? 'Photo' : 'Clip')} of ${escHtml(s.playerName)}${
-              s.caption ? ': ' + escHtml(s.caption) : ''}">
-      ${thumb
-        ? `<img src="${thumb}" alt="" loading="lazy" />`
-        : `<span class="media-gal-ph">${isPhoto ? '🏀' : '🎬'}</span>`}
-      ${promotedAs === 'photo' ? `<span class="media-gal-badge">Profile</span>` : ''}
-      ${promotedAs === 'video' ? `<span class="media-gal-badge">Primary</span>` : ''}
-      ${!isPhoto ? `<span class="media-gal-play" aria-hidden="true">▶</span>` : ''}
-      ${!isPhoto && s.durationSec
-        ? `<span class="media-gal-dur">${formatDuration(s.durationSec)}</span>` : ''}
-      ${s.submitterName
-        ? `<span class="media-gal-by">${escHtml(s.submitterName)}</span>` : ''}
-    </button>`;
+    <div class="media-gal-cell">
+      <button class="media-gal-item${promotedAs ? ' is-promoted' : ''}${s.isTryout ? ' is-tryout' : ''}"
+              data-id="${escHtml(s.id)}"
+              aria-label="${escHtml(s.isTryout ? 'Tryout video' : (isPhoto ? 'Photo' : 'Clip'))} of ${escHtml(s.playerName)}${
+                s.caption ? ': ' + escHtml(s.caption) : ''}">
+        ${thumb
+          ? `<img src="${thumb}" alt="" loading="lazy" />`
+          : `<span class="media-gal-ph">${isPhoto ? '🏀' : '🎬'}</span>`}
+        ${s.isTryout ? `<span class="media-gal-badge tryout">Tryout</span>` : ''}
+        ${promotedAs === 'photo' ? `<span class="media-gal-badge">Profile</span>` : ''}
+        ${promotedAs === 'video' ? `<span class="media-gal-badge">Primary</span>` : ''}
+        ${!isPhoto ? `<span class="media-gal-play" aria-hidden="true">▶</span>` : ''}
+        ${!isPhoto && s.durationSec
+          ? `<span class="media-gal-dur">${formatDuration(s.durationSec)}</span>` : ''}
+        ${s.submitterName
+          ? `<span class="media-gal-by">${escHtml(s.submitterName)}</span>` : ''}
+      </button>
+      ${controls}
+    </div>`;
+}
+
+// ── Remove / promote ─────────────────────────────────────────────────────────
+
+function wireControls(container, tiles, playerId, rerender) {
+  container.addEventListener('click', async e => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const sub = tiles.find(t => t.id === btn.dataset.id);
+    if (!sub || sub.isTryout) return;
+    const actor = getCurrentCoach()?.name || 'admin';
+
+    if (btn.dataset.act === 'remove') {
+      const perm = canRemoveFor({ _teamFB: sub.playerTeam, name: sub.playerName });
+      // Re-check at click time, not just at render: a logout between the two
+      // would otherwise leave a live button behind.
+      const allowed = perm.ok || canPromote();
+      if (!allowed) { alert(perm.reason || 'You cannot remove this.'); return; }
+      if (!confirm('Remove this from the app? An admin can restore it later — nothing is deleted.')) return;
+      btn.disabled = true;
+      try {
+        await removeSubmission(sub.id, actor, perm.role || 'admin');
+        await rerender();
+      } catch (err) { alert(`Could not remove that: ${err.message}`); btn.disabled = false; }
+    }
+
+    if (btn.dataset.act === 'promote') {
+      if (!canPromote()) { alert('Only a league admin can set the profile picture.'); return; }
+      btn.disabled = true;
+      try {
+        await promote(playerId, 'photo', sub, actor);
+        // The promotion map is cached for the session — without this the new
+        // headshot would not appear elsewhere until the tab was closed.
+        await refreshPromotions();
+        await rerender();
+      } catch (err) { alert(`Could not set the profile picture: ${err.message}`); btn.disabled = false; }
+    }
+  });
 }
 
 // ── Lightbox ─────────────────────────────────────────────────────────────────
@@ -170,10 +260,15 @@ function showSlide() {
   const body = el.querySelector('.media-gal-lb-body');
   // Always replace the node: reusing a <video> across slides leaves the
   // previous clip's audio playing under the new one.
-  body.innerHTML = s.kind === 'photo'
-    ? `<img src="${fullUrl(s.publicId)}" alt="${escHtml(s.playerName)}" />`
-    : `<video src="${videoUrl(s.publicId)}" controls autoplay playsinline
-              poster="${videoPosterUrl(s.publicId)}"></video>`;
+  // The tryout clip is a Drive preview URL, which only plays in an iframe —
+  // it is not a direct media file, so a <video> tag would show nothing.
+  body.innerHTML = s.isTryout
+    ? `<iframe src="${escHtml(s.driveUrl)}" allow="autoplay"
+               allowfullscreen class="media-gal-lb-frame"></iframe>`
+    : s.kind === 'photo'
+      ? `<img src="${fullUrl(s.publicId)}" alt="${escHtml(s.playerName)}" />`
+      : `<video src="${videoUrl(s.publicId)}" controls autoplay playsinline
+                poster="${videoPosterUrl(s.publicId)}"></video>`;
 
   const parts = [];
   if (s.caption) parts.push(escHtml(s.caption));

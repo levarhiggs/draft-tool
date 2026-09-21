@@ -42,8 +42,10 @@ function mid(id) { return `${SEASON_CODE}__${id}`; }
 
 const SUBMISSIONS = 'mediaSubmissions';
 const PROMOTIONS  = 'mediaPromotions';
+const MESSAGES    = 'mediaMessages';
 
 function submissionRef(id) { return doc(db, SUBMISSIONS, id); }
+function messageRef(id) { return doc(db, MESSAGES, id); }
 function promotionRef(playerId) { return doc(db, PROMOTIONS, mid(playerId)); }
 
 // ── Reads ────────────────────────────────────────────────────────────────────
@@ -171,6 +173,8 @@ export async function createSubmission(fields) {
     submitterName:  (fields.submitterName || '').trim(),
     submitterPhone: (fields.submitterPhone || '').trim(),
     caption:        (fields.caption || '').trim(),
+    // Private message to the admin — shown in the inbox, NEVER in the gallery.
+    adminNote:      (fields.adminNote || '').trim(),
 
     sortOrder:    0,
     submittedAt:  serverTimestamp(),
@@ -204,6 +208,28 @@ export async function rejectSubmission(id, adminName, reason = null) {
   });
 }
 
+/**
+ * Remove an approved item from public view.
+ *
+ * Deliberately the SAME non-destructive path as rejectSubmission: the item
+ * moves to 'rejected', keeping its Cloudinary asset and its record, so it can
+ * be restored with one click. Nobody — coach or admin — can permanently
+ * destroy a parent's contribution from the UI.
+ *
+ * `removedBy` records WHO pulled it, because the admin needs to tell their own
+ * rejections apart from a coach's. reviewedBy carries the name; removedRole
+ * carries the capacity they acted in.
+ */
+export async function removeSubmission(id, actorName, role, reason = null) {
+  await updateDoc(submissionRef(id), {
+    status: 'rejected',
+    reviewedAt: serverTimestamp(),
+    reviewedBy: actorName,
+    removedRole: role,          // 'admin' | 'coach'
+    rejectReason: reason,
+  });
+}
+
 /** Back to the pending queue — the undo for both actions above. */
 export async function unreviewSubmission(id) {
   await updateDoc(submissionRef(id), {
@@ -228,6 +254,48 @@ export async function deleteSubmission(id) {
 export async function saveSortOrder(orderedIds) {
   await Promise.all(orderedIds.map((id, i) =>
     updateDoc(submissionRef(id), { sortOrder: i })));
+}
+
+// ── Contact-admin messages ───────────────────────────────────────────────────
+// Sent from the player media page. Kept in their own collection rather than
+// bolted onto mediaSubmissions: a message is not a submission, has no media,
+// and needs its own read/unread lifecycle.
+
+export async function createMessage(fields) {
+  const id = mid(`${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+  const record = {
+    season:      SEASON_CODE,
+    playerId:    fields.playerId ? String(fields.playerId) : null,
+    playerName:  fields.playerName || '',
+    submissionId: fields.submissionId || null,   // set when reporting one item
+    kind:        fields.kind || 'question',      // 'removal' | 'question'
+    fromName:    (fields.fromName || '').trim(),
+    fromContact: (fields.fromContact || '').trim(),
+    body:        (fields.body || '').trim(),
+    status:      'unread',
+    createdAt:   serverTimestamp(),
+    handledAt:   null,
+    handledBy:   null,
+  };
+  await setDoc(messageRef(id), record);
+  return { id, ...record };
+}
+
+/** Live message list for the admin badge and inbox. */
+export function subscribeMessages(callback) {
+  const q = query(collection(db, MESSAGES), where('season', '==', SEASON_CODE));
+  return onSnapshot(q,
+    snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))),
+    err => { console.warn('media: messages subscription failed', err); callback([]); });
+}
+
+export async function markMessageHandled(id, adminName, handled = true) {
+  await updateDoc(messageRef(id), {
+    status: handled ? 'handled' : 'unread',
+    handledAt: handled ? serverTimestamp() : null,
+    handledBy: handled ? adminName : null,
+  });
 }
 
 // ── Promotions ───────────────────────────────────────────────────────────────

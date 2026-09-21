@@ -26,6 +26,7 @@
       </div>
       <div class="header-controls">
         <div id="coach-badge" class="coach-badge hidden">
+          <a id="media-msg-badge" class="media-msg-badge hidden" href="media-admin.html?tab=messages" title="Messages from parents">✉ <span id="media-msg-count">0</span></a>
           <span id="coach-badge-name"></span>
           <button id="btn-logout" class="btn-sm">Log Out</button>
         </div>
@@ -83,6 +84,7 @@
           <button class="chip media-filter" data-status="pending"  aria-pressed="true">Pending <span class="chip-n" id="n-pending">0</span></button>
           <button class="chip media-filter" data-status="approved" aria-pressed="false">Approved <span class="chip-n" id="n-approved">0</span></button>
           <button class="chip media-filter" data-status="rejected" aria-pressed="false">Rejected <span class="chip-n" id="n-rejected">0</span></button>
+          <button class="chip media-filter" data-status="messages" aria-pressed="false">✉ Messages <span class="chip-n" id="n-messages">0</span></button>
           <button class="btn btn-sm" id="btn-export-csv" title="Metadata and direct links — no media files">⤓ Export list (CSV)</button>
           <span class="media-adm-count" id="media-adm-count"></span>
         </div>

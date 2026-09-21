@@ -5237,13 +5237,21 @@ body:not(.draft-final) .slot.filled { cursor: grab; }
 .player-card-thumb > img,
 .player-card-thumb > .player-card-img-placeholder { width: 100%; display: block; }
 
+/* The badge is now a real <button> and the way into a player's media (it
+   opens the gallery/upload sheet in BOTH states). It sits as a sibling of the
+   card rather than inside it — a <button> nested in an <a href> is invalid
+   HTML and gets hoisted out of the anchor, detaching its listener. So it is
+   positioned against .player-card-wrap, and pointer-events are ON. */
 .card-video-badge {
   position: absolute; bottom: 6px; left: 6px; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
   width: 30px; height: 21px; border-radius: 5px;
   background: #c0392b; color: #fff; font-size: 0.68rem; line-height: 1;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.45); pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.45);
+  border: 0; padding: 0; cursor: pointer; z-index: 3;
 }
+.card-video-badge:hover { filter: brightness(1.18); }
+.card-video-badge:focus-visible { outline: 2px solid var(--clr-accent); outline-offset: 2px; }
 /* No footage: grey it out and strike it through, so "no video" reads at a
    glance instead of depending on noticing the colour difference. */
 .card-video-badge.disabled {
@@ -5868,3 +5876,124 @@ body:not(.draft-final) .slot.filled { cursor: grab; }
   .media-gal-lb-nav.next { right: 0; }
   .media-page-ava { width: 72px; height: 72px; }
 }
+
+
+/* ── Placeholder text ──────────────────────────────────────────────────────
+   Lighter than the input's own text so a prompt is never mistaken for a
+   pre-filled value someone has to clear. */
+.media-field input::placeholder,
+.media-field textarea::placeholder,
+.modal-box input::placeholder,
+.modal-box textarea::placeholder {
+  color: #5a6076;
+  opacity: 1;            /* Firefox dims placeholders by default */
+}
+
+/* ── Unread-message badge in the header, next to Change PIN ────────────────
+   Removal requests are time-sensitive in a way a queued photo is not, so this
+   sits in the header rather than behind the hamburger. */
+.media-msg-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  background: var(--clr-danger);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  line-height: 1.4;
+}
+.media-msg-badge:hover { filter: brightness(1.12); }
+
+/* ── Gallery tile controls (remove / set as profile picture) ───────────────
+   Wrapped in a cell so the controls sit OUTSIDE the tile's own <button> —
+   nesting a button inside a button is invalid and the inner one stops
+   receiving clicks in some browsers. */
+.media-gal-cell { position: relative; }
+.media-gal-ctl {
+  position: absolute; top: 5px; right: 5px;
+  display: flex; gap: 4px; z-index: 2;
+}
+.media-gal-btn {
+  width: 24px; height: 24px; padding: 0;
+  border-radius: 6px; cursor: pointer;
+  font-size: 0.75rem; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.65);
+  border: 1px solid rgba(255,255,255,0.28);
+  color: #fff;
+}
+.media-gal-btn:hover:not(:disabled) { background: rgba(0,0,0,0.85); }
+.media-gal-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.media-gal-btn.remove:hover:not(:disabled) { background: var(--clr-danger); border-color: var(--clr-danger); }
+.media-gal-btn.promote:hover:not(:disabled) { background: var(--clr-accent); border-color: var(--clr-accent); }
+
+/* The tryout clip is the league's own footage, pinned first and not
+   removable — badged so it reads as different from a submission. */
+.media-gal-badge.tryout { background: #1c5a80; }
+.media-gal-item.is-tryout { border-color: #2f6f96; }
+
+.media-gal-lb-frame {
+  width: 100%; height: 70vh; border: 0; border-radius: 8px; background: #000;
+}
+
+/* ── Media page: back link, actions, toast ─────────────────────────────── */
+.media-page-back {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--clr-accent);
+  text-decoration: none;
+  margin-bottom: 14px;
+}
+.media-page-back:hover { text-decoration: underline; }
+
+.media-page-actions { display: flex; gap: 8px; margin-top: 11px; flex-wrap: wrap; }
+
+.media-page-toast {
+  margin-top: 9px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #8fd6a8;
+  background: rgba(78,207,135,0.12);
+  border: 1px solid rgba(78,207,135,0.35);
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: inline-block;
+}
+.media-page-toast.hidden { display: none; }
+
+/* ── Contact-admin modal ──────────────────────────────────────────────── */
+.media-contact-sub { font-size: 0.78rem; color: var(--clr-muted); margin: -4px 0 0; }
+#media-contact-modal .modal-box { max-width: 460px; }
+#media-contact-modal textarea {
+  width: 100%;
+  background: var(--clr-bg);
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  resize: vertical;
+}
+
+/* ── Admin inbox: private note, messages ──────────────────────────────── */
+.media-q-note {
+  font-size: 0.73rem;
+  color: #e6c28a;
+  margin-top: 6px;
+  padding: 6px 9px;
+  background: rgba(224,167,92,0.09);
+  border-left: 2px solid rgba(224,167,92,0.5);
+  border-radius: 0 5px 5px 0;
+  line-height: 1.45;
+}
+.media-q-note b { color: var(--clr-warning); font-weight: 700; }
+
+.media-msg-item.is-unread { border-left: 3px solid var(--clr-danger); }
+.media-msg-item .media-q-cap { font-style: normal; color: var(--clr-text); }
+.media-q-acts a.btn { text-decoration: none; }

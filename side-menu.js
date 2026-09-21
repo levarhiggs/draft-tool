@@ -11,6 +11,7 @@ import { TEAM_ADMINS } from './coaches-config.js';
  * directly — this is the menu-level half, same split as Coach Rankings below.
  */
 let pendingUnsub = null;
+let msgUnsub = null;
 
 function syncAdminLinks() {
   const link = document.getElementById('nav-media-admin');
@@ -27,7 +28,9 @@ function syncAdminLinks() {
     // Drop the subscription on logout — no reason to hold a live Firestore
     // listener open for someone who can't see the inbox.
     pendingUnsub?.(); pendingUnsub = null;
+    msgUnsub?.(); msgUnsub = null;
     link.querySelector('.nav-badge')?.remove();
+    document.getElementById('media-msg-badge')?.classList.add('hidden');
   }
 }
 
@@ -42,7 +45,22 @@ function syncAdminLinks() {
 async function startPendingBadge(link) {
   if (pendingUnsub) return;
   try {
-    const { subscribeSubmissions } = await import('./media-data.js');
+    const { subscribeSubmissions, subscribeMessages } = await import('./media-data.js');
+
+    // Unread parent messages get their own badge in the HEADER, next to
+    // Change PIN — not in the hamburger. A removal request is time-sensitive
+    // in a way a queued photo is not, so it should be visible without opening
+    // a menu.
+    msgUnsub = subscribeMessages(list => {
+      const n = list.filter(m => m.status === 'unread').length;
+      const el = document.getElementById('media-msg-badge');
+      const ct = document.getElementById('media-msg-count');
+      if (!el || !ct) return;
+      ct.textContent = n > 99 ? '99+' : String(n);
+      el.classList.toggle('hidden', n === 0);
+      el.setAttribute('aria-label', `${n} unread message${n === 1 ? '' : 's'} from parents`);
+    });
+
     pendingUnsub = subscribeSubmissions(list => {
       const n = list.filter(s => s.status === 'pending').length;
       let badge = link.querySelector('.nav-badge');

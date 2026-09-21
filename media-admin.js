@@ -15,7 +15,9 @@ import { TEAM_ADMINS } from './coaches-config.js';
 import {
   subscribeSubmissions, approveSubmission, rejectSubmission, unreviewSubmission,
   saveSortOrder, getApprovedMedia, promote, unpromote, getAllPromotions, isPromoted,
+  subscribeMessages, markMessageHandled,
 } from './media-data.js';
+import { removalLabel } from './media-permissions.js';
 import { refreshPromotions } from './media-promotions.js';
 import {
   thumbUrl, fullUrl, videoUrl, videoPosterUrl,
@@ -23,9 +25,11 @@ import {
 } from './media-config.js';
 
 let submissions = [];
+let messages    = [];
 let promotions  = {};
 let filter      = 'pending';
 let unsubscribe = null;
+let msgUnsub    = null;
 let orderPlayerId = null;
 
 // ── Gate ─────────────────────────────────────────────────────────────────────
@@ -50,6 +54,7 @@ function applyGate() {
     // Stop listening while locked out — no reason to hold a live subscription
     // open for someone who can't see any of it.
     unsubscribe?.(); unsubscribe = null;
+    msgUnsub?.(); msgUnsub = null;
     return;
   }
   if (!unsubscribe) start();
@@ -71,6 +76,17 @@ async function start() {
     renderQueue();
     if (orderPlayerId) renderOrderList(orderPlayerId);
   });
+  msgUnsub = subscribeMessages(list => {
+    messages = list;
+    renderCounts();
+    if (filter === 'messages') renderQueue();
+  });
+
+  // Deep link from the header badge: media-admin.html?tab=messages
+  if (new URLSearchParams(location.search).get('tab') === 'messages') {
+    const chip = document.querySelector('.media-filter[data-status="messages"]');
+    chip?.click();
+  }
 }
 
 // ── Render ───────────────────────────────────────────────────────────────────
@@ -81,6 +97,15 @@ function renderCounts() {
   document.getElementById('n-approved').textContent = by('approved');
   document.getElementById('n-rejected').textContent = by('rejected');
 
+  const unread = messages.filter(m => m.status === 'unread').length;
+  const msgEl = document.getElementById('n-messages');
+  if (msgEl) msgEl.textContent = unread;
+
+  if (filter === 'messages') {
+    document.getElementById('media-adm-count').textContent =
+      unread === 0 ? 'No unread messages' : `${unread} unread`;
+    return;
+  }
   const n = by(filter);
   document.getElementById('media-adm-count').textContent =
     filter === 'pending'
@@ -104,6 +129,7 @@ function approvedCounts(playerId) {
 
 function renderQueue() {
   const el = document.getElementById('media-queue');
+  if (filter === 'messages') return renderMessages(el);
   const list = submissions.filter(s => s.status === filter);
 
   if (!list.length) {
@@ -177,6 +203,8 @@ function itemHTML(s) {
         </div>
         <div class="media-q-meta">${facts}</div>
         ${s.caption ? `<div class="media-q-cap">"${escHtml(s.caption)}"</div>` : ''}
+        ${s.adminNote ? `<div class="media-q-note"><b>Note to admin:</b> ${escHtml(s.adminNote)}</div>` : ''}
+        ${s.status === 'rejected' ? `<div class="media-q-meta">${escHtml(removalLabel(s))}</div>` : ''}
         ${s.rejectReason ? `<div class="media-q-meta">Reason: ${escHtml(s.rejectReason)}</div>` : ''}
         <div class="media-q-acts">${acts.join('')}</div>
         ${capNote}
@@ -243,7 +271,59 @@ async function onQueueClick(e) {
   }
 }
 
-// ── Reorder ──────────────────────────────────────────────────────────────────
+
+// -- Messages ---------------------------------------------------------------
+
+function renderMessages(el) {
+  if (!messages.length) {
+    el.innerHTML = `<div class="loading">No messages yet.</div>`;
+    return;
+  }
+  el.innerHTML = messages.map(m => `
+    <article class="media-q-item media-msg-item${m.status === 'unread' ? ' is-unread' : ''}"
+             data-msg="${escHtml(m.id)}">
+      <div class="media-q-body">
+        <div class="media-q-top">
+          <span class="media-q-player">${m.playerName
+            ? `<span class="pid">${escHtml(m.playerId)}</span> ${escHtml(m.playerName)}`
+            : 'General'}</span>
+          <span class="pill ${m.kind === 'removal' ? 'pill-rejected' : 'pill-pending'}">${
+            m.kind === 'removal' ? 'Removal request' : 'Question'}</span>
+          ${m.status === 'unread' ? '<span class="pill pill-promoted">Unread</span>' : ''}
+        </div>
+        <div class="media-q-meta">
+          <b>${escHtml(m.fromName || 'anonymous')}</b>${
+            m.fromContact ? ' \u00b7 ' + escHtml(m.fromContact) : ''} \u00b7 ${timeAgo(m.createdAt)}
+        </div>
+        <div class="media-q-cap">${escHtml(m.body)}</div>
+        <div class="media-q-acts">
+          <button class="btn btn-sm ${m.status === 'unread' ? 'btn-ok' : ''}"
+                  data-msg-act="${m.status === 'unread' ? 'handled' : 'unread'}">
+            ${m.status === 'unread' ? '\u2713 Mark handled' : '\u21a9 Mark unread'}
+          </button>
+          ${m.playerId ? `<a class="btn btn-sm" href="media-gallery.html?id=${encodeURIComponent(m.playerId)}"
+                             target="_blank" rel="noopener">Open media page</a>` : ''}
+        </div>
+      </div>
+    </article>`).join('');
+
+  el.onclick = async e => {
+    const btn = e.target.closest('[data-msg-act]');
+    if (!btn) return;
+    const id = btn.closest('[data-msg]')?.dataset.msg;
+    if (!id) return;
+    btn.disabled = true;
+    try {
+      await markMessageHandled(id, getCurrentCoach()?.name || 'admin',
+                               btn.dataset.msgAct === 'handled');
+    } catch (err) {
+      alert(`That did not work: ${err.message}`);
+      btn.disabled = false;
+    }
+  };
+}
+
+// -- Reorder ----------------------------------------------------------------
 
 async function renderOrderList(playerId) {
   const section = document.getElementById('media-order-section');
