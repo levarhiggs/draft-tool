@@ -4,7 +4,7 @@
 // drag-and-drop, Add Coach, and remove-by-double-click are NOT wired here —
 // out of scope for this pass per the user's direction ("bypass coding that
 // part" if it's a hiccup; ship the read-only view first).
-import { subscribePracticeSchedule, seedPracticeScheduleIfEmpty } from './firebase.js';
+import { subscribePracticeSchedule, seedPracticeScheduleIfEmpty, swapPracticeSlots } from './firebase.js';
 
 // ── Static grid shape — which days/hours/courts exist. This does NOT change
 // season to season on its own; it's a fact about the two gyms' rented time,
@@ -122,8 +122,8 @@ const SEED_SLOTS = {
   "Wednesday|8-9|glades|1":  { coach: null,       tbd: false },
 
   "Thursday|6-7|glades|0": { coach: "Mason/Jaylen",  tbd: false },
-  "Thursday|6-7|glades|1": { coach: "Kingston/Shaun", tbd: false },
-  "Thursday|7-8|glades|0": { coach: "Ken",  tbd: false },
+  "Thursday|6-7|glades|1": { coach: "Ken", tbd: false },
+  "Thursday|7-8|glades|0": { coach: "Kingston/Shaun",  tbd: false },
   "Thursday|7-8|glades|1": { coach: null,  tbd: false },
   "Thursday|8-9|glades|0": { coach: null,  tbd: false },
   "Thursday|8-9|glades|1": { coach: null,  tbd: false },
@@ -305,14 +305,54 @@ function build() {
   table.innerHTML = colgroup + thead + '<tbody>' + tbody + '</tbody>';
 }
 
+// ── One-time corrections ─────────────────────────────────────────────────────
+// The seed above only writes when the Firestore doc is ABSENT, so editing it
+// does nothing once the doc exists. Real schedule changes therefore need an
+// actual write. Until the admin UI lands (see PRACTICE_SCHEDULE_SPEC.md),
+// each change ships as an entry here: it checks whether the swap is still
+// needed, applies it once, and then no-ops forever after.
+//
+// Delete an entry once it's confirmed applied in production.
+const CORRECTIONS = [
+  {
+    // 2026-09-21: Kingston/Shaun and Ken traded Thursday Glades times.
+    id: 'thu-glades-kingston-ken-swap',
+    a: { key: 'Thursday|6-7|glades|1', was: 'Kingston/Shaun', now: 'Ken' },
+    b: { key: 'Thursday|7-8|glades|0', was: 'Ken', now: 'Kingston/Shaun' },
+  },
+];
+
+async function applyCorrections(slots) {
+  for (const c of CORRECTIONS) {
+    const a = slots[c.a.key], b = slots[c.b.key];
+    // Only fire when the data still matches the pre-swap state, so this
+    // can't clobber a later reassignment of either slot.
+    if (a?.coach !== c.a.was || b?.coach !== c.b.was) continue;
+    try {
+      await swapPracticeSlots(
+        c.a.key, c.a.now, false,
+        c.b.key, c.b.now, false,
+        'correction:' + c.id,
+      );
+    } catch (err) {
+      console.error(`correction ${c.id} failed:`, err);
+    }
+  }
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
 seedPracticeScheduleIfEmpty(SEED_SLOTS).catch(err =>
   console.error('seedPracticeScheduleIfEmpty error:', err));
 
+let correctionsChecked = false;
 subscribePracticeSchedule(slots => {
   liveSlots = slots || SEED_SLOTS;
   build();
+  if (slots && !correctionsChecked) {
+    correctionsChecked = true;
+    applyCorrections(slots);
+  }
 });
 
 build();
