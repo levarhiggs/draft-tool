@@ -221,10 +221,13 @@ function build() {
     let row = '<tr class="loc-header-row"><th></th>';
     DAYS.forEach(day => {
       if (day === "Friday") { row += '<td class="friday-cell"></td>'; return; }
-      const labels = activeDayLocs[day].map(loc =>
+      const locs = activeDayLocs[day];
+      const singleLoc = locs.length === 1;
+      const labels = locs.map(loc =>
         `<span class="psched-loc-label ${loc}">${loc === "mullins" ? "Mullins" : "Glades"}</span>`
       ).join('');
-      row += `<td><div style="display:flex;justify-content:center;gap:6px;">${labels}</div></td>`;
+      const justify = singleLoc ? 'center' : 'space-between';
+      row += `<td><div style="display:flex;justify-content:${justify};gap:6px;">${labels}</div></td>`;
     });
     return row + '</tr>';
   }
@@ -242,31 +245,37 @@ function build() {
     const maxRows = Math.max(1, ...DAYS.map(day =>
       (ACTIVE_HOURS[day] || []).includes(hour) ? rowCountFor(day, hour) : 0));
 
-    for (let r = 0; r < maxRows; r++) {
-      const isFirst = r === 0;
-      let row = `<tr class="${isFirst ? 'hour-start slot-row' : 'slot-row'}">`;
-      row += isFirst ? `<th rowspan="${maxRows}">${HOUR_LABELS[hour]}</th>` : '';
-      DAYS.forEach(day => {
-        if (day === "Friday") {
-          if (isFirst) row += `<td class="friday-cell" rowspan="${maxRows}"></td>`;
-          return;
-        }
-        const active = (ACTIVE_HOURS[day] || []).includes(hour);
-        if (!active) {
-          if (isFirst) row += `<td class="nodata-cell" rowspan="${maxRows}"></td>`;
-          return;
-        }
-        const locs = activeDayLocs[day];
-        const cells = locs.map(loc => {
-          const count = slotCountFor(day, hour, loc);
-          return r < count
-            ? `<div>${renderSlot(day, hour, loc, r)}</div>`
-            : '<div></div>';
-        }).join('');
-        row += `<td><div style="display:flex;justify-content:center;gap:6px;">${cells}</div></td>`;
-      });
-      tbody += row + '</tr>';
-    }
+    // One row in the DOM per hour-block (not per slot-row): each day's cell
+    // spans every slot-row via rowspan and lays its Mullins/Glades columns
+    // out independently, so a day with 4 Mullins slots but only 2 Glades
+    // slots keeps Mullins flush left and Glades flush right instead of the
+    // shorter column dragging both toward the middle of a shared flex row.
+    let row = `<tr class="hour-start slot-row">`;
+    row += `<th rowspan="${maxRows}">${HOUR_LABELS[hour]}</th>`;
+    DAYS.forEach(day => {
+      if (day === "Friday") {
+        row += `<td class="friday-cell" rowspan="${maxRows}"></td>`;
+        return;
+      }
+      const active = (ACTIVE_HOURS[day] || []).includes(hour);
+      if (!active) {
+        row += `<td class="nodata-cell" rowspan="${maxRows}"></td>`;
+        return;
+      }
+      const locs = activeDayLocs[day];
+      const singleLoc = locs.length === 1;
+      const columns = locs.map(loc => {
+        const count = slotCountFor(day, hour, loc);
+        const side = singleLoc ? "center" : (loc === "mullins" ? "flex-start" : "flex-end");
+        const slots = Array.from({ length: count }, (_, r) =>
+          `<div style="padding:2px 0;">${renderSlot(day, hour, loc, r)}</div>`
+        ).join('');
+        return `<div style="display:flex;flex-direction:column;align-items:${side};${singleLoc ? '' : 'flex:1;'}">${slots}</div>`;
+      }).join('');
+      const justify = singleLoc ? 'center' : 'space-between';
+      row += `<td rowspan="${maxRows}"><div style="display:flex;justify-content:${justify};gap:6px;">${columns}</div></td>`;
+    });
+    tbody += row + '</tr>';
   });
 
   table.innerHTML = colgroup + thead + '<tbody>' + tbody + '</tbody>';
