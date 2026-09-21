@@ -10,13 +10,58 @@ import { TEAM_ADMINS } from './coaches-config.js';
  * media-admin.html gates itself independently for anyone reaching the URL
  * directly — this is the menu-level half, same split as Coach Rankings below.
  */
+let pendingUnsub = null;
+
 function syncAdminLinks() {
   const link = document.getElementById('nav-media-admin');
   if (!link) return;
   const coach = getCurrentCoach();
   const isAdmin = !!coach && TEAM_ADMINS.includes(coach.name);
-  link.style.display = isAdmin ? '' : 'none';
+  // Toggle a class, not inline style: this link is a flex row (so the pending
+  // badge can sit at its right edge) and an inline `display` would override
+  // that rule, collapsing the badge back onto the text.
+  link.classList.toggle('hidden', !isAdmin);
+
+  if (isAdmin) startPendingBadge(link);
+  else {
+    // Drop the subscription on logout — no reason to hold a live Firestore
+    // listener open for someone who can't see the inbox.
+    pendingUnsub?.(); pendingUnsub = null;
+    link.querySelector('.nav-badge')?.remove();
+  }
 }
+
+/**
+ * Live count of media awaiting review, as a red pill on the menu item.
+ *
+ * Subscribed rather than fetched once: an admin often leaves a tab open, and
+ * a submission that arrives while they're on another page should surface
+ * without a refresh. Imported lazily so no non-admin page pays for
+ * media-data.js (and its Firestore query) just to render a menu.
+ */
+async function startPendingBadge(link) {
+  if (pendingUnsub) return;
+  try {
+    const { subscribeSubmissions } = await import('./media-data.js');
+    pendingUnsub = subscribeSubmissions(list => {
+      const n = list.filter(s => s.status === 'pending').length;
+      let badge = link.querySelector('.nav-badge');
+      if (!n) { badge?.remove(); return; }
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'nav-badge';
+        link.appendChild(badge);
+      }
+      // 99+ keeps the pill from stretching the menu row on an unworked queue.
+      badge.textContent = n > 99 ? '99+' : String(n);
+      badge.setAttribute('aria-label', `${n} item${n === 1 ? '' : 's'} awaiting review`);
+    });
+  } catch (err) {
+    // A badge is a nicety — never let it break the menu.
+    console.warn('media: pending badge unavailable', err);
+  }
+}
+
 document.addEventListener('coachChanged', syncAdminLinks);
 document.addEventListener('DOMContentLoaded', syncAdminLinks);
 syncAdminLinks();

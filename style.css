@@ -5693,3 +5693,178 @@ body:not(.draft-final) .slot.filled { cursor: grab; }
   .media-q-item { flex-direction: column; }
   .media-q-thumb { width: 100%; height: 150px; }
 }
+
+
+/* ── Pending-review badge on the Media Inbox menu item ─────────────────────
+   Only this one link becomes a flex row — .side-menu-link is display:block
+   for every other entry and stays that way, so nothing else shifts. */
+#nav-media-admin {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--clr-danger);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   APPROVED MEDIA GALLERY
+   Two surfaces, one renderer (media-gallery.js): a compact grid inside the
+   submit sheet, and the full public page (media-gallery.html). Public on
+   purpose — the parent who submitted a clip has to see it appear.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.media-gal-section { margin-bottom: 16px; }
+.media-gal-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; margin-bottom: 8px;
+}
+.media-gal-h {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--clr-muted);
+}
+.media-gal-more {
+  font-size: 0.7rem; font-weight: 600; color: var(--clr-accent); text-decoration: none;
+}
+.media-gal-more:hover { text-decoration: underline; }
+.media-gal-loading { font-size: 0.78rem; color: var(--clr-muted); padding: 10px 0; }
+
+.media-gal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+}
+/* Inside the sheet the tiles are smaller and the grid scrolls rather than
+   pushing the pickers off-screen on a phone. */
+.media-gal-grid.compact {
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 6px;
+  max-height: 188px;
+  overflow-y: auto;
+}
+
+.media-gal-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  cursor: pointer;
+  padding: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.media-gal-item:hover { border-color: var(--clr-accent); }
+.media-gal-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.media-gal-item.is-promoted { border-color: var(--clr-accent); box-shadow: inset 0 0 0 1px var(--clr-accent); }
+.media-gal-ph { font-size: 1.6rem; }
+
+.media-gal-badge {
+  position: absolute; top: 5px; left: 5px;
+  font-size: 0.54rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; padding: 2px 5px; border-radius: 4px;
+  background: var(--clr-accent); color: #fff;
+}
+.media-gal-play {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.8); pointer-events: none;
+}
+.media-gal-dur {
+  position: absolute; bottom: 5px; right: 5px;
+  font-size: 0.58rem; font-weight: 700; background: rgba(0,0,0,0.72);
+  color: #fff; padding: 2px 4px; border-radius: 3px; font-variant-numeric: tabular-nums;
+}
+.media-gal-by {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 12px 6px 4px;
+  background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
+  font-size: 0.56rem; color: #c8cde0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The submitter credit is noise at 84px — the lightbox still shows it. */
+.media-gal-grid.compact .media-gal-by { display: none; }
+
+/* The empty state is the only place this feature announces itself — the
+   long-press trigger is invisible by nature. */
+.media-gal-empty {
+  border: 1px dashed var(--clr-border); border-radius: var(--radius);
+  padding: 22px 18px; text-align: center; color: var(--clr-muted);
+}
+.media-gal-empty-t { font-size: 0.87rem; font-weight: 600; color: var(--clr-text); }
+.media-gal-empty-b {
+  font-size: 0.76rem; margin-top: 5px; line-height: 1.5;
+  max-width: 46ch; margin-inline: auto;
+}
+.media-gal-empty-b a { color: var(--clr-accent); }
+
+/* ── Lightbox ──────────────────────────────────────────────────────────────
+   z-index above the submit sheet (600), since it opens from inside it. */
+.media-gal-lb {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 700;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.media-gal-lb.hidden { display: none; }
+.media-gal-lb-inner { max-width: 900px; width: 100%; position: relative; }
+.media-gal-lb-body img,
+.media-gal-lb-body video {
+  max-width: 100%; max-height: 74vh; display: block; margin: 0 auto;
+  border-radius: 8px; background: #000;
+}
+.media-gal-lb-x {
+  position: absolute; top: -34px; right: 0;
+  background: none; border: 0; color: #fff; font-size: 1.2rem;
+  cursor: pointer; padding: 4px 8px;
+}
+.media-gal-lb-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.25);
+  color: #fff; font-size: 1.6rem; line-height: 1;
+  width: 40px; height: 56px; border-radius: 7px; cursor: pointer;
+}
+.media-gal-lb-nav:hover { background: rgba(0,0,0,0.75); }
+.media-gal-lb-nav.hidden { display: none; }
+.media-gal-lb-nav.prev { left: -8px; }
+.media-gal-lb-nav.next { right: -8px; }
+.media-gal-lb-cap {
+  text-align: center; color: var(--clr-muted); font-size: 0.78rem; margin-top: 12px;
+}
+
+/* ── The public per-player page ─────────────────────────────────────────── */
+.media-page { max-width: 900px; margin: 0 auto; }
+.media-page-head { margin-bottom: 20px; }
+.media-page-id { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.media-page-ava {
+  width: 92px; height: 92px; border-radius: 22%; flex-shrink: 0;
+  object-fit: cover; object-position: center 68%;
+  background: var(--clr-card);
+  display: flex; align-items: center; justify-content: center; font-size: 2rem;
+}
+.media-page-meta { min-width: 0; flex: 1; }
+.media-page-name { font-size: 1.15rem; font-weight: 700; margin: 0; }
+.media-page-name .pid { color: var(--clr-accent); font-variant-numeric: tabular-nums; }
+.media-page-sub { font-size: 0.8rem; color: var(--clr-muted); margin-top: 3px; }
+.media-page-add { margin-top: 10px; }
+
+@media (max-width: 480px) {
+  .media-gal-lb { padding: 14px; }
+  .media-gal-lb-nav { width: 34px; height: 46px; font-size: 1.3rem; }
+  .media-gal-lb-nav.prev { left: 0; }
+  .media-gal-lb-nav.next { right: 0; }
+  .media-page-ava { width: 72px; height: 72px; }
+}

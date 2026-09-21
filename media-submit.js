@@ -39,6 +39,7 @@ import {
 import { validateFile, uploadToCloudinary, durationWithinLimit, readImagePreview }
   from './media-upload.js';
 import { createSubmission, getPlayerCounts, canSubmit } from './media-data.js';
+import { renderGallery } from './media-gallery.js';
 
 const DBLCLICK_MS  = 250;  // how long a single click waits to see if a second lands
 const LONGPRESS_MS = 500;  // press duration that opens the sheet on touch
@@ -69,6 +70,34 @@ export function attachMediaSubmit(el, player, { onSingleClick } = {}) {
   // afterwards doesn't also run the single-click action.
   let suppressClick = false;
 
+  // ── Links swallow the double-click ────────────────────────────────────────
+  // When this element sits inside an <a href> — which every directory card is
+  // once a coach logs in — the FIRST click of a double navigates away before
+  // the second ever arrives, so dblclick never fires and the sheet never
+  // opens. preventDefault() on the dblclick handler is far too late.
+  //
+  // So: swallow the navigation at the first click, and re-issue it after the
+  // double-click window closes if no second click came. A single click still
+  // navigates (250ms later, imperceptible); a double click opens the sheet
+  // and never navigates at all.
+  const link = el.closest('a[href]');
+  let navTimer = null;
+  if (link) {
+    el.addEventListener('click', e => {
+      // Touch never produces a dblclick here (long-press is its gesture), so
+      // let the tap navigate immediately rather than sitting on a 250ms delay.
+      if (e.pointerType === 'touch' || isTouchLike()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (navTimer) clearTimeout(navTimer);
+      navTimer = setTimeout(() => {
+        navTimer = null;
+        window.location.href = link.href;
+      }, DBLCLICK_MS);
+    });
+  }
+  const cancelNav = () => { if (navTimer) { clearTimeout(navTimer); navTimer = null; } };
+
   if (onSingleClick) {
     el.addEventListener('click', e => {
       if (suppressClick) { suppressClick = false; e.preventDefault(); e.stopPropagation(); return; }
@@ -84,6 +113,7 @@ export function attachMediaSubmit(el, player, { onSingleClick } = {}) {
     e.preventDefault();
     e.stopPropagation();
     if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
+    cancelNav();          // a double never navigates
     open();
   });
 
@@ -107,6 +137,7 @@ export function attachMediaSubmit(el, player, { onSingleClick } = {}) {
       pressTimer = null;
       el.classList.remove('media-pressing');
       suppressClick = true;
+      cancelNav();
       // Haptic confirmation where supported — the standard "the press took"
       // signal on Android. Silently absent on iOS Safari.
       navigator.vibrate?.(15);
@@ -235,6 +266,14 @@ function renderPicker(counts) {
     : '';
 
   renderBody(`
+    <div class="media-gal-section" id="media-sheet-gallery-wrap">
+      <div class="media-gal-head">
+        <span class="media-gal-h">In the app</span>
+        <a class="media-gal-more" id="media-sheet-more" href="#">See all →</a>
+      </div>
+      <div id="media-sheet-gallery"></div>
+    </div>
+
     <div class="media-review-note">
       <span aria-hidden="true">🛡️</span>
       <div>
@@ -265,6 +304,22 @@ function renderPicker(counts) {
 
     <input type="file" id="media-file-photo" accept="image/*" hidden />
     <input type="file" id="media-file-video" accept="video/*" hidden />`);
+
+  // Gallery of what's already approved. Rendered AFTER the body exists, and
+  // deliberately not awaited — the pickers must be usable immediately even on
+  // a slow connection, rather than the whole sheet waiting on Firestore.
+  const galWrap = sheetEl.querySelector('#media-sheet-gallery-wrap');
+  const moreLink = sheetEl.querySelector('#media-sheet-more');
+  if (moreLink) {
+    moreLink.href = `media-gallery.html?id=${encodeURIComponent(activeState.id)}`;
+  }
+  renderGallery(sheetEl.querySelector('#media-sheet-gallery'), activeState.id, {
+    playerName: activeState.name,
+    compact: true,
+    // Nothing approved yet? Drop the heading and the "See all" link — the
+    // gallery's own empty state says it better than a header over a blank box.
+    onEmpty: () => galWrap?.querySelector('.media-gal-head')?.remove(),
+  }).catch(() => {});
 
   const photoInput = sheetEl.querySelector('#media-file-photo');
   const videoInput = sheetEl.querySelector('#media-file-video');
