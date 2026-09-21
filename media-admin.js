@@ -18,6 +18,7 @@ import {
   subscribeMessages, markMessageHandled,
 } from './media-data.js';
 import { removalLabel } from './media-permissions.js';
+import { fetchPlayers, buildDriveIndex, videoUrl as tryoutVideoUrl, COL } from './players-data.js';
 import { refreshPromotions } from './media-promotions.js';
 import {
   thumbUrl, fullUrl, videoUrl, videoPosterUrl,
@@ -28,6 +29,12 @@ import {
 let submissions = [];
 let messages    = [];
 let promotions  = {};
+// Player id -> has a Drive tryout video. The tryout clip occupies one of the
+// 6 clip slots (see media-config.js/media-data.js) even though it never
+// appears in `submissions` — it lives in Drive, not Firestore. Without this,
+// the cap check here would let an admin approve a 6th real clip on a player
+// who effectively already has 6 (5 approved + the tryout video).
+let tryoutById  = {};
 let filter      = 'pending';
 let unsubscribe = null;
 let msgUnsub    = null;
@@ -71,6 +78,14 @@ async function start() {
     return;
   }
   promotions = await getAllPromotions();
+  try {
+    const [players] = await Promise.all([fetchPlayers(), buildDriveIndex()]);
+    tryoutById = Object.fromEntries(players.map(p => [String(p[COL.ID]), !!tryoutVideoUrl(p)]));
+  } catch (err) {
+    // Never let this block the inbox from loading — worst case the cap check
+    // undercounts by the tryout video, same as before this fix existed.
+    console.warn('media: could not load tryout-video index', err);
+  }
   unsubscribe = subscribeSubmissions(list => {
     submissions = list;
     renderCounts();
@@ -124,7 +139,8 @@ function approvedCounts(playerId) {
     String(s.playerId) === String(playerId) && s.status === 'approved');
   return {
     photos: mine.filter(s => s.kind === 'photo').length,
-    videos: mine.filter(s => s.kind === 'video').length,
+    videos: mine.filter(s => s.kind === 'video').length
+      + (tryoutById[String(playerId)] ? 1 : 0),
   };
 }
 

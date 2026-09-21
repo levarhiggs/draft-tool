@@ -5786,8 +5786,15 @@ body:not(.draft-final) .slot.filled { cursor: grab; }
   overflow-y: auto;
 }
 
+/* width:100% is load-bearing, not decorative. A <button> is a replaced-like
+   inline-block by default and sizes to its CONTENT, not its grid cell — a
+   tile with an <img> inside stretches to fill because the image is itself
+   width:100%, but the tryout tile has no <img> (Drive gives no poster frame,
+   so it falls back to a plain emoji span) and was shrinking to ~37px against
+   its 101px siblings. Verified via getBoundingClientRect before/after. */
 .media-gal-item {
   position: relative;
+  width: 100%;
   aspect-ratio: 1;
   border-radius: 8px;
   overflow: hidden;

@@ -244,23 +244,32 @@ async function openSubmitSheet(player) {
   }
 
   renderBody('<p class="media-hint">Loading…</p>');
-  let counts, gate;
+  let counts, gate, extras;
   try {
-    [counts, gate] = await Promise.all([getPlayerCounts(id), canSubmit(id)]);
+    // Resolved ONCE, up front: the tryout video occupies one of the 6 clip
+    // slots (see media-data.js), so the quota display has to know about it
+    // before rendering, not just the gallery further down. Sharing this one
+    // resolvePlayerExtras() call between the counts and the gallery is also
+    // what stops them from silently disagreeing about the same player.
+    extras = await resolvePlayerExtras(id);
+    [counts, gate] = await Promise.all([
+      getPlayerCounts(id, !!extras.tryoutVideo),
+      canSubmit(id),
+    ]);
   } catch (err) {
     renderBody(`<p class="media-err">Couldn't load this player's media. ${escape(err.message)}</p>`);
     return;
   }
 
   if (!gate.ok) { renderBody(`<p class="media-err">${escape(gate.reason)}</p>`); return; }
-  renderPicker(counts);
+  renderPicker(counts, extras);
 }
 
 function renderBody(html) {
   sheetEl.querySelector('#media-sheet-body').innerHTML = html;
 }
 
-function renderPicker(counts) {
+function renderPicker(counts, extras) {
   const photosFull = counts.approvedPhotos >= counts.maxPhotos;
   const videosFull = counts.approvedVideos >= counts.maxVideos;
   // Full slots never BLOCK submission — the admin decides what displaces what.
@@ -319,25 +328,26 @@ function renderPicker(counts) {
   if (moreLink) {
     moreLink.href = `media-gallery.html?id=${encodeURIComponent(activeState.id)}`;
   }
-  resolvePlayerExtras(activeState.id).then(({ tryoutVideo, record }) =>
-    renderGallery(sheetEl.querySelector('#media-sheet-gallery'), activeState.id, {
-      playerName: activeState.name,
-      compact: true,
-      // The league's own tryout clip leads the gallery, so a player with only
-      // a tryout video no longer reads as "no photos or clips yet".
-      tryoutVideo,
-      player: record,
-      // Nothing at all? Drop the heading and the "See all" link — the
-      // gallery's own empty state says it better than a header over a blank box.
-      onEmpty: () => galWrap?.querySelector('.media-gal-head')?.remove(),
-    })).catch(() => {});
+  // extras was already resolved in openSubmitSheet, alongside counts — no
+  // second Firestore/Drive round-trip here.
+  renderGallery(sheetEl.querySelector('#media-sheet-gallery'), activeState.id, {
+    playerName: activeState.name,
+    compact: true,
+    // The league's own tryout clip leads the gallery, so a player with only
+    // a tryout video no longer reads as "no photos or clips yet".
+    tryoutVideo: extras?.tryoutVideo,
+    player: extras?.record,
+    // Nothing at all? Drop the heading and the "See all" link — the
+    // gallery's own empty state says it better than a header over a blank box.
+    onEmpty: () => galWrap?.querySelector('.media-gal-head')?.remove(),
+  }).catch(() => {});
 
   const photoInput = sheetEl.querySelector('#media-file-photo');
   const videoInput = sheetEl.querySelector('#media-file-video');
   sheetEl.querySelector('#media-pick-photo').addEventListener('click', () => photoInput.click());
   sheetEl.querySelector('#media-pick-video').addEventListener('click', () => videoInput.click());
-  photoInput.addEventListener('change', () => onFileChosen(photoInput.files[0], counts));
-  videoInput.addEventListener('change', () => onFileChosen(videoInput.files[0], counts));
+  photoInput.addEventListener('change', () => onFileChosen(photoInput.files[0], counts, extras));
+  videoInput.addEventListener('change', () => onFileChosen(videoInput.files[0], counts, extras));
 }
 
 function quotaTile(label, used, max) {
@@ -350,7 +360,7 @@ function quotaTile(label, used, max) {
   </div>`;
 }
 
-async function onFileChosen(file, counts) {
+async function onFileChosen(file, counts, extras) {
   if (!file) return;
   renderBody('<p class="media-hint">Checking the file…</p>');
 
@@ -364,7 +374,7 @@ async function onFileChosen(file, counts) {
       <div class="media-actions">
         <button class="btn" id="media-back">Choose another</button>
       </div>`);
-    sheetEl.querySelector('#media-back').addEventListener('click', () => renderPicker(counts));
+    sheetEl.querySelector('#media-back').addEventListener('click', () => renderPicker(counts, extras));
     return;
   }
 
@@ -373,10 +383,10 @@ async function onFileChosen(file, counts) {
   activeState.durationSec = result.durationSec;
 
   const preview = result.kind === 'photo' ? await readImagePreview(file) : null;
-  renderForm(preview, counts);
+  renderForm(preview, counts, extras);
 }
 
-function renderForm(preview, counts) {
+function renderForm(preview, counts, extras) {
   const { file, kind, durationSec } = activeState;
   const facts = [
     kind === 'video' && durationSec !== null ? formatDuration(durationSec) : null,
@@ -438,7 +448,7 @@ function renderForm(preview, counts) {
   const nameInput = sheetEl.querySelector('#media-name');
   try { nameInput.value = sessionStorage.getItem('media_submitter_name') || ''; } catch {}
 
-  sheetEl.querySelector('#media-cancel').addEventListener('click', () => renderPicker(counts));
+  sheetEl.querySelector('#media-cancel').addEventListener('click', () => renderPicker(counts, extras));
   sheetEl.querySelector('#media-send').addEventListener('click', () => doUpload(counts));
 }
 
