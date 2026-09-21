@@ -178,10 +178,6 @@ function renderSlot(day, hour, loc, idx) {
   return `<div class="psched-tile ${loc}${openClass}${courtClass}">${content}</div>`;
 }
 
-function rowCountFor(day, hour) {
-  return Math.max(slotCountFor(day, hour, "mullins"), slotCountFor(day, hour, "glades"));
-}
-
 function build() {
   const table = document.getElementById('psched-table');
   if (!table) return;
@@ -242,24 +238,25 @@ function build() {
     const anyActive = DAYS.some(day => (ACTIVE_HOURS[day] || []).includes(hour));
     if (!anyActive) return;
 
-    const maxRows = Math.max(1, ...DAYS.map(day =>
-      (ACTIVE_HOURS[day] || []).includes(hour) ? rowCountFor(day, hour) : 0));
-
-    // One row in the DOM per hour-block (not per slot-row): each day's cell
-    // spans every slot-row via rowspan and lays its Mullins/Glades columns
-    // out independently, so a day with 4 Mullins slots but only 2 Glades
-    // slots keeps Mullins flush left and Glades flush right instead of the
-    // shorter column dragging both toward the middle of a shared flex row.
+    // ONE <tr> per hour block, one <td> per day, and NO rowspan anywhere.
+    // Each day's cell stacks its own slots internally (see the flex columns
+    // below), so the cell grows to whatever height its busiest location
+    // needs and the row heights line up on their own.
+    //
+    // Do NOT reintroduce rowspan here: an earlier version put rowspan="N" on
+    // every cell of a single <tr>, which promises N rows that don't exist —
+    // the browser then invents extra COLUMNS for the overflow and half the
+    // hour labels end up off the right edge behind a horizontal scrollbar.
     let row = `<tr class="hour-start slot-row">`;
-    row += `<th rowspan="${maxRows}">${HOUR_LABELS[hour]}</th>`;
+    row += `<th>${HOUR_LABELS[hour]}</th>`;
     DAYS.forEach(day => {
       if (day === "Friday") {
-        row += `<td class="friday-cell" rowspan="${maxRows}"></td>`;
+        row += `<td class="friday-cell"></td>`;
         return;
       }
       const active = (ACTIVE_HOURS[day] || []).includes(hour);
       if (!active) {
-        row += `<td class="nodata-cell" rowspan="${maxRows}"></td>`;
+        row += `<td class="nodata-cell"></td>`;
         return;
       }
       const locs = activeDayLocs[day];
@@ -273,7 +270,7 @@ function build() {
         return `<div style="display:flex;flex-direction:column;align-items:${side};${singleLoc ? '' : 'flex:1;'}">${slots}</div>`;
       }).join('');
       const justify = singleLoc ? 'center' : 'space-between';
-      row += `<td rowspan="${maxRows}"><div style="display:flex;justify-content:${justify};gap:6px;">${columns}</div></td>`;
+      row += `<td><div style="display:flex;justify-content:${justify};gap:6px;align-items:flex-start;">${columns}</div></td>`;
     });
     tbody += row + '</tr>';
   });
