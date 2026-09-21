@@ -22,6 +22,7 @@ import { refreshPromotions } from './media-promotions.js';
 import {
   thumbUrl, fullUrl, videoUrl, videoPosterUrl,
   formatDuration, formatBytes, mediaConfigured,
+  MAX_APPROVED_PHOTOS, MAX_APPROVED_VIDEOS,
 } from './media-config.js';
 
 let submissions = [];
@@ -146,7 +147,7 @@ function itemHTML(s) {
   const thumb = isPhoto ? thumbUrl(s.publicId) : videoPosterUrl(s.publicId);
   const counts = approvedCounts(s.playerId);
   const used = isPhoto ? counts.photos : counts.videos;
-  const max  = isPhoto ? 10 : 5;
+  const max  = isPhoto ? MAX_APPROVED_PHOTOS : MAX_APPROVED_VIDEOS;
   const atCap = s.status === 'pending' && used >= max;
   const promotedAs = isPromoted(promotions, s.playerId, s.id);
 

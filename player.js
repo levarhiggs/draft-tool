@@ -16,7 +16,7 @@ import { subscribePlayer, getPriorPlayerData, saveRanking, deleteRanking, saveNo
 import { getCurrentCoach } from './coach-login.js';
 import { personByName, teamNameFor } from './coaches-config.js';
 import { contactFor } from './player-contacts.js';
-import { attachMediaSubmit } from './media-submit.js';
+import { attachMediaSubmit, openMediaSheet } from './media-submit.js';
 import { loadPromotions } from './media-promotions.js';
 import {
   activeFilters, currentSort, favorites, loadFavorites,
@@ -198,8 +198,8 @@ function rowHTML(p, isLoggedIn) {
     : `<div class="rank-row-photo-placeholder">🏀</div>`;
 
   const videoIconHtml = video
-    ? `<button class="rank-row-video-btn" data-action="video" title="Watch tryout video">▶<span>VIDEO</span></button>`
-    : `<button class="rank-row-video-btn disabled" disabled title="No video available">▶<span>NO VIDEO</span></button>`;
+    ? `<button class="rank-row-video-btn" data-action="video" title="Photos &amp; clips">▶<span>VIDEO</span></button>`
+    : `<button class="rank-row-video-btn no-tryout" data-action="video" title="Photos &amp; clips">▶<span>MEDIA</span></button>`;
 
   const rankingHtml = isLoggedIn ? rankingMechanismHTML(p) : `
     <div class="coach-panel-locked rank-row-locked">
@@ -293,8 +293,11 @@ function wireRow(p) {
   row.querySelector('[data-action="composite"]')
     ?.addEventListener('click', () => openRankingsModal(id));
 
+  // Opens the media gallery/upload sheet, not the tryout clip directly. The
+  // sheet leads with that clip, so nothing is lost — and everything else the
+  // player has is reachable from the same place.
   row.querySelector('[data-action="video"]')
-    ?.addEventListener('click', () => openVideoModal(p));
+    ?.addEventListener('click', () => openMediaSheet({ id: p[COL.ID], name: p[COL.NAME] }));
 
   wireMechanism(p);
 }
@@ -502,8 +505,8 @@ function openBioModal(p) {
 
   const video = videoUrl(p);
   const videoTileHtml = video
-    ? `<button class="rank-row-video-btn player-modal-video-tile" data-action="video" title="Watch tryout video">▶<span>VIDEO</span></button>`
-    : `<button class="rank-row-video-btn player-modal-video-tile disabled" disabled title="No video available">▶<span>NO VIDEO</span></button>`;
+    ? `<button class="rank-row-video-btn player-modal-video-tile" data-action="video" title="Photos &amp; clips">▶<span>VIDEO</span></button>`
+    : `<button class="rank-row-video-btn player-modal-video-tile no-tryout" data-action="video" title="Photos &amp; clips">▶<span>MEDIA</span></button>`;
 
   const noteEntries = Object.entries(data?.notes || {}).filter(([, v]) => v && v.trim());
   const notesHtml = noteEntries.length ? `
@@ -540,7 +543,12 @@ function openBioModal(p) {
   `;
 
   document.getElementById('bio-modal-body').querySelector('[data-action="video"]')
-    ?.addEventListener('click', () => openVideoModal(p));
+    ?.addEventListener('click', () => {
+      // Close the bio popup first — the media sheet sits above it, and
+      // leaving both open stacks two overlays on a phone.
+      document.getElementById('modal-bio')?.classList.add('hidden');
+      openMediaSheet({ id: p[COL.ID], name: p[COL.NAME] });
+    });
 
   document.getElementById('modal-bio').classList.remove('hidden');
 }
@@ -652,6 +660,11 @@ function openRankingsModal(id) {
 
 // ── Video modal ───────────────────────────────────────────────────────────────
 
+// UNUSED as of 2026-09-21 — every video entry point now opens the media
+// gallery/upload sheet instead, which leads with the tryout clip. Kept
+// (not deleted) because the modal markup it drives still exists in the
+// HTML and a future 'play just the tryout video' path may want it. Delete
+// both together if that never materialises.
 function openVideoModal(p) {
   const video = videoUrl(p);
   if (!video) return;

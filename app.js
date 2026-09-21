@@ -193,6 +193,11 @@ function renderGrid() {
 
 // ── Public (logged-out) single-player profile popup ───────────────────────────
 
+// UNUSED as of 2026-09-21 — every video entry point now opens the media
+// gallery/upload sheet instead, which leads with the tryout clip. Kept
+// (not deleted) because the modal markup it drives still exists in the
+// HTML and a future 'play just the tryout video' path may want it. Delete
+// both together if that never materialises.
 function openVideoModal(video, name = '') {
   if (!video) return;
   const title = document.getElementById('video-modal-title');

@@ -38,7 +38,11 @@ export function mediaConfigured() {
 // the admin always gets the choice — an eleventh photo may be the best one.
 // The gate is at APPROVAL time (see canApprove in media-data.js).
 export const MAX_APPROVED_PHOTOS = 10;
-export const MAX_APPROVED_VIDEOS = 5;
+// 6, not 5: the league's own tryout clip is pinned as the first tile in every
+// gallery, so a cap of 5 would have let it eat a slot a parent could otherwise
+// have filled. 6 keeps the effective allowance at the 5 submitted clips the
+// spec asked for, plus the tryout video.
+export const MAX_APPROVED_VIDEOS = 6;
 
 // Abuse circuit-breaker ONLY, unrelated to the display caps above. A real
 // parent will never see this: it takes 30 unreviewed items on a single player.

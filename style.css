@@ -4641,6 +4641,21 @@ body.coach-gate-active .btn-drawer-toggle {
   border: 1px solid var(--clr-border);
 }
 
+/* No TRYOUT clip, but the button still works — it opens the media gallery,
+   where submitted photos and clips may well exist. Greyed to show there is no
+   tryout footage, but clickable, unlike the old .disabled state. */
+.rank-row-video-btn.no-tryout {
+  background: var(--clr-surface);
+  color: var(--clr-muted);
+  border: 1px solid var(--clr-border);
+  cursor: pointer;
+}
+.rank-row-video-btn.no-tryout:hover {
+  background: var(--clr-card);
+  border-color: var(--clr-accent);
+  color: var(--clr-text);
+}
+
 .modal-box-video { max-width: 720px; }
 
 .bio-modal-photo {

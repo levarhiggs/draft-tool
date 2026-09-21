@@ -40,6 +40,34 @@ import { validateFile, uploadToCloudinary, durationWithinLimit, readImagePreview
   from './media-upload.js';
 import { createSubmission, getPlayerCounts, canSubmit } from './media-data.js';
 import { renderGallery } from './media-gallery.js';
+import { fetchPlayers, videoUrl, COL } from './players-data.js';
+
+/**
+ * The player's Drive tryout clip, and their roster record.
+ *
+ * Resolved HERE rather than requiring every caller to pass it: six different
+ * places open this sheet (directory cards, the video badge, the ranking-page
+ * photo, the draft board, draft results, the media page) and threading the
+ * same two values through all of them is how they drift apart.
+ *
+ * fetchPlayers() is sessionStorage-cached, so this is a map lookup after the
+ * first call on a page, not a fetch.
+ */
+async function resolvePlayerExtras(id) {
+  try {
+    const all = await fetchPlayers();
+    const rec = all.find(x => String(x[COL.ID]) === String(id));
+    if (!rec) return { tryoutVideo: null, record: null };
+    return {
+      tryoutVideo: videoUrl(rec),
+      record: { ...rec, name: rec[COL.NAME], _teamFB: rec._teamFB || rec[COL.TEAM] || '' },
+    };
+  } catch {
+    // The gallery still works without these — it just loses the pinned tryout
+    // tile and the remove-permission check falls back to admin-only.
+    return { tryoutVideo: null, record: null };
+  }
+}
 
 const DBLCLICK_MS  = 250;  // how long a single click waits to see if a second lands
 const LONGPRESS_MS = 500;  // press duration that opens the sheet on touch
@@ -291,13 +319,18 @@ function renderPicker(counts) {
   if (moreLink) {
     moreLink.href = `media-gallery.html?id=${encodeURIComponent(activeState.id)}`;
   }
-  renderGallery(sheetEl.querySelector('#media-sheet-gallery'), activeState.id, {
-    playerName: activeState.name,
-    compact: true,
-    // Nothing approved yet? Drop the heading and the "See all" link — the
-    // gallery's own empty state says it better than a header over a blank box.
-    onEmpty: () => galWrap?.querySelector('.media-gal-head')?.remove(),
-  }).catch(() => {});
+  resolvePlayerExtras(activeState.id).then(({ tryoutVideo, record }) =>
+    renderGallery(sheetEl.querySelector('#media-sheet-gallery'), activeState.id, {
+      playerName: activeState.name,
+      compact: true,
+      // The league's own tryout clip leads the gallery, so a player with only
+      // a tryout video no longer reads as "no photos or clips yet".
+      tryoutVideo,
+      player: record,
+      // Nothing at all? Drop the heading and the "See all" link — the
+      // gallery's own empty state says it better than a header over a blank box.
+      onEmpty: () => galWrap?.querySelector('.media-gal-head')?.remove(),
+    })).catch(() => {});
 
   const photoInput = sheetEl.querySelector('#media-file-photo');
   const videoInput = sheetEl.querySelector('#media-file-video');
