@@ -221,10 +221,37 @@ export async function approveSubmission(id, adminName) {
  * before it will purge.
  */
 export async function rejectSubmission(id, adminName, reason = null) {
+  await demotePromotionIfNeeded(id);
   await updateDoc(submissionRef(id), {
     status: 'rejected', reviewedAt: serverTimestamp(),
     reviewedBy: adminName, rejectReason: reason,
   });
+}
+
+/**
+ * Invariant: mediaPromotions must never point at a submission that isn't
+ * approved. Called before every status-changing write below (reject, remove,
+ * unreview) so it's structurally impossible to leave a stale promotion behind
+ * — rather than depending on every call site to remember.
+ *
+ * Real incident this fixes (2026-09-21): a photo was approved, promoted to
+ * profile picture, then rejected. Rejecting only ever touched the
+ * submission's own status — nothing checked mediaPromotions — so the
+ * rejected (and since-deleted-from-Cloudinary-by-nobody, still-live) photo
+ * kept serving as the player's face across the whole app, invisible from the
+ * gallery (which correctly stopped showing it) and with no UI path to revert
+ * it short of a manual Firestore fix.
+ */
+async function demotePromotionIfNeeded(submissionId) {
+  const snap = await getDoc(submissionRef(submissionId));
+  if (!snap.exists()) return;
+  const { playerId, kind } = snap.data();
+  const promoSnap = await getDoc(promotionRef(playerId));
+  if (!promoSnap.exists()) return;
+  const promo = promoSnap.data();
+  if (promo[kind]?.submissionId === submissionId) {
+    await unpromote(playerId, kind);
+  }
 }
 
 /**
@@ -240,6 +267,7 @@ export async function rejectSubmission(id, adminName, reason = null) {
  * carries the capacity they acted in.
  */
 export async function removeSubmission(id, actorName, role, reason = null) {
+  await demotePromotionIfNeeded(id);
   await updateDoc(submissionRef(id), {
     status: 'rejected',
     reviewedAt: serverTimestamp(),
@@ -251,6 +279,9 @@ export async function removeSubmission(id, actorName, role, reason = null) {
 
 /** Back to the pending queue — the undo for both actions above. */
 export async function unreviewSubmission(id) {
+  // A promoted item going back to pending is the same invariant violation as
+  // rejecting it — "pending" is not "approved" either.
+  await demotePromotionIfNeeded(id);
   await updateDoc(submissionRef(id), {
     status: 'pending', reviewedAt: null, reviewedBy: null, rejectReason: null,
   });
