@@ -7,7 +7,7 @@
 // Shows NO ranking data — see PRODUCT_SPEC "Rankings are never stated
 // publicly". Name, photo, grade, age; nothing evaluative.
 
-import { fetchPlayers, buildDriveIndex, photoUrl, videoUrl, ageDisplay, COL }
+import { fetchPlayers, buildDriveIndex, photoUrl, biggerPhotoUrl, videoUrl, ageDisplay, COL }
   from './players-data.js';
 import { loadPromotions } from './media-promotions.js';
 import { renderGallery } from './media-gallery.js';
@@ -104,7 +104,10 @@ async function init() {
 
   await renderGallery(galEl, id, {
     playerName: name,
-    // The league's own tryout clip leads the gallery. It lives in Drive, not
+    // The player's own headshot leads the gallery as photo 1 of N — same
+    // full-size (w1200) treatment as draft-board.js's own lightbox.
+    headshotPhoto: biggerPhotoUrl(p, 1200),
+    // The league's own tryout clip comes next. It lives in Drive, not
     // Cloudinary, so it is pinned and never removable - see media-gallery.js.
     tryoutVideo: videoUrl(p),
     // Roster record, so the gallery can decide whether this viewer may remove

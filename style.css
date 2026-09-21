@@ -5960,7 +5960,11 @@ body:not(.draft-final) .slot.filled { cursor: grab; }
 /* The tryout clip is the league's own footage, pinned first and not
    removable — badged so it reads as different from a submission. */
 .media-gal-badge.tryout { background: #1c5a80; }
-.media-gal-item.is-tryout { border-color: #2f6f96; }
+/* Shared border treatment for both pinned tiles (the player's own headshot
+   and the league's tryout clip) — visually "this isn't a submission" without
+   needing two near-identical color rules. .is-tryout/.is-headshot stay
+   available individually for anything that needs to tell them apart. */
+.media-gal-item.is-pinned { border-color: #2f6f96; }
 
 .media-gal-lb-frame {
   width: 100%; height: 70vh; border: 0; border-radius: 8px; background: #000;

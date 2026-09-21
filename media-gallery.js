@@ -42,7 +42,7 @@ import { getCurrentCoach } from './coach-login.js';
  */
 export async function renderGallery(container, playerId, opts = {}) {
   const { playerName = 'this player', compact = false, onEmpty,
-          tryoutVideo = null, player = null } = opts;
+          headshotPhoto = null, tryoutVideo = null, player = null } = opts;
   if (!container) return { count: 0 };
 
   container.innerHTML = `<div class="media-gal-loading">Loading…</div>`;
@@ -61,7 +61,7 @@ export async function renderGallery(container, playerId, opts = {}) {
     return { count: 0, error: err };
   }
 
-  if (!items.length && !tryoutVideo) {
+  if (!items.length && !tryoutVideo && !headshotPhoto) {
     onEmpty?.();
     container.innerHTML = emptyHTML(playerName, compact);
     return { count: 0 };
@@ -70,9 +70,24 @@ export async function renderGallery(container, playerId, opts = {}) {
   const perm = canRemoveFor(player);
   const tiles = [];
 
-  // Tryout video leads, when one exists. Synthesised as a pseudo-item so the
-  // lightbox can page through it alongside real submissions — it is flagged
-  // isTryout so nothing offers to remove or promote it.
+  // The player's own headshot leads the gallery as tile 1 of N — same
+  // treatment as the tryout video below, and for the same reason: it's
+  // already the first thing every other page shows for this player, so the
+  // gallery should read as "everything about this player's media", not just
+  // "what's been submitted". Synthesised as a pseudo-item (isHeadshot) so
+  // nothing offers to remove or promote it — removing the app's own default
+  // photo isn't a thing, and "promote to profile picture" doesn't make sense
+  // applied to the photo that's already serving that role.
+  if (headshotPhoto) {
+    tiles.push({
+      id: '__headshot', isHeadshot: true, kind: 'photo',
+      driveUrl: headshotPhoto, playerId, playerName,
+      caption: 'Profile photo', submitterName: '',
+    });
+  }
+  // Tryout video comes next. Synthesised as a pseudo-item so the lightbox can
+  // page through it alongside real submissions — it is flagged isTryout so
+  // nothing offers to remove or promote it.
   if (tryoutVideo) {
     tiles.push({
       id: '__tryout', isTryout: true, kind: 'video',
@@ -110,17 +125,22 @@ function emptyHTML(playerName, compact) {
 
 function itemHTML(s, promotions, perm, compact) {
   const isPhoto = s.kind === 'photo';
+  const isPinned = s.isHeadshot || s.isTryout;
 
-  // The tryout clip is a Drive file, not a Cloudinary asset — no transform
-  // URLs, and Drive gives no poster frame, so the tile shows a film glyph.
-  const thumb = s.isTryout ? null
+  // The headshot and tryout clip are Drive files, not Cloudinary assets — no
+  // transform URLs, so their own driveUrl is used directly as the thumbnail.
+  // Drive gives no poster frame for video, so the tryout tile still falls
+  // back to a film glyph.
+  const thumb = s.isHeadshot ? s.driveUrl
+    : s.isTryout ? null
     : (isPhoto ? thumbUrl(s.publicId) : videoPosterUrl(s.publicId));
-  const promotedAs = s.isTryout ? null : isPromoted(promotions, s.playerId, s.id);
+  const promotedAs = isPinned ? null : isPromoted(promotions, s.playerId, s.id);
 
-  // Controls are never offered on the tryout video: it cannot be removed (it
-  // lives in Drive) and a video cannot be a profile picture.
-  const showRemove  = !s.isTryout && perm?.ok && !compact;
-  const showPromote = !s.isTryout && isPhoto && canPromote() && !compact && !promotedAs;
+  // Controls are never offered on the headshot or the tryout video: neither
+  // can be removed (both live in Drive, not Cloudinary) and "promote to
+  // profile picture" doesn't apply to the photo already serving that role.
+  const showRemove  = !isPinned && perm?.ok && !compact;
+  const showPromote = !isPinned && isPhoto && canPromote() && !compact && !promotedAs;
 
   const controls = (showRemove || showPromote) ? `
       <span class="media-gal-ctl">
@@ -132,13 +152,14 @@ function itemHTML(s, promotions, perm, compact) {
 
   return `
     <div class="media-gal-cell">
-      <button class="media-gal-item${promotedAs ? ' is-promoted' : ''}${s.isTryout ? ' is-tryout' : ''}"
+      <button class="media-gal-item${promotedAs ? ' is-promoted' : ''}${isPinned ? ' is-pinned' : ''}${s.isTryout ? ' is-tryout' : ''}${s.isHeadshot ? ' is-headshot' : ''}"
               data-id="${escHtml(s.id)}"
-              aria-label="${escHtml(s.isTryout ? 'Tryout video' : (isPhoto ? 'Photo' : 'Clip'))} of ${escHtml(s.playerName)}${
+              aria-label="${escHtml(s.isHeadshot ? 'Profile photo' : s.isTryout ? 'Tryout video' : (isPhoto ? 'Photo' : 'Clip'))} of ${escHtml(s.playerName)}${
                 s.caption ? ': ' + escHtml(s.caption) : ''}">
         ${thumb
           ? `<img src="${thumb}" alt="" loading="lazy" />`
           : `<span class="media-gal-ph">${isPhoto ? '🏀' : '🎬'}</span>`}
+        ${s.isHeadshot ? `<span class="media-gal-badge tryout">Profile</span>` : ''}
         ${s.isTryout ? `<span class="media-gal-badge tryout">Tryout</span>` : ''}
         ${promotedAs === 'photo' ? `<span class="media-gal-badge">Profile</span>` : ''}
         ${promotedAs === 'video' ? `<span class="media-gal-badge">Primary</span>` : ''}
@@ -260,15 +281,26 @@ function showSlide() {
   const body = el.querySelector('.media-gal-lb-body');
   // Always replace the node: reusing a <video> across slides leaves the
   // previous clip's audio playing under the new one.
-  // The tryout clip is a Drive preview URL, which only plays in an iframe —
+  //
+  // The headshot's driveUrl is a plain thumbnail URL (sz=w400/w1200 or a
+  // Cloudinary-promoted override) — a normal <img src>, same as any approved
+  // photo, just pointed at the roster's own photoUrl() instead of a
+  // Cloudinary publicId. This is deliberately the SAME full-size treatment
+  // draft-board.js's own lightbox gives a headshot (bigPhotoUrl there is
+  // just photoUrl() with the Drive size bumped to w1200) — one lightbox,
+  // reused, rather than a second one for this page.
+  //
+  // The tryout clip is a Drive PREVIEW url, which only plays in an iframe —
   // it is not a direct media file, so a <video> tag would show nothing.
-  body.innerHTML = s.isTryout
-    ? `<iframe src="${escHtml(s.driveUrl)}" allow="autoplay"
-               allowfullscreen class="media-gal-lb-frame"></iframe>`
-    : s.kind === 'photo'
-      ? `<img src="${fullUrl(s.publicId)}" alt="${escHtml(s.playerName)}" />`
-      : `<video src="${videoUrl(s.publicId)}" controls autoplay playsinline
-                poster="${videoPosterUrl(s.publicId)}"></video>`;
+  body.innerHTML = s.isHeadshot
+    ? `<img src="${escHtml(s.driveUrl)}" alt="${escHtml(s.playerName)}" />`
+    : s.isTryout
+      ? `<iframe src="${escHtml(s.driveUrl)}" allow="autoplay"
+                 allowfullscreen class="media-gal-lb-frame"></iframe>`
+      : s.kind === 'photo'
+        ? `<img src="${fullUrl(s.publicId)}" alt="${escHtml(s.playerName)}" />`
+        : `<video src="${videoUrl(s.publicId)}" controls autoplay playsinline
+                  poster="${videoPosterUrl(s.publicId)}"></video>`;
 
   const parts = [];
   if (s.caption) parts.push(escHtml(s.caption));

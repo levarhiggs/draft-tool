@@ -102,21 +102,28 @@ function bySortOrder(a, b) {
  * capped by those — see media-config.js.
  *
  * @param {string|number} playerId
- * @param {boolean} hasTryoutVideo  Whether this player has a Drive tryout
- *   clip. It occupies one of the video slots — MAX_APPROVED_VIDEOS is 6
- *   specifically so 5 remain for submissions once it's counted (see
- *   media-config.js). The tryout clip lives in Drive, not mediaSubmissions,
- *   so this module has no way to know about it on its own — the CALLER
- *   (which already has the roster record) passes it in. Defaults to false
- *   so existing callers that don't pass it degrade to the old undercount
- *   rather than throwing.
+ * @param {object} pinned
+ * @param {boolean} pinned.hasHeadshot     Player has a photo (Drive default or
+ *   an admin-promoted override) pinned as the gallery's first PHOTO tile.
+ *   MAX_APPROVED_PHOTOS is 11 specifically so 10 remain for submissions once
+ *   it's counted (see media-config.js).
+ * @param {boolean} pinned.hasTryoutVideo  Player has a Drive tryout clip
+ *   pinned as the first VIDEO tile. MAX_APPROVED_VIDEOS is 6 specifically so
+ *   5 remain for submissions once it's counted.
+ *
+ *   Neither the headshot nor the tryout clip lives in mediaSubmissions —
+ *   they're Drive/Cloudinary-delivery concerns this module has no way to
+ *   know about on its own. The CALLER (which already has the roster record)
+ *   resolves and passes both. Omitting `pinned` degrades to the old
+ *   undercount rather than throwing.
  */
-export async function getPlayerCounts(playerId, hasTryoutVideo = false) {
+export async function getPlayerCounts(playerId, pinned = {}) {
+  const { hasHeadshot = false, hasTryoutVideo = false } = pinned;
   const all = await getPlayerSubmissions(playerId);
   const approved = all.filter(s => s.status === 'approved');
   const pending  = all.filter(s => s.status === 'pending');
   return {
-    approvedPhotos: approved.filter(s => s.kind === 'photo').length,
+    approvedPhotos: approved.filter(s => s.kind === 'photo').length + (hasHeadshot ? 1 : 0),
     approvedVideos: approved.filter(s => s.kind === 'video').length + (hasTryoutVideo ? 1 : 0),
     pending:        pending.length,
     maxPhotos:      MAX_APPROVED_PHOTOS,
@@ -131,8 +138,8 @@ export async function getPlayerCounts(playerId, hasTryoutVideo = false) {
  * only the abuse circuit-breaker does.
  */
 export async function canSubmit(playerId) {
-  // hasTryoutVideo doesn't matter here — canSubmit only reads `pending`,
-  // which the tryout video never touches.
+  // Neither pinned tile matters here — canSubmit only reads `pending`, which
+  // is untouched by the headshot or the tryout video.
   const { pending } = await getPlayerCounts(playerId);
   return pending >= MAX_PENDING_PER_PLAYER
     ? { ok: false, reason: `There are already ${pending} submissions waiting for review on this player. Try again once an admin has worked through them.` }
@@ -143,8 +150,8 @@ export async function canSubmit(playerId) {
  * Can this submission be APPROVED? This is where the display cap bites.
  * Rejecting is always allowed; only going live is gated.
  */
-export async function canApprove(playerId, kind, hasTryoutVideo = false) {
-  const c = await getPlayerCounts(playerId, hasTryoutVideo);
+export async function canApprove(playerId, kind, pinned = {}) {
+  const c = await getPlayerCounts(playerId, pinned);
   const isPhoto = kind === 'photo';
   const used = isPhoto ? c.approvedPhotos : c.approvedVideos;
   const max  = isPhoto ? c.maxPhotos : c.maxVideos;

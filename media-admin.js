@@ -138,7 +138,8 @@ function approvedCounts(playerId) {
   const mine = submissions.filter(s =>
     String(s.playerId) === String(playerId) && s.status === 'approved');
   return {
-    photos: mine.filter(s => s.kind === 'photo').length,
+    photos: mine.filter(s => s.kind === 'photo').length
+      + (headshotById[String(playerId)] ? 1 : 0),
     videos: mine.filter(s => s.kind === 'video').length
       + (tryoutById[String(playerId)] ? 1 : 0),
   };

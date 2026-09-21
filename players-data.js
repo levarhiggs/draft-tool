@@ -247,6 +247,26 @@ export function photoUrl(player) {
   return null;
 }
 
+/**
+ * Same photo as photoUrl(), requested at a larger size.
+ *
+ * Drive thumbnails are sized by a `sz=w{n}` query param; bumping it is how
+ * every "open this player's photo bigger" view already works —
+ * player.js's bio popup (w800) and draft-board.js's lightbox (w1200) each
+ * had their own copy of this exact swap before this export existed. Kept as
+ * one shared function so a third caller (media-gallery.js's headshot tile)
+ * doesn't become a fourth copy — gotcha #12's three-parallel-implementations
+ * problem, one call site away from happening again.
+ *
+ * A no-op for a promoted (Cloudinary-delivered) photo: those URLs carry no
+ * `sz=w\d+` param, and Cloudinary already delivers at a fixed w_800 via
+ * headshotUrl() in media-config.js, so there's nothing here to upsize.
+ */
+export function biggerPhotoUrl(player, size = 1200) {
+  const url = photoUrl(player);
+  return url ? url.replace(/sz=w\d+/, `sz=w${size}`) : null;
+}
+
 export function videoUrl(player) {
   const promoted = promotedVideoUrl(player[COL.ID]);
   if (promoted) return promoted;

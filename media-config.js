@@ -37,7 +37,10 @@ export function mediaConfigured() {
 // THE APP, not what can be submitted. Submission is deliberately unbounded so
 // the admin always gets the choice — an eleventh photo may be the best one.
 // The gate is at APPROVAL time (see canApprove in media-data.js).
-export const MAX_APPROVED_PHOTOS = 10;
+// 11, not 10: the player's own headshot is pinned as the first PHOTO tile in
+// every gallery (2026-09-21), same reasoning as the tryout video below — 11
+// keeps the parent-submitted photo allowance at the 10 the spec asked for.
+export const MAX_APPROVED_PHOTOS = 11;
 // 6, not 5: the league's own tryout clip is pinned as the first tile in every
 // gallery, so a cap of 5 would have let it eat a slot a parent could otherwise
 // have filled. 6 keeps the effective allowance at the 5 submitted clips the

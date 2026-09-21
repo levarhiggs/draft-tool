@@ -40,15 +40,16 @@ import { validateFile, uploadToCloudinary, durationWithinLimit, readImagePreview
   from './media-upload.js';
 import { createSubmission, getPlayerCounts, canSubmit } from './media-data.js';
 import { renderGallery } from './media-gallery.js';
-import { fetchPlayers, videoUrl, COL } from './players-data.js';
+import { fetchPlayers, biggerPhotoUrl, videoUrl, COL } from './players-data.js';
 
 /**
- * The player's Drive tryout clip, and their roster record.
+ * The player's headshot (Drive default or an admin-promoted override), Drive
+ * tryout clip, and roster record.
  *
  * Resolved HERE rather than requiring every caller to pass it: six different
  * places open this sheet (directory cards, the video badge, the ranking-page
  * photo, the draft board, draft results, the media page) and threading the
- * same two values through all of them is how they drift apart.
+ * same three values through all of them is how they drift apart.
  *
  * fetchPlayers() is sessionStorage-cached, so this is a map lookup after the
  * first call on a page, not a fetch.
@@ -57,15 +58,19 @@ async function resolvePlayerExtras(id) {
   try {
     const all = await fetchPlayers();
     const rec = all.find(x => String(x[COL.ID]) === String(id));
-    if (!rec) return { tryoutVideo: null, record: null };
+    if (!rec) return { headshot: null, tryoutVideo: null, record: null };
     return {
+      // w1200 — same full-size treatment as draft-board.js's own lightbox
+      // (its bigPhotoUrl there is exactly this same swap).
+      headshot: biggerPhotoUrl(rec, 1200),
       tryoutVideo: videoUrl(rec),
       record: { ...rec, name: rec[COL.NAME], _teamFB: rec._teamFB || rec[COL.TEAM] || '' },
     };
   } catch {
-    // The gallery still works without these — it just loses the pinned tryout
-    // tile and the remove-permission check falls back to admin-only.
-    return { tryoutVideo: null, record: null };
+    // The gallery still works without these — it just loses the pinned
+    // headshot/tryout tiles and the remove-permission check falls back to
+    // admin-only.
+    return { headshot: null, tryoutVideo: null, record: null };
   }
 }
 
@@ -253,7 +258,7 @@ async function openSubmitSheet(player) {
     // what stops them from silently disagreeing about the same player.
     extras = await resolvePlayerExtras(id);
     [counts, gate] = await Promise.all([
-      getPlayerCounts(id, !!extras.tryoutVideo),
+      getPlayerCounts(id, { hasHeadshot: !!extras.headshot, hasTryoutVideo: !!extras.tryoutVideo }),
       canSubmit(id),
     ]);
   } catch (err) {
@@ -333,8 +338,14 @@ function renderPicker(counts, extras) {
   renderGallery(sheetEl.querySelector('#media-sheet-gallery'), activeState.id, {
     playerName: activeState.name,
     compact: true,
-    // The league's own tryout clip leads the gallery, so a player with only
-    // a tryout video no longer reads as "no photos or clips yet".
+    // The player's headshot leads, then the league's own tryout clip — so a
+    // player with only a tryout video no longer reads as "no photos or clips
+    // yet". Key MUST match renderGallery's destructured opts.headshotPhoto —
+    // a mismatched key here silently drops the tile with no error (verified:
+    // this was `headshot:` against `headshotPhoto` for one commit and the
+    // headshot tile never rendered, while everything else — counts, tryout
+    // tile — still worked, since JS doesn't complain about an unused key).
+    headshotPhoto: extras?.headshot,
     tryoutVideo: extras?.tryoutVideo,
     player: extras?.record,
     // Nothing at all? Drop the heading and the "See all" link — the
