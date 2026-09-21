@@ -18,6 +18,15 @@ const HOUR_LABELS = {
   "4-5":"4 PM", "5-6":"5 PM", "6-7":"6 PM", "7-8":"7 PM", "8-9":"8 PM",
 };
 
+// Full start–end range, for the hover tooltip. HOUR_LABELS only carries the
+// start time because that's all the grid's left axis has room for.
+const HOUR_RANGES = {
+  "9-10":"9:00 – 10:00 AM", "10-11":"10:00 – 11:00 AM",
+  "11-12":"11:00 AM – 12:00 PM", "12-1":"12:00 – 1:00 PM",
+  "4-5":"4:00 – 5:00 PM", "5-6":"5:00 – 6:00 PM", "6-7":"6:00 – 7:00 PM",
+  "7-8":"7:00 – 8:00 PM", "8-9":"8:00 – 9:00 PM",
+};
+
 const ACTIVE_HOURS = {
   Sunday:    ["4-5","5-6","6-7"],
   Monday:    ["6-7","7-8","8-9"],
@@ -156,10 +165,27 @@ function escHtml(s) {
 }
 
 function chipHtml(entry) {
-  if (entry.tbd) return `<span class="psched-chip tbd-chip" title="Coach TBD">TBD</span>`;
+  if (entry.tbd) return `<span class="psched-chip tbd-chip">TBD</span>`;
   if (!entry.coach) return "";
   const name = escHtml(entry.coach);
-  return `<span class="psched-chip" title="${name}">${name}</span>`;
+  return `<span class="psched-chip">${name}</span>`;
+}
+
+/** Full venue name for a slot, including which Mullins court. */
+function venueName(loc, court) {
+  if (loc !== "mullins") return "Glades Middle";
+  return court ? `Mullins ${court}` : "Mullins";
+}
+
+/**
+ * Hover tooltip: who, when, where — including East/West court, which the
+ * tile itself only conveys through a thin colored edge bar.
+ */
+function slotTooltip(day, hour, loc, court, entry) {
+  const who = entry.tbd ? "Coach TBD"
+    : entry.coach ? entry.coach
+    : "Open slot";
+  return `${who}\n${day} · ${HOUR_RANGES[hour] || HOUR_LABELS[hour]}\n${venueName(loc, court)}`;
 }
 
 function openLabelHtml(loc, court) {
@@ -175,7 +201,8 @@ function renderSlot(day, hour, loc, idx) {
   const court = loc === "mullins" ? courtFor(day, hour, idx) : null;
   const courtClass = court ? " " + court.toLowerCase() : "";
   const content = chip || openLabelHtml(loc, court);
-  return `<div class="psched-tile ${loc}${openClass}${courtClass}">${content}</div>`;
+  const tip = escHtml(slotTooltip(day, hour, loc, court, entry));
+  return `<div class="psched-tile ${loc}${openClass}${courtClass}" title="${tip}">${content}</div>`;
 }
 
 function build() {
