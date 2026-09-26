@@ -401,7 +401,7 @@ const DRIVE_API_KEY    = 'AIzaSyAoIlK4ncTUeJjPeOYJLXuj2GoWnMge3X8';
 
 const TEAMS = [
   {
-    coach:"Coach Ken", num:1, color:"#e74c8b",
+    coach:"Coach Ken", num:1, color:"#7B3FA0", colorName:"Purple",
     players:[
       {id:"01",name:"Sebastian Fernandez",pick:1},
       {id:"60",name:"Andrew Lemelman",pick:2},
@@ -414,7 +414,7 @@ const TEAMS = [
     ]
   },
   {
-    coach:"Coach Sedat", num:2, color:"#f39c12",
+    coach:"Coach Sedat", num:2, color:"#F5EA0A", colorName:"Neon Yellow",
     players:[
       {id:"28",name:"Jaiden Vasquez",pick:1},
       {id:"87",name:"Eseosa Aghariaha",pick:2},
@@ -427,7 +427,7 @@ const TEAMS = [
     ]
   },
   {
-    coach:"Coach Xavier", num:3, color:"#2ecc71",
+    coach:"Coach Xavier", num:3, color:"#B4E1FA", colorName:"Carolina Blue",
     players:[
       {id:"31",name:"Kaden Charles",pick:1},
       {id:"77",name:"Blake Mager",pick:2},
@@ -440,7 +440,7 @@ const TEAMS = [
     ]
   },
   {
-    coach:"Coach Mason-Jaylen", num:4, color:"#9b59b6",
+    coach:"Coach Mason-Jaylen", num:4, color:"#8C8C8C", colorName:"Grey Concrete",
     players:[
       {id:"86",name:"Ryan Dashoush",pick:1},
       {id:"21",name:"Lucas Fields",pick:2},
@@ -453,7 +453,7 @@ const TEAMS = [
     ]
   },
   {
-    coach:"Coach Kingston", num:5, color:"#1abc9c",
+    coach:"Coach Kingston", num:5, color:"#7A3B2E", colorName:"Maroon",
     players:[
       {id:"43",name:"Liam Seiderman",pick:1},
       {id:"64",name:"Tobia Vickers",pick:2},
@@ -466,7 +466,7 @@ const TEAMS = [
     ]
   },
   {
-    coach:"Coach Craig", num:6, color:"#e91e8c",
+    coach:"Coach Craig", num:6, color:"#CC5500", colorName:"Burnt Orange",
     players:[
       {id:"35",name:"Amani Burke",pick:1},
       {id:"80",name:"Kylan Crynes",pick:2},
@@ -479,7 +479,7 @@ const TEAMS = [
     ]
   },
   {
-    coach:"Coach Humberto", num:7, color:"#3498db",
+    coach:"Coach Humberto", num:7, color:"#FFFFFF", colorName:"White",
     players:[
       {id:"16",name:"Camden Bryant",pick:1},
       {id:"78",name:"Josofat Marcano",pick:2},
@@ -492,7 +492,7 @@ const TEAMS = [
     ]
   },
   {
-    coach:"Coach Micah", num:8, color:"#e67e22",
+    coach:"Coach Micah", num:8, color:"#0A0A0A", colorName:"Black",
     players:[
       {id:"12",name:"Levar Higgs",pick:1},
       {id:"56",name:"Jace Mciver",pick:2},
@@ -505,7 +505,7 @@ const TEAMS = [
     ]
   },
   {
-    coach:"Coach Kevin K.", num:9, color:"#16a085",
+    coach:"Coach Kevin K.", num:9, color:"#8BC98A", colorName:"Lime Shock",
     players:[
       {id:"81",name:"Aneesh Murthy",pick:1},
       {id:"46",name:"Jaxon Perry",pick:2},
@@ -518,7 +518,7 @@ const TEAMS = [
     ]
   },
   {
-    coach:"Coach David", num:10, color:"#c0392b",
+    coach:"Coach David", num:10, color:"#F5A623", colorName:"Gold",
     players:[
       {id:"07",name:"David Martin",pick:1},
       {id:"02",name:"Reid Hammel",pick:2},
@@ -531,7 +531,7 @@ const TEAMS = [
     ]
   },
   {
-    coach:"Coach Paul", num:11, color:"#8e44ad",
+    coach:"Coach Paul", num:11, color:"#E30613", colorName:"True Red",
     players:[
       {id:"05",name:"Rachaad Spence",pick:1},
       {id:"18",name:"Jacob Sachs",pick:2},
@@ -595,14 +595,28 @@ function renderTeam(t) {
       </div>`;
   }).join('');
 
+  const textColor = readableTextColor(t.color);
   return `
     <div class="team-card">
       <div class="team-header">
-        <div class="team-number" style="background:${t.color}20;color:${t.color};border:1.5px solid ${t.color}40">${t.num}</div>
-        <div class="team-name">${t.coach}</div>
+        <div class="team-number" style="background:${t.color};color:${textColor};border:1.5px solid var(--border)">${t.num}</div>
+        <div class="team-name">${t.coach} — Team ${t.colorName}</div>
       </div>
       <div class="player-list">${tiles}</div>
     </div>`;
+}
+
+// Same luminance-based contrast pick used by gameboard.js/playoffs.js — this
+// page is a standalone (non-module) script, per gotcha #11, so it keeps its
+// own copy rather than importing across script types.
+function readableTextColor(hex) {
+  const h = String(hex).replace('#', '');
+  if (h.length !== 6) return '#ffffff';
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? '#000000' : '#ffffff';
 }
 
 async function init() {
