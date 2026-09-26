@@ -2404,9 +2404,10 @@ main {
 /* Calendar view */
 /* Calendar cells are fixed-width, sized to fit their content (time +
    2 color swatches + up to ~5 score characters) rather than stretching
-   fluidly with the window. Mon-Fri share one width; Sat/Sun share a
-   narrower width (no games are ever played on weekends, but the columns
-   stay visible for date-context continuity). The grid scrolls horizontally
+   fluidly with the window. Sun-Sat now share ONE equal width (see
+   --sched-cal-day-w below) — Fall 2026 introduced weekend games, so the
+   old narrower Sat/Sun columns (sized on the assumption no game is ever
+   played on a weekend) stopped being valid. The grid scrolls horizontally
    on very narrow viewports rather than shrinking cells below their
    content's minimum size. */
 .sched-calendar-wrap {
@@ -2440,20 +2441,42 @@ main {
 }
 
 :root {
-  --sched-cal-weekday-w: 112px;
-  --sched-cal-weekend-w: 56px;
+  /* Same total width as the old 5x112 + 2x56 layout (672px), just spread
+     evenly across all 7 days instead of narrowing Sat/Sun. */
+  --sched-cal-day-w: 96px;
 }
 
 .sched-cal-weekdays,
-.sched-cal-grid {
+.sched-cal-week-row {
   display: grid;
-  grid-template-columns:
-    var(--sched-cal-weekend-w)
-    repeat(5, var(--sched-cal-weekday-w))
-    var(--sched-cal-weekend-w);
+  grid-template-columns: repeat(7, var(--sched-cal-day-w));
   gap: 4px;
   width: fit-content;
   margin: 0 auto;
+}
+
+/* The continuous season view stacks one .sched-cal-week-row per calendar
+   week (Sun-Sat), top to bottom, rather than one grid per month — see
+   renderCalendar(). */
+.sched-cal-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: fit-content;
+  margin: 0 auto;
+}
+
+/* A month boundary falling mid-week gets a label row of its own, spanning
+   the full week-row width, so the scroller has a visual break between
+   months without needing to restart the week grid on a Sunday. */
+.sched-cal-month-divider {
+  width: fit-content;
+  margin: 10px auto 2px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--clr-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .sched-cal-weekdays {

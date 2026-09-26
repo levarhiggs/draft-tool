@@ -12,8 +12,6 @@ let overrides = {};            // gameNum -> Firestore doc data (or null if fetc
 let currentTeamFilter = '';    // '' = All Teams, else a TEAMS entry
 let currentView = 'calendar';  // 'table' | 'calendar'
 let currentSeasonCode = SCHEDULE_SEASON_CODE; // which season's games are loaded/shown
-let calMonth = new Date().getMonth();
-let calYear  = new Date().getFullYear();
 let activeGameForModal = null; // game object currently open in the score modal
 
 // ── Init ───────────────────────────────────────────────────────────────────────
@@ -22,7 +20,6 @@ async function init() {
   populateSeasonSelect();
   wireToolbar();
   wireScoreModal();
-  wireCalendarNav();
   wirePopoverDismiss();
   wireStickyHeaderOffset();
   wireCalendarScrollSync();
@@ -68,14 +65,11 @@ async function loadSeason(code) {
     return;
   }
 
-  // Default calendar month/year to this season's first game's month, if
-  // available, so the calendar opens showing actual season data rather
-  // than "today" (the season may not overlap the current month).
-  const firstDated = allGames.find(g => g._date);
-  if (firstDated) {
-    calMonth = firstDated._date.getMonth();
-    calYear  = firstDated._date.getFullYear();
-  }
+  // Reset the "already auto-scrolled to season start" flag so switching
+  // seasons scrolls to the NEW season's own first game, not wherever the
+  // viewer happened to be scrolled to in the previous one — see the
+  // scrolledOnce check in renderCalendar().
+  delete document.getElementById('sched-cal-grid').dataset.scrolledOnce;
 
   document.getElementById('sched-empty-state').classList.add('hidden');
   render();
@@ -383,76 +377,142 @@ function formatDateShort(game) {
 
 // ── Calendar view ──────────────────────────────────────────────────────────────
 
-// Navigation is intentionally unbounded — any month, any year, in either
-// direction. There used to be a hardcoded July/August-only clamp here (this
-// league's Summer 2026 season), which silently no-op'd Next/Prev once a
-// season ran outside those two months (caught 2026-09-26: Fall's calendar
-// got stuck on September). A season with no games in the shown month just
-// renders an empty grid — see renderCalendar — same as any other blank month
-// on a normal calendar.
-function wireCalendarNav() {
-  document.getElementById('sched-cal-prev').addEventListener('click', () => {
-    const prevMonth = calMonth - 1;
-    calYear = prevMonth < 0 ? calYear - 1 : calYear;
-    calMonth = prevMonth < 0 ? 11 : prevMonth;
-    render();
-  });
-  document.getElementById('sched-cal-next').addEventListener('click', () => {
-    const nextMonth = calMonth + 1;
-    calYear = nextMonth > 11 ? calYear + 1 : calYear;
-    calMonth = nextMonth > 11 ? 0 : nextMonth;
-    render();
-  });
-}
+// One continuous scroll spanning the whole season (first scheduled game's
+// week through the last), not a paged month-by-month grid. A season only
+// runs ~12 weeks — short enough to scroll end to end rather than clicking
+// Prev/Next one month at a time, and lets a weekend game (new for Fall
+// 2026) sit next to the week around it instead of being buried a click
+// away. Replaces the old calMonth/calYear-paged renderCalendar(), which
+// used to hard-clamp navigation to July/August (see the 2026-09-26 fix)
+// before that whole paging model was dropped for this one.
+let monthScrollHandler = null; // re-created per render(); see wireMonthLabelSync
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-function renderCalendar(games) {
-  document.getElementById('sched-cal-month-label').textContent = `${MONTH_NAMES[calMonth]} ${calYear}`;
+// Sunday that starts the calendar week containing `date`.
+function weekStart(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
 
-  const gamesByDay = {}; // day-of-month -> [games]
-  games.forEach(g => {
-    if (!g._date) return;
-    if (g._date.getMonth() !== calMonth || g._date.getFullYear() !== calYear) return;
-    const day = g._date.getDate();
-    (gamesByDay[day] = gamesByDay[day] || []).push(g);
+function renderCalendar(games) {
+  const dated = games.filter(g => g._date);
+  const grid = document.getElementById('sched-cal-grid');
+  const monthLabel = document.getElementById('sched-cal-month-label');
+
+  if (dated.length === 0) {
+    grid.innerHTML = '';
+    monthLabel.textContent = '';
+    return;
+  }
+
+  const gamesByDate = {}; // 'YYYY-MM-DD' -> [games]
+  dated.forEach(g => {
+    const key = `${g._date.getFullYear()}-${g._date.getMonth()}-${g._date.getDate()}`;
+    (gamesByDate[key] = gamesByDate[key] || []).push(g);
   });
 
-  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-  const startWeekday = new Date(calYear, calMonth, 1).getDay(); // 0 = Sun
+  const firstWeek = weekStart(dated.reduce((min, g) => g._date < min ? g._date : min, dated[0]._date));
+  const lastGameDate = dated.reduce((max, g) => g._date > max ? g._date : max, dated[0]._date);
+  const lastWeek = weekStart(lastGameDate);
 
-  const cells = [];
-  for (let i = 0; i < startWeekday; i++) {
-    cells.push('<div class="sched-cal-cell sched-cal-cell-empty"></div>');
-  }
   // Filtered to a single team, a date can hold at most 2 games (that team
   // plays at most once per slot) — shrink cells accordingly. Unfiltered
   // ("All Teams") reverts to the normal height sized for up to 6 games.
   const compact = !!currentTeamFilter;
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dayGames = (gamesByDay[day] || []).sort((a, b) => (a._date - b._date));
-    cells.push(calendarCellHTML(day, dayGames, compact));
-  }
-  // Pad trailing cells to complete the final week row
-  while (cells.length % 7 !== 0) {
-    cells.push('<div class="sched-cal-cell sched-cal-cell-empty"></div>');
+
+  // A month divider only ever sits BETWEEN week-rows, never mid-week — a
+  // week spanning a month boundary (e.g. Sun Sep 27 - Sat Oct 3) renders as
+  // one normal row, with that row's Oct 1 cell carrying its own "Oct 1"
+  // label (see calendarCellHTML) for in-context signaling. Inserting a
+  // divider the INSTANT any cell in the row crossed into the new month used
+  // to plant "September" and "October" side by side on top of the same
+  // week's row, which read as two headers for one row (caught 2026-09-27).
+  const rows = [];
+  let seenMonths = new Set(); // 'YYYY-M' already given a divider label
+  for (let week = new Date(firstWeek); week <= lastWeek; week.setDate(week.getDate() + 7)) {
+    const sundayKey = `${week.getFullYear()}-${week.getMonth()}`;
+    if (!seenMonths.has(sundayKey)) {
+      seenMonths.add(sundayKey);
+      rows.push(`<div class="sched-cal-month-divider" data-month-key="${sundayKey}">${MONTH_NAMES[week.getMonth()]} ${week.getFullYear()}</div>`);
+    }
+    const cells = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(week.getFullYear(), week.getMonth(), week.getDate() + i);
+      const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const dayGames = (gamesByDate[dayKey] || []).sort((a, b) => (a._date - b._date));
+      cells.push(calendarCellHTML(d, dayGames, compact));
+    }
+    rows.push(`<div class="sched-cal-week-row">${cells.join('')}</div>`);
   }
 
-  const grid = document.getElementById('sched-cal-grid');
-  grid.innerHTML = cells.join('');
+  grid.innerHTML = rows.join('');
 
   wireGameClicks(
     grid.querySelectorAll('.sched-cal-entry'),
     el => showGamePopover(el, gameForEl(el)),
     el => { const game = gameForEl(el); if (game) tryOpenScoreModal(game); }
   );
+
+  wireMonthLabelSync(grid, monthLabel);
+
+  // Only jump-scroll to season start on the FIRST render for a given season
+  // (season switch resets this — see loadSeason) — a re-render from, say,
+  // saving a score shouldn't yank the viewer's scroll position back to the
+  // top. The range built above always starts at the season's first game's
+  // week, so the first .sched-cal-week-row IS that week already. The PAGE
+  // itself scrolls vertically here (the weekday-labels row is sticky against
+  // the real page, same as before — see its own CSS comment), so this
+  // scrolls the window, not a boxed sub-container.
+  if (!grid.dataset.scrolledOnce) {
+    grid.dataset.scrolledOnce = '1';
+    requestAnimationFrame(() => {
+      const firstRow = grid.querySelector('.sched-cal-week-row');
+      if (firstRow) firstRow.scrollIntoView({ block: 'start' });
+    });
+  }
 }
 
-function calendarCellHTML(day, dayGames, compact) {
+// Keeps the sticky month label in sync with whichever month's divider has
+// most recently scrolled past the top of the viewport. A plain scroll
+// listener rather than an IntersectionObserver — tried that first, but with
+// a season this short (a few hundred px of content), a single programmatic
+// jump (the initial auto-scroll, or scrolling to the very bottom) can cross
+// several dividers' thresholds in one frame, and IntersectionObserver only
+// fires on elements whose intersection ratio actually changes THAT frame,
+// which silently dropped later dividers when several crossed at once (caught
+// 2026-09-26: the label stuck on "October" after scrolling all the way to
+// November). A direct getBoundingClientRect() check on every scroll event
+// has no such gap — it always re-evaluates every divider's real position.
+function wireMonthLabelSync(grid, monthLabel) {
+  if (monthScrollHandler) window.removeEventListener('scroll', monthScrollHandler);
+  const dividers = [...grid.querySelectorAll('.sched-cal-month-divider')];
+  if (dividers.length === 0) return;
+
+  const STICKY_OFFSET = 100; // roughly the page header + weekday-labels row height
+  const updateLabel = () => {
+    // Among dividers currently at/above the sticky header's own height, the
+    // label should read the LATEST one — i.e. whichever month's rows are
+    // what the viewer is actually looking at right now.
+    const passed = dividers.filter(d => d.getBoundingClientRect().top <= STICKY_OFFSET);
+    monthLabel.textContent = (passed.length > 0 ? passed[passed.length - 1] : dividers[0]).textContent;
+  };
+
+  updateLabel();
+  monthScrollHandler = updateLabel;
+  window.addEventListener('scroll', monthScrollHandler, { passive: true });
+}
+
+function calendarCellHTML(date, dayGames, compact) {
   const entries = dayGames.map(g => calendarEntryHTML(g)).join('');
+  const isFirstOfMonth = date.getDate() === 1;
+  const dayLabel = isFirstOfMonth
+    ? `${MONTH_NAMES[date.getMonth()].slice(0, 3)} ${date.getDate()}`
+    : String(date.getDate());
   return `
     <div class="sched-cal-cell${compact ? ' sched-cal-cell-compact' : ''}">
-      <div class="sched-cal-daynum">${day}</div>
+      <div class="sched-cal-daynum">${escHtml(dayLabel)}</div>
       <div class="sched-cal-entries">${entries}</div>
     </div>`;
 }

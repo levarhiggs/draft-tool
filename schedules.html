@@ -118,12 +118,14 @@
         </table>
       </div>
 
-      <!-- Calendar view -->
+      <!-- Calendar view: one continuous scroll spanning the whole season
+           (first scheduled game's week through the last), not a paged
+           month-by-month grid — a season only runs ~12 weeks, short enough
+           to scroll end to end. The month label stays sticky and updates to
+           whichever month is currently in view (see wireMonthLabelSync). -->
       <div id="sched-calendar-wrap" class="sched-calendar-wrap hidden">
         <div class="sched-cal-nav">
-          <button id="sched-cal-prev" class="btn-secondary" type="button">‹ Prev</button>
           <div id="sched-cal-month-label" class="sched-cal-month-label"></div>
-          <button id="sched-cal-next" class="btn-secondary" type="button">Next ›</button>
         </div>
         <!-- The weekday-labels row lives OUTSIDE the horizontally-scrolling
              wrapper below, so its position:sticky (pinning it while the page
