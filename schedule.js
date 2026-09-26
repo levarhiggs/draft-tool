@@ -1,15 +1,17 @@
 // schedule.js — Schedules feature: table + calendar views of the season
 // schedule CSV, team filtering, and coach score entry (Firestore overrides).
-import { fetchSchedule, parseGameDate, COL } from './schedule-data.js';
+import { fetchSchedule, fetchScheduleForSeason, parseGameDate, COL, SCHEDULE_SEASON_CODE } from './schedule-data.js';
 import { getScheduleGame, saveScheduleGame, saveGameComment } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
-import { TEAMS, TEAM_COLORS, TEAM_ADMINS, personByName } from './coaches-config.js';
+import { TEAM_ADMINS, personByName, teamsFor, teamColorsFor } from './coaches-config.js';
+import { allSeasonCodes, getSeason } from './season-config.js';
 
 // ── State ──────────────────────────────────────────────────────────────────────
 let allGames = [];             // raw CSV rows, augmented with _date (Date|null)
 let overrides = {};            // gameNum -> Firestore doc data (or null if fetched & missing)
 let currentTeamFilter = '';    // '' = All Teams, else a TEAMS entry
 let currentView = 'calendar';  // 'table' | 'calendar'
+let currentSeasonCode = SCHEDULE_SEASON_CODE; // which season's games are loaded/shown
 let calMonth = new Date().getMonth();
 let calYear  = new Date().getFullYear();
 let activeGameForModal = null; // game object currently open in the score modal
@@ -17,8 +19,37 @@ let activeGameForModal = null; // game object currently open in the score modal
 // ── Init ───────────────────────────────────────────────────────────────────────
 
 async function init() {
+  populateSeasonSelect();
+  wireToolbar();
+  wireScoreModal();
+  wireCalendarNav();
+  wirePopoverDismiss();
+  wireStickyHeaderOffset();
+  wireCalendarScrollSync();
+
+  await loadSeason(currentSeasonCode);
+
+  document.addEventListener('coachChanged', render);
+}
+
+// Loads a season's games (default schedule season on first call, or
+// whichever season the switcher picks afterward), resets the calendar to
+// that season's own first game month, and re-renders. Overrides are keyed
+// by game number and NOT season-scoped in Firestore (see getScheduleGame),
+// but game numbers reset each season anyway, so clearing the cache on every
+// season switch avoids one season's cached override bleeding onto another
+// season's same-numbered game.
+async function loadSeason(code) {
+  currentSeasonCode = code;
+  overrides = {};
+  currentTeamFilter = ''; // a team filter from one season means nothing in another
+  populateTeamSelect();
+  renderTeamDots();
+  document.getElementById('sched-empty-state').classList.remove('hidden');
+  document.getElementById('sched-empty-state').textContent = 'Loading schedule…';
+
   try {
-    allGames = await fetchSchedule();
+    allGames = code === SCHEDULE_SEASON_CODE ? await fetchSchedule() : await fetchScheduleForSeason(code);
     allGames.forEach(g => {
       g._date = parseGameDate(g[COL.DATE], g[COL.TIME]);
       g._gameNum = g[COL.GAME];
@@ -29,28 +60,39 @@ async function init() {
     return;
   }
 
-  // Default calendar month/year to the first game's month, if available,
-  // so the calendar opens showing actual season data rather than "today"
-  // (the season may not overlap the current month).
+  if (allGames.length === 0) {
+    document.getElementById('sched-empty-state').textContent =
+      `No schedule published yet for ${getSeason(code).name}.`;
+    document.getElementById('sched-table-wrap').classList.add('hidden');
+    document.getElementById('sched-calendar-wrap').classList.add('hidden');
+    return;
+  }
+
+  // Default calendar month/year to this season's first game's month, if
+  // available, so the calendar opens showing actual season data rather
+  // than "today" (the season may not overlap the current month).
   const firstDated = allGames.find(g => g._date);
   if (firstDated) {
     calMonth = firstDated._date.getMonth();
     calYear  = firstDated._date.getFullYear();
   }
 
-  populateTeamSelect();
-  renderTeamDots();
-  wireToolbar();
-  wireScoreModal();
-  wireCalendarNav();
-  wirePopoverDismiss();
-  wireStickyHeaderOffset();
-  wireCalendarScrollSync();
-
   document.getElementById('sched-empty-state').classList.add('hidden');
   render();
+}
 
-  document.addEventListener('coachChanged', render);
+// One <option> per known season (newest first), so a coach/parent can
+// browse a past season's completed schedule the same way standings/
+// gameboard already support ?season= — this is the first page to surface
+// it as an actual visible control rather than a URL param only.
+function populateSeasonSelect() {
+  const select = document.getElementById('sched-season-select');
+  if (!select) return;
+  select.innerHTML = allSeasonCodes()
+    .map(code => `<option value="${escHtml(code)}">${escHtml(getSeason(code).name)}</option>`)
+    .join('');
+  select.value = currentSeasonCode;
+  select.addEventListener('change', () => loadSeason(select.value));
 }
 
 // Measures the real (possibly-responsive) page header height and exposes it
@@ -96,7 +138,7 @@ function wireCalendarScrollSync() {
 function populateTeamSelect() {
   const select = document.getElementById('sched-team-select');
   select.innerHTML = '<option value="">All Teams</option>' +
-    TEAMS.filter(t => t !== 'Undrafted')
+    teamsFor(currentSeasonCode).filter(t => t !== 'Undrafted')
       .map(t => {
         // Coaches refer to teams by color first ("LIME SHOCK") once colors
         // are assigned — lead with that, team name second, matching how
@@ -110,16 +152,16 @@ function populateTeamSelect() {
       }).join('');
 }
 
-// One dot per team, color-coded, in the same 1-12 order as TEAMS (which
-// mirrors the coaches array) — a faster tap target for the same filter the
-// dropdown already drives. Clicking a dot toggles it: selecting an already-
-// active team's dot clears the filter back to "All Teams", same as picking
-// the dropdown's blank option. Kept in sync with the dropdown in both
-// directions (see wireToolbar and setTeamFilter below).
+// One dot per team, color-coded, in the same 1-12 order as that season's
+// team list (mirrors the coaches array) — a faster tap target for the same
+// filter the dropdown already drives. Clicking a dot toggles it: selecting
+// an already-active team's dot clears the filter back to "All Teams", same
+// as picking the dropdown's blank option. Kept in sync with the dropdown in
+// both directions (see wireToolbar and setTeamFilter below).
 function renderTeamDots() {
   const wrap = document.getElementById('sched-team-dots');
-  wrap.innerHTML = TEAMS.filter(t => t !== 'Undrafted').map(t => {
-    const info = TEAM_COLORS[t];
+  wrap.innerHTML = teamsFor(currentSeasonCode).filter(t => t !== 'Undrafted').map(t => {
+    const info = teamColorsFor(currentSeasonCode)[t];
     const hex = info?.hex || '#8890a8';
     const label = teamColorDisplayName(t) || t;
     const active = currentTeamFilter === t;
@@ -162,14 +204,14 @@ function wireToolbar() {
 // ── Filtering ──────────────────────────────────────────────────────────────────
 
 function teamColorName(team) {
-  return TEAM_COLORS[team]?.name || null;
+  return teamColorsFor(currentSeasonCode)[team]?.name || null;
 }
 
 // Display-only variant for dropdowns/menus — prefers the short label
 // (e.g. "Grey" for "Grey Concrete") where one exists, so long color names
 // don't overflow tight UI. Never used for matching against sheet data.
 function teamColorDisplayName(team) {
-  const entry = TEAM_COLORS[team];
+  const entry = teamColorsFor(currentSeasonCode)[team];
   return entry ? (entry.shortName || entry.name) : null;
 }
 
@@ -305,7 +347,7 @@ function winnerChipHTML(game, winner) {
 }
 
 function colorHexFor(colorName) {
-  const entry = Object.values(TEAM_COLORS).find(c => c.name === colorName);
+  const entry = Object.values(teamColorsFor(currentSeasonCode)).find(c => c.name === colorName);
   return entry?.hex || '#8890a8';
 }
 
@@ -341,33 +383,24 @@ function formatDateShort(game) {
 
 // ── Calendar view ──────────────────────────────────────────────────────────────
 
-// The season runs July 5 - August 31 (same year as the schedule data
-// itself, resolved dynamically from the first parsed game date — see
-// init() — rather than hardcoded, so this still works if the sheet is ever
-// reused for a different year). Calendar navigation is clamped to those two
-// months; there is nothing to show before or after the season.
-function seasonYear() {
-  return calYear; // calYear is seeded from the first game's real parsed year at init
-}
-function isMonthInSeason(month, year) {
-  return year === seasonYear() && (month === 6 || month === 7); // 6 = July, 7 = August (0-indexed)
-}
-
+// Navigation is intentionally unbounded — any month, any year, in either
+// direction. There used to be a hardcoded July/August-only clamp here (this
+// league's Summer 2026 season), which silently no-op'd Next/Prev once a
+// season ran outside those two months (caught 2026-09-26: Fall's calendar
+// got stuck on September). A season with no games in the shown month just
+// renders an empty grid — see renderCalendar — same as any other blank month
+// on a normal calendar.
 function wireCalendarNav() {
   document.getElementById('sched-cal-prev').addEventListener('click', () => {
     const prevMonth = calMonth - 1;
-    const prevYear = prevMonth < 0 ? calYear - 1 : calYear;
-    if (!isMonthInSeason(prevMonth < 0 ? 11 : prevMonth, prevYear)) return; // clamp: nothing before July
+    calYear = prevMonth < 0 ? calYear - 1 : calYear;
     calMonth = prevMonth < 0 ? 11 : prevMonth;
-    calYear = prevYear;
     render();
   });
   document.getElementById('sched-cal-next').addEventListener('click', () => {
     const nextMonth = calMonth + 1;
-    const nextYear = nextMonth > 11 ? calYear + 1 : calYear;
-    if (!isMonthInSeason(nextMonth > 11 ? 0 : nextMonth, nextYear)) return; // clamp: nothing after August
+    calYear = nextMonth > 11 ? calYear + 1 : calYear;
     calMonth = nextMonth > 11 ? 0 : nextMonth;
-    calYear = nextYear;
     render();
   });
 }
@@ -386,15 +419,7 @@ function renderCalendar(games) {
   });
 
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-
-  // Season bounds: July 5 - August 31 of the season's actual year (August
-  // needs no upper clamp since it naturally ends at 31). July's calendar
-  // starts from the 5th, not the 1st — the leading blank cells are sized to
-  // July 5th's own weekday, not July 1st's, so the grid opens flush against
-  // the weekday-labels row with no dead first week of empty padding.
-  const isJuly = calMonth === 6;
-  const minDayThisMonth = isJuly ? 5 : 1;
-  const startWeekday = new Date(calYear, calMonth, minDayThisMonth).getDay(); // 0 = Sun
+  const startWeekday = new Date(calYear, calMonth, 1).getDay(); // 0 = Sun
 
   const cells = [];
   for (let i = 0; i < startWeekday; i++) {
@@ -404,7 +429,7 @@ function renderCalendar(games) {
   // plays at most once per slot) — shrink cells accordingly. Unfiltered
   // ("All Teams") reverts to the normal height sized for up to 6 games.
   const compact = !!currentTeamFilter;
-  for (let day = minDayThisMonth; day <= daysInMonth; day++) {
+  for (let day = 1; day <= daysInMonth; day++) {
     const dayGames = (gamesByDay[day] || []).sort((a, b) => (a._date - b._date));
     cells.push(calendarCellHTML(day, dayGames, compact));
   }
@@ -519,16 +544,24 @@ function suffixOf(fullName) {
   return fullName.replace(/^(Team|Coach|Director)\s+/, '').trim();
 }
 
+// Always resolved against the REAL live schedule season (SCHEDULE_SEASON_CODE),
+// never whichever season the viewer has browsed to — a coach's team is a
+// property of the current season, and editing scores on a past, read-only
+// season a coach happens to be viewing was never a valid action anyway (see
+// canEditGame below, which also gates on this).
 function currentCoachTeam() {
   const coach = getCurrentCoach();
   if (!coach) return null;
   const coachSuffix = suffixOf(coach.name);
-  return TEAMS.find(t => suffixOf(t) === coachSuffix) || null;
+  return teamsFor(SCHEDULE_SEASON_CODE).find(t => suffixOf(t) === coachSuffix) || null;
 }
 
 function canEditGame(game) {
   const coach = getCurrentCoach();
   if (!coach) return false;
+  // Browsing a past season's schedule is always view-only, admins included —
+  // there is nothing to "edit" on a season that's already finished.
+  if (currentSeasonCode !== SCHEDULE_SEASON_CODE) return false;
   if (TEAM_ADMINS.includes(coach.name)) return true;
 
   const team = currentCoachTeam();

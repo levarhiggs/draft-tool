@@ -7,7 +7,7 @@
 // season has no schedule yet (released ~1 week before games). Until then these
 // pages keep showing the previous season's completed games.
 // See SCHEDULE_SEASON in season-config.js for how to flip this over.
-import { scheduleSeason, cacheKey } from './season-config.js';
+import { scheduleSeason, getSeason, cacheKey } from './season-config.js';
 
 const SEASON = scheduleSeason();
 
@@ -36,10 +36,21 @@ export const COL = {
 // ── Sheet fetch ───────────────────────────────────────────────────────────────
 
 export async function fetchSchedule() {
-  const CK = cacheKey('scheduleSheet', SEASON.code);
+  return fetchScheduleForSeason(SEASON.code);
+}
+
+// Season-parameterized variant — lets a page (e.g. Schedules' season
+// switcher) fetch a DIFFERENT season's games than the one this module
+// resolved to at load, without a page reload. Returns [] rather than
+// throwing when that season has no schedule published yet (scheduleCsvUrl
+// === ''), same as an empty sheet would.
+export async function fetchScheduleForSeason(code) {
+  const season = getSeason(code);
+  if (!season.scheduleCsvUrl) return [];
+  const CK = cacheKey('scheduleSheet', season.code);
   const cached = sessionStorage.getItem(CK);
   if (cached) return JSON.parse(cached);
-  const res = await fetch(SCHEDULE_CSV_URL);
+  const res = await fetch(season.scheduleCsvUrl);
   if (!res.ok) throw new Error(`Schedule sheet fetch failed: ${res.status}`);
   const text = await res.text();
   const games = parseCSV(text);
