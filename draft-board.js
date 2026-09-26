@@ -2036,4 +2036,24 @@ function wireWheel() {
   el('wheel-undo').addEventListener('click', undoWheelRemoval);
 }
 
-init();
+// ── Coach-only gate ────────────────────────────────────────────────────────────
+// The draft is final and everything here (sandbox boards, Pool/Split/
+// Unranked, the Random Coach Pick Wheel) is coach-only tooling — same
+// reasoning and same pattern as player.html's own coach-only gate. A direct
+// hit on this URL (typed, bookmarked, an old shared link) with no session
+// gets a notice and is sent to the directory instead of the board. The
+// side-menu link on every page performs the same check before navigating
+// here at all (see side-menu.js) so a logged-out click never even leaves
+// the current page.
+if (getCurrentCoach()) {
+  init();
+} else {
+  document.body.classList.add('coach-gate-active');
+  el('db-loading').classList.add('hidden');
+  el('db-main').innerHTML = `
+    <div class="coach-gate-notice">
+      <p>Coaches must login to view the Draft Board.</p>
+      <p class="coach-gate-sub">Taking you to the Player Directory…</p>
+    </div>`;
+  setTimeout(() => { window.location.href = 'directory.html'; }, 1800);
+}

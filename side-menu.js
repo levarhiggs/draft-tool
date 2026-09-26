@@ -113,4 +113,16 @@ syncAdminLinks();
       alert('Coaches must login to view and set player rankings.');
     }
   });
+
+  // Draft Board is coach-only, same reasoning as Coach Rankings above — the
+  // draft is final and coach-only tooling (sandbox boards, Pool/Split/
+  // Unranked, the Random Coach Pick Wheel) has no business being reachable
+  // by a logged-out visitor. draft-board.js gates itself too for anyone who
+  // reaches the URL directly rather than through this menu.
+  document.getElementById('nav-draft-board')?.addEventListener('click', e => {
+    if (!getCurrentCoach()) {
+      e.preventDefault();
+      alert('Coaches must login to view the Draft Board.');
+    }
+  });
 })();
