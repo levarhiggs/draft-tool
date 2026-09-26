@@ -568,30 +568,49 @@ async function buildPhotoIndex() {
   sessionStorage.setItem('drivePhotos_26.3', JSON.stringify(photoIndex));
 }
 
+// Same sessionStorage key coach-login.js uses ('draft_tool_coach') — this
+// page's script predates the rest of the app and is NOT a module (gotcha
+// #11), so it can't import getCurrentCoach() and keeps its own tiny inline
+// check instead, same duplication pattern as readableTextColor() below.
+function isCoachLoggedIn() {
+  try { return !!JSON.parse(sessionStorage.getItem('draft_tool_coach')); }
+  catch { return false; }
+}
+
 /**
  * This page is what coaches share with parents, so it shows the roster and
  * nothing about how the roster came to be: no player ids, no pick numbers,
  * no seed order. Those are internal draft mechanics and live on the draft
  * board instead. Players are listed alphabetically by first name, which is
  * how a parent scans for their kid.
+ *
+ * Privacy scoping ahead of opening media uploads to parents: a logged-out
+ * visitor sees only a player's first name on the visible tile (never Grade/
+ * Age — this page never showed those fields to begin with). `data-player-
+ * name` stays the REAL full name regardless of login state — media-submit.js
+ * reads it for the submission sheet's display text and for the playerName
+ * field written to Firestore, and neither should be corrupted by a
+ * display-only truncation.
  */
 function renderTeam(t) {
   const roster = t.players.slice().sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  const coachView = isCoachLoggedIn();
 
   const tiles = roster.map(p => {
+    const displayName = coachView ? p.name : (p.name.split(/\s+/)[0] || p.name);
     const entry = photoIndex[p.id];
     const photoHtml = entry
       ? `<img class="player-photo"
               src="${entry.thumbUrl}"
-              alt="${p.name}"
-              onclick="openLightbox('${entry.fullUrl}','${p.name.replace(/'/g, "\\'")}',event)"
+              alt="${displayName}"
+              onclick="openLightbox('${entry.fullUrl}','${displayName.replace(/'/g, "\\'")}',event)"
               onerror="this.outerHTML='<div class=\\'player-photo-placeholder\\'>🏀</div>'" />`
       : `<div class="player-photo-placeholder">🏀</div>`;
     return `
       <div class="player-tile" data-player-id="${p.id}" data-player-name="${p.name.replace(/"/g, '&quot;')}">
         ${photoHtml}
-        <div class="player-name">${p.name}</div>
+        <div class="player-name">${displayName}</div>
       </div>`;
   }).join('');
 

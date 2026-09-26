@@ -232,7 +232,12 @@ function wirePlayerModal() {
 }
 
 function playerCardHTML(p, isLoggedIn) {
-  const name      = p[COL.NAME] || 'Unknown';
+  const fullName  = p[COL.NAME] || 'Unknown';
+  // Privacy scoping ahead of opening media uploads to parents: a logged-out
+  // visitor sees only a player's first name, and never Grade/Age — both are
+  // withheld below (see displayName/metaHtml), not just here. Coaches keep
+  // the full name and both fields, same as before.
+  const name      = isLoggedIn ? fullName : (fullName.split(/\s+/)[0] || fullName);
   const grade     = p[COL.GRADE] || '—';
   // AGE column holds a birth date; coaches want the age.
   const age       = ageDisplay(p[COL.AGE]);
@@ -279,7 +284,7 @@ function playerCardHTML(p, isLoggedIn) {
   // Returning-player badge: ids are season-scoped and change every season, so
   // "has this kid played before" comes from the cross-season identity link
   // (player-identity.js), never from the id itself.
-  const prior = priorSeasons(name, SEASON_CODE);
+  const prior = priorSeasons(fullName, SEASON_CODE);
   const badges = [];
   if (prior.length) {
     const seasons = prior.map(e => escHtml(getSeason(e.season).name)).join(', ');
@@ -323,11 +328,15 @@ function playerCardHTML(p, isLoggedIn) {
           onclick="event.stopPropagation()" title="Call ${escHtml(phone)}">${escHtml(phone)}</a>`
     : '';
 
+  const metaHtml = isLoggedIn
+    ? `<div class="player-card-meta">Grade ${escHtml(grade)} · Age ${escHtml(age)}</div>`
+    : '';
+
   const cardInner = `
     <span class="player-card-thumb">${imgHtml}${videoBadge}</span>
     <div class="player-card-info">
       <div class="player-card-name"><span class="pc-id">${escHtml(id)}</span><span class="pc-sep"> · </span>${escHtml(name)}</div>
-      <div class="player-card-meta">Grade ${escHtml(grade)} · Age ${escHtml(age)}</div>
+      ${metaHtml}
       ${phoneHtml}
       ${priorHtml}
       ${scoreHtml}
