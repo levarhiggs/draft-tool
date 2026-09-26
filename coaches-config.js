@@ -227,12 +227,22 @@ const TEAM_COLORS_BY_SEASON = {
     'Team Chris':        { name: 'True Red',      hex: '#E30613' },
   },
 
-  // Fall 2026: colors aren't assigned yet (typically ~1-2 days before the
-  // first game — see SEASON_INTAKE_RECONSTRUCTION.md). Starts empty ON
-  // PURPOSE — do not copy 26.2's map down here "to have something." Fill
-  // this in once the commissioner actually assigns colors, keyed by the
-  // same 'Team {Coach}' names TEAMS_BY_SEASON['26.3'] below already uses.
-  '26.3': {},
+  // Fall 2026: colors assigned 2026-09-26, in draft-board order (Team 1-11
+  // per the commissioner's screenshot) — matches the schedule sheet's V/H
+  // columns verbatim (gotcha #4).
+  '26.3': {
+    'Team Ken':           { name: 'Purple',        hex: '#7B3FA0' },
+    'Team Sedat':         { name: 'Neon Yellow',   hex: '#F5EA0A' },
+    'Team Xavier':        { name: 'Carolina Blue', hex: '#B4E1FA' },
+    'Team Mason-Jaylen':  { name: 'Grey Concrete', hex: '#8C8C8C', shortName: 'Grey' },
+    'Team Kingston':      { name: 'Maroon',        hex: '#7A3B2E' },
+    'Team Craig':         { name: 'Burnt Orange',  hex: '#CC5500' },
+    'Team Humberto':      { name: 'White',         hex: '#FFFFFF' },
+    'Team Micah':         { name: 'Black',         hex: '#0A0A0A' },
+    'Team Kevin K.':      { name: 'Lime Shock',    hex: '#8BC98A', shortName: 'Lime' },
+    'Team David':         { name: 'Gold',          hex: '#F5A623' },
+    'Team Paul':          { name: 'True Red',      hex: '#E30613' },
+  },
 };
 
 // Coaches allowed to view and change Team Assignment and mark No Shows.

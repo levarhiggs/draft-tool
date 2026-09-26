@@ -60,21 +60,28 @@
   <main>
     <div class="stand-page">
 
-      <!-- PENDING (Fall 2026): the H2H matrix reads team colors from the
-           schedule sheet, which hasn't been published yet, and colors are
-           reassigned every season — there's no real data to show until
-           both land. Restore the matrix markup below (removed 2026-09-17,
-           see git history on this file) once standings.js has a real
-           schedule to read. -->
-      <div class="season-pending">
-        <div class="season-pending-icon">📊</div>
-        <h2>Standings Coming Soon</h2>
-        <p>The Fall 2026 head-to-head matrix needs the game schedule and
-           team colors, neither of which have been published yet. Check
-           back in about a week.</p>
-        <p>In the meantime, see who's on each team on the
-           <a href="draft-results.html">Draft Results</a> page.</p>
+      <!-- Mirrors Schedules' "Click here for Rankings" link — a one-tap
+           path to Gameboard's Board view (the "podium rankings"). -->
+      <div class="sched-rankings-link-row">
+        <a href="gameboard.html?view=board" class="sched-rankings-link">Click here for Podium Rankings</a>
       </div>
+
+      <h2 class="stand-title">Head-to-Head Matrix</h2>
+      <p class="stand-desc">Rows are ordered best record (top) to worst (bottom). Columns run the reverse — worst record (left) to best (right) — so results above a team's own row skew green and results below skew red, without ranking anyone in the labels themselves.</p>
+
+      <div class="stand-caveat">
+        Record only — not a prediction. Standings don't account for injuries, absences, illness, or a team's current form, and they shift after every game.
+      </div>
+
+      <p id="stand-snapshot" class="stand-snapshot"></p>
+
+      <div id="stand-empty-state" class="loading">Loading standings…</div>
+
+      <div id="stand-matrix-wrap" class="stand-matrix-wrap hidden">
+        <table id="stand-matrix" class="stand-matrix"></table>
+      </div>
+
+      <div id="stand-tooltip" class="stand-tooltip hidden" role="tooltip"></div>
 
     </div>
   </main>
@@ -99,10 +106,7 @@
     </div>
   </div>
 
-  <!-- standings.js is unloaded for now — the page has nothing left for it
-       to attach to while the matrix is pending (see the season-pending
-       panel above). Restore it alongside the matrix markup once there's a
-       real schedule to read. -->
+  <script type="module" src="standings.js"></script>
   <script type="module" src="coach-login.js"></script>
   <script type="module" src="side-menu.js"></script>
   <script>

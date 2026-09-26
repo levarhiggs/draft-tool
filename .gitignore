@@ -3,3 +3,10 @@ _local/
 _notes/
 _archive/
 _temp/
+
+# Local firebase-tools install (added for the Firebase MCP server)
+node_modules/
+
+# Machine-local MCP server config — hardcodes this machine's absolute paths
+# and the Firebase service-account credential path
+.mcp.json

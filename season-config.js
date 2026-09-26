@@ -43,10 +43,7 @@ export const SEASONS = {
     longName:    'CSBC SJV Fall 2026',
     status:      'active',
     sheetCsvUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ0PoVbwQIFlpXHC9EDjRIdi_VlozZ93GnBWEhu3zIZdxWLa2pCz32zlcK0intKWenfnjhmV4ThSXX8/pub?output=csv',
-    // No Fall schedule yet — released ~1 week before games begin. Until then
-    // schedule-driven pages (Schedules/Gameboard/Standings/Playoffs) keep
-    // reading 26.2 via SCHEDULE_SEASON below.
-    scheduleCsvUrl: '',
+    scheduleCsvUrl: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTyeo0qxHL7dE5wVbSW95lsFUqbFZrVTLVhVPCiWPVlTKNBfKKQZs5eKS9WjuGU7dy1pBjnVOKPG9cL/pub?output=csv',
     photosFolderId: '1xkM8AOWc_tOCwiXJsXVtK3wMWdCbi99Z',
     videosFolderId: '1oTuWp5fC5lVM7csgPt0lPr2_wEPuF2UM',
     // Fall teams/colors aren't assigned until ~1-2 days before the first game
@@ -61,9 +58,7 @@ export const SEASONS = {
 // Schedules/Gameboard/Standings/Playoffs must keep showing the previous
 // season's completed games rather than rendering empty.
 //
-// WHEN THE FALL SCHEDULE IS PUBLISHED: set 26.3's scheduleCsvUrl above, then
-// change this to CURRENT_SEASON. That is the only edit required.
-export const SCHEDULE_SEASON = '26.2';
+export const SCHEDULE_SEASON = CURRENT_SEASON;
 
 // ── Accessors ────────────────────────────────────────────────────────────────
 

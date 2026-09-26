@@ -138,34 +138,48 @@ function tileHtml(team, i) {
 }
 
 // Board view lists teams ranked by True Rank, highest first (Undrafted
-// excluded) — see trueRankFor.
-// PENDING (Fall 2026): the podium ranking is computed from trueRankFor(),
-// which reads the schedule sheet and TEAM_COLORS — neither has Fall data
-// yet (TEAM_COLORS still holds Summer's assignments, e.g. Team Sedat =
-// White, Team Humberto = Purple, which are reassigned every season), so the
-// board was quietly ranking teams by stale Summer results. Same fix as
-// Schedules/Standings (see git history + _local/PROJECT_STATUS.md): show a
-// "coming soon" panel instead of real tiles until both exist. Restore the
-// tile-rendering body below (preserved in git history on this function)
-// once there's real data to rank by.
+// excluded) — see trueRankFor. Held back until every team has at least one
+// game played: True Rank divides by a fixed 10-game season, so an 0-0 team
+// sits at the same 0 as a team that's simply losing, and ranking the whole
+// podium off a single early result would read as a real standing before
+// there's a real sample to back it.
 function renderBoardGrid() {
   const top = document.getElementById('gb-board-top');
   const second = document.getElementById('gb-board-second');
   const grid = document.getElementById('gb-board-grid');
-  top.classList.remove('gb-board-top-active');
-  second.classList.remove('gb-board-second-active');
-  top.innerHTML = '';
-  second.innerHTML = '';
-  grid.innerHTML = `
-    <div class="season-pending" style="grid-column:1/-1">
-      <div class="season-pending-icon">🏅</div>
-      <h2>Rankings Coming Soon</h2>
-      <p>Podium rankings need the game schedule and team colors, neither of
-         which have been published yet for Fall 2026. Check back in about a
-         week.</p>
-      <p>In the meantime, see who's on each team on the
-         <a href="draft-results.html">Draft Results</a> page.</p>
-    </div>`;
+  const teams = TEAMS.filter(t => t !== 'Undrafted')
+    .sort((a, b) => trueRankFor(b) - trueRankFor(a));
+
+  if (teams.some(t => statsFor(t).gamesPlayed === 0)) {
+    top.classList.remove('gb-board-top-active');
+    second.classList.remove('gb-board-second-active');
+    top.innerHTML = '';
+    second.innerHTML = '';
+    grid.innerHTML = `
+      <div class="season-pending" style="grid-column:1/-1">
+        <div class="season-pending-icon">🏅</div>
+        <h2>Rankings Coming Soon</h2>
+        <p>Podium rankings start once every team has played at least one
+           game, so True Rank has a real result to sort by.</p>
+        <p>In the meantime, see who's on each team on the
+           <a href="draft-results.html">Draft Results</a> page.</p>
+      </div>`;
+    return;
+  }
+
+  if (USE_PODIUM_LAYOUT) {
+    top.classList.add('gb-board-top-active');
+    second.classList.add('gb-board-second-active');
+    top.innerHTML = tileHtml(teams[0], 0);
+    second.innerHTML = teams.slice(1, 3).map((team, i) => tileHtml(team, i + 1)).join('');
+    grid.innerHTML = teams.slice(3).map((team, i) => tileHtml(team, i + 3)).join('');
+  } else {
+    top.classList.remove('gb-board-top-active');
+    second.classList.remove('gb-board-second-active');
+    top.innerHTML = '';
+    second.innerHTML = '';
+    grid.innerHTML = teams.map((team, i) => tileHtml(team, i)).join('');
+  }
 }
 
 // ── Team stats popover (click/tap a Board tile) ─────────────────────────────
