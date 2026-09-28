@@ -3,7 +3,7 @@ import { db } from './firebase-config.js';
 import { resolveSeason, isReadOnly, scheduleSeason } from './season-config.js';
 import {
   doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField, serverTimestamp, arrayUnion,
-  collection, getDocs, query, where, addDoc, deleteDoc,
+  collection, getDocs, query, where, addDoc, deleteDoc, increment,
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 // ── SEASON SCOPING ───────────────────────────────────────────────────────────
@@ -825,5 +825,41 @@ export async function swapPracticeSlots(slotKeyA, coachA, tbdA, slotKeyB, coachB
     [`slots.${slotKeyB}.tbd`]: !!tbdB,
     updatedAt: serverTimestamp(),
     updatedBy,
+  });
+}
+
+// ── Rotations primer read receipts ───────────────────────────────────────────
+// Who has opened primer.html while logged in, so the commissioner can see
+// which coaches have read it. One doc per season in `coaches` — same reason
+// as draftBoard_/roster_ above: that collection already has a published rule,
+// and a new collection's missing rule fails silently (gotcha #3).
+//
+// Firestore doc shape for coaches/primerViews_{season}:
+// { views: { [personId]: { name, firstViewed, lastViewed, count } } }
+function primerViewsRef() {
+  return doc(db, 'coaches', `primerViews_${SEASON_CODE}`);
+}
+
+/**
+ * Record one open of the primer by a logged-in coach. A merge write with
+ * nested maps, so two coaches opening it at once never clobber each other.
+ * firstViewed is only set when this person has no entry yet.
+ */
+export async function recordPrimerView(personId, name) {
+  assertWritable('recording a primer view');
+  const snap = await getDoc(primerViewsRef());
+  const seen = snap.exists() && snap.data().views?.[personId];
+  const entry = { name, lastViewed: serverTimestamp(), count: increment(1) };
+  if (!seen) entry.firstViewed = serverTimestamp();
+  await setDoc(primerViewsRef(), { views: { [personId]: entry } }, { merge: true });
+}
+
+/** Live { [personId]: { name, firstViewed, lastViewed, count } } for the admin list. */
+export function subscribePrimerViews(callback) {
+  return onSnapshot(primerViewsRef(), snap => {
+    callback(snap.exists() ? (snap.data().views || {}) : {});
+  }, err => {
+    console.error('subscribePrimerViews error:', err);
+    callback({});
   });
 }

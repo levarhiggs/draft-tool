@@ -98,6 +98,10 @@ async function attemptLogin() {
   // during the draft, and player.html (rankings) before that. A coach with
   // no team this season (the commissioner) lands on Rotations without one,
   // which falls back to their last-viewed team.
+  // Exception: the primer page. A coach logging in there is doing so to be
+  // counted as having read it (primer.js records the view on coachChanged),
+  // so they stay put.
+  if (window.location.pathname.endsWith('/primer.html')) return;
   const team = coachTeam(candidate.name);
   window.location.href = team
     ? `rotations.html?team=${encodeURIComponent(team)}`

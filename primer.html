@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How to Use Rotations — CSBC Coach App</title>
+  <meta property="og:title" content="How to Use Rotations — CSBC Coach App" />
+  <meta property="og:description" content="Coaches' primer: building your game lineups on the Rotations page under CSBC playing-time rules." />
+  <meta name="description" content="Coaches' primer: building your game lineups on the Rotations page under CSBC playing-time rules." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="favicon.png" type="image/png" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0f1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CSBC Draft" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+</head>
+<body>
+
+  <header>
+    <div class="header-inner">
+      <div class="header-left">
+        <button id="btn-menu-toggle" class="btn-menu-toggle" aria-label="Open menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+        <h1>Rotations Primer</h1>
+      </div>
+      <div class="header-controls">
+        <div id="coach-badge" class="coach-badge hidden">
+          <a id="media-msg-badge" class="media-msg-badge hidden" href="media-admin.html?tab=messages" title="Messages from parents">✉ <span id="media-msg-count">0</span></a>
+          <span id="coach-badge-name"></span>
+          <button id="btn-logout" class="btn-sm">Log Out</button>
+        </div>
+        <button id="btn-login" class="btn-primary">Coach Login</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Side menu -->
+  <div id="side-menu-overlay" class="side-menu-overlay hidden"></div>
+  <nav id="side-menu" class="side-menu" aria-label="Main menu">
+    <div class="side-menu-header">
+      <span>Menu</span>
+      <button id="btn-menu-close" class="btn-menu-close" aria-label="Close menu">✕</button>
+    </div>
+    <a href="directory.html" class="side-menu-link">🏀 Player Directory</a>
+    <a href="player.html" class="side-menu-link" id="nav-player-ranking">📝 Coach Rankings</a>
+    <a href="draft-board.html" class="side-menu-link" id="nav-draft-board">📋 Draft Board</a>
+    <a href="draft-results.html" class="side-menu-link">🏆 Draft Results</a>
+    <a href="practice-schedule.html" class="side-menu-link">🏟️ Practice Schedule</a>
+    <a href="schedules.html" class="side-menu-link">📅 Game Schedules</a>
+    <a href="gameboard.html" class="side-menu-link">🎯 Gameboard</a>
+    <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
+    <a href="standings.html" class="side-menu-link">📊 Standings</a>
+    <a href="playoffs.html" class="side-menu-link">🥇 Playoffs</a>
+    <a href="media-admin.html" class="side-menu-link" id="nav-media-admin">📸 Media Inbox</a>
+  </nav>
+
+  <main>
+    <article class="primer-page">
+
+      <!-- Admin-only: who has opened this page while logged in. -->
+      <section id="primer-readers" class="primer-readers hidden">
+        <h2>Who's read it</h2>
+        <p id="primer-readers-summary" class="primer-muted">Loading…</p>
+        <div class="primer-table-wrap">
+          <table class="primer-table">
+            <thead><tr><th>Coach</th><th>Team</th><th>First opened</th><th>Opens</th></tr></thead>
+            <tbody id="primer-readers-body"></tbody>
+          </table>
+        </div>
+        <p class="primer-muted">Only counts coaches who opened this page while logged in. Visible to admins only.</p>
+      </section>
+
+      <div id="primer-login-note" class="primer-login-note hidden">
+        Coaches: tap <strong>Coach Login</strong> (top right) so we know you've read this.
+      </div>
+
+      <p class="primer-back"><a href="rotations.html">← Back to Rotations</a></p>
+
+      <h2>Building a game lineup, step by step</h2>
+      <ol>
+        <li><strong>Log in.</strong> Tap <strong>Coach Login</strong>, pick your name and enter your PIN. The app opens Rotations with your team and players already loaded. You can skip logging in, but then you pick your team from the Team dropdown yourself and nothing is saved to your account.</li>
+        <li><strong>Mark absences.</strong> Double-tap the photo of anyone who won't be at the game. Do this first, because it changes which rules apply (see The playbook rules below).</li>
+        <li><strong>Set your tile order.</strong> Drag players by the ≡ handle so the ones you want on the court most are at the top. Your top two will be favored to start and finish.</li>
+        <li><strong>Tap 🎲 Generate Options.</strong> Look over the 10 mini-grids. Each row shows a player's quarters and their total (for example 3q). Tap <strong>Apply</strong> on your pick. It replaces whatever was on the grid.</li>
+        <li><strong>Fine-tune by hand if you want.</strong> Tap cells to swap players. Keep an eye on the red dots and red quarter headers, and fix each one until the banner turns green.</li>
+        <li><strong>Apply it to your games.</strong> Tap <strong>🎯 Apply to Gameboard</strong>. Games without a saved lineup are pre-checked. Games that already have one show a green or red dot and start unchecked. Check what you want and tap <strong>Apply</strong>. You'll be asked before anything is overwritten, then offered a jump to the Gameboard.</li>
+        <li><strong>Share it.</strong> Tap <strong>📤 Export Rotation</strong>, then <strong>Print</strong> or <strong>Download Image</strong>. On a computer, the image is also copied so you can paste it into a text or chat.</li>
+      </ol>
+      <p>Export and Apply to Gameboard both save a copy under <strong>Saved Rotations</strong> automatically, named like "8-man - Config 3". Saving the same lineup twice doesn't create a duplicate.</p>
+
+      <h2>The short version</h2>
+      <p>The Rotations page builds your quarter-by-quarter lineup and checks it against the CSBC playing-time rules as you go. Mark who is absent, put your players in the order you want to favor, tap <strong>Generate Options</strong>, pick one, and send it to the Gameboard.</p>
+      <p>Logging in takes you straight there. You can also find it in the app menu (☰, top left) under <strong>🔄 Rotations</strong>. Anyone can build and export a lineup. You need to be logged in (<strong>Coach Login</strong>, top right) to save lineups or apply them to your games.</p>
+
+      <h2>The playbook rules</h2>
+      <p>A lineup is legal only when all of these hold. The page checks every one of them after each tap. "Present" means every player on your roster who is not marked absent.</p>
+      <ol>
+        <li><strong>Five on the court every quarter.</strong> If fewer than 5 players show up, everyone present plays every quarter.</li>
+        <li><strong>Everyone plays at least one full quarter in each half.</strong> Q1–Q2 is the first half, Q3–Q4 is the second.</li>
+        <li><strong>With 7 or more present, everyone sits at least one quarter.</strong> Nobody plays all four.</li>
+        <li><strong>With 6 or fewer present, the sit-out rule is waived.</strong> Players may play all four, but rule 2 still applies.</li>
+      </ol>
+      <p>One result of rule 2: no player can ever sit more than 2 quarters, one per half.</p>
+      <p>Here is what those rules allow at each attendance level:</p>
+      <div class="primer-table-wrap">
+        <table class="primer-table">
+          <thead><tr><th>Players present</th><th>Quarters each player can play</th><th>How the 20 court spots must split</th></tr></thead>
+          <tbody>
+            <tr><td>8</td><td>2 or 3</td><td>4 players play 3 quarters, 4 players play 2</td></tr>
+            <tr><td>7</td><td>2 or 3</td><td>6 players play 3 quarters, 1 player plays 2</td></tr>
+            <tr><td>6</td><td>2, 3 or 4</td><td>Any mix that adds to 20 (for example 4 play all 4, 2 play 2)</td></tr>
+            <tr><td>5</td><td>4</td><td>Everyone plays every quarter</td></tr>
+            <tr><td>Under 5</td><td>4</td><td>Everyone plays every quarter (short-handed)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The rules set the minimum. How you use the extra quarters is your call, and the page helps you with that through tile order (below).</p>
+
+      <h2>Tour of the page</h2>
+      <p>The page is one grid: a row per player, a column per quarter. Each row reads left to right: drag handle (≡), photo, name, status dot, a small initials or first-name tag, then the Q1–Q4 cells.</p>
+      <p>The numbers on the screenshots match the numbers in the table below. The player names are placeholders.</p>
+      <img class="primer-img" src="assets/primer-top.png" alt="Top of the Rotations page, with numbered callouts 1 to 8" loading="lazy" />
+      <img class="primer-img" src="assets/primer-bottom.png" alt="Bottom of the grid and the action buttons, callouts 5, 9, 10 and 11" loading="lazy" />
+      <img class="primer-img" src="assets/primer-options.png" alt="The Choose a Rotation window that opens from Generate Options" loading="lazy" />
+      <div class="primer-table-wrap">
+        <table class="primer-table">
+          <thead><tr><th>#</th><th>Part of the page</th><th>What it tells you</th><th>What you do with it</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td><strong>Team</strong> dropdown</td><td>Teams listed as COLOR — Team Coach</td><td>Filled in for you when you log in. Change it to view another team.</td></tr>
+            <tr><td>2</td><td><strong>Cell avatars</strong> toggle</td><td>Photo or colored initials inside "on" cells</td><td>Pick whichever is easier to read. Display only.</td></tr>
+            <tr><td>3</td><td><strong>Status banner</strong> (above the grid)</td><td>Green = valid lineup. Red = counts of player and quarter errors</td><td>Glance here before you export or apply.</td></tr>
+            <tr><td>4</td><td><strong>Quarter cells</strong></td><td>A face in the cell = on the court that quarter</td><td>Tap to put a player in or take them out.</td></tr>
+            <tr><td>5</td><td><strong>Player photo</strong></td><td>Grayed out with hatched cells = absent</td><td>Double-tap (double-click on a computer) to mark absent or present.</td></tr>
+            <tr><td>6</td><td><strong>Drag handle</strong> ≡</td><td>Row position = tile order, your priority list</td><td>Press and drag up or down to reorder.</td></tr>
+            <tr><td>7</td><td><strong>Status dot</strong></td><td>Green = legal. Red = breaks a rule. Gray = absent</td><td>Tap the player's <strong>name</strong> for the reason, such as "Misses the entire second half (Q3–Q4)."</td></tr>
+            <tr><td>8</td><td><strong>Q1–Q4 headers</strong></td><td>Red with "N on court" = not exactly 5</td><td>Tap for how many to add or remove.</td></tr>
+            <tr><td>9</td><td><strong>🎲 Generate Options</strong></td><td>10 legal lineups built from your tile order, with each player's quarter total</td><td>Tap <strong>Apply</strong> on the one you want. <strong>See 10 more options</strong> for more.</td></tr>
+            <tr><td>10</td><td><strong>📤 Export Rotation</strong></td><td>Print, or Download Image (a PNG with your team header and a timestamp)</td><td>Hand it to your bench or send it to parents.</td></tr>
+            <tr><td>11</td><td><strong>🎯 Apply to Gameboard</strong></td><td>A checklist of your team's scheduled games</td><td>Save this lineup to one or more games.</td></tr>
+            <tr><td>12</td><td><strong>Saved Gameboards</strong> and <strong>Saved Rotations</strong> (below the grid, logged in only)</td><td>Mini-grids of your saved lineups, each with a ✓ or ✕ for valid or not</td><td>Tap a mini-grid for <strong>Apply to Grid</strong>, <strong>Apply to Gameboard</strong> or <strong>Go to Game</strong>. Click the title to rename. 🗑️ deletes.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Tile order matters.</strong> It starts as the league's composite ranking. Players higher in the list get more of the extra quarters when you use Generate Options. The top two are also placed in Q1 and Q4 when possible, so your strongest players start and finish the game.</p>
+      <p><strong>Absent is not the same as benched.</strong> An absent player drops out of every rule check and the page recalculates for the smaller group. Leaving a present player's row empty is a rule error.</p>
+
+      <h2>Common situations</h2>
+      <p><strong>A player shows up late or leaves early.</strong> Double-tap their photo to switch them between present and absent, then Generate Options again. The rules change with the head count, so a lineup that was legal for 8 may not be legal for 7.</p>
+      <p><strong>The banner is red and I can't see why.</strong> Tap each red dot's name and each red quarter header. The pop-up names the exact rule broken, or how many players to add or remove from that quarter.</p>
+      <p><strong>Can I export a lineup that breaks the rules?</strong> Yes. You'll see "This is not a valid configuration. Export anyways?" first. Use this only when you have a real reason, and expect to explain it.</p>
+      <p><strong>My printed or downloaded lineup shows initials, not photos.</strong> That's expected. Exports always use initials so every cell prints cleanly.</p>
+      <p><strong>Who can see my saved lineups?</strong> Only you. Saved lineups are stored under your coach login, and other coaches can't see them.</p>
+      <p><strong>I built a lineup without logging in. Is it gone?</strong> The grid is remembered on that phone or computer only, per team. Log in and export or apply it to keep a copy in your account.</p>
+      <p><strong>How do I reuse last week's lineup?</strong> Scroll to <strong>Saved Gameboards</strong> or <strong>Saved Rotations</strong>, tap its mini-grid and choose <strong>Apply to Grid</strong>. That restores its order, absences and quarters, ready to adjust.</p>
+      <p><strong>I'm on the Gameboard and want to change a lineup.</strong> Double-click a team's mini-grid on the Gameboard to jump straight to Rotations with that team selected.</p>
+
+      <p class="primer-back"><a href="rotations.html">← Back to Rotations</a></p>
+    </article>
+  </main>
+
+  <!-- Coach Login Modal -->
+  <div id="modal-login" class="modal-overlay hidden">
+    <div class="modal-box">
+      <h2>Coach Login</h2>
+      <label>Select your name
+        <select id="login-name">
+          <option value="">— choose —</option>
+        </select>
+      </label>
+      <label>PIN
+        <input id="login-pin" type="password" maxlength="6" placeholder="Enter your PIN" />
+      </label>
+      <p id="login-error" class="error-msg hidden">Incorrect PIN. Try again.</p>
+      <div class="modal-actions">
+        <button id="btn-login-cancel" class="btn-secondary">Cancel</button>
+        <button id="btn-login-submit" class="btn-primary">Log In</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="primer.js"></script>
+  <script type="module" src="coach-login.js"></script>
+  <script type="module" src="side-menu.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/draft-tool/sw.js');
+  </script>
+</body>
+</html>
