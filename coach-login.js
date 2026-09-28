@@ -1,5 +1,5 @@
 // coach-login.js — handles coach session (stored in sessionStorage)
-import { getActiveCoaches } from './coaches-config.js';
+import { getActiveCoaches, TEAMS } from './coaches-config.js';
 import { CURRENT_SEASON } from './season-config.js';
 import { getPinOverride, savePinOverride } from './firebase.js';
 
@@ -92,13 +92,23 @@ async function attemptLogin() {
   closeLoginModal();
   updateBadge();
 
-  // Straight to the draft board — that's the coach's real destination after
-  // logging in now that the draft's happened, not wherever they clicked
-  // "Coach Login" from. Used to be player.html (the ranking list), back
-  // when ranking players before the draft was the point.
-  if (!window.location.pathname.endsWith('/draft-board.html')) {
-    window.location.href = 'draft-board.html';
-  }
+  // Straight to Rotations with the coach's own team pre-selected — building
+  // game lineups is the coach's real job during the regular season, not
+  // wherever they clicked "Coach Login" from. Used to be draft-board.html
+  // during the draft, and player.html (rankings) before that. A coach with
+  // no team this season (the commissioner) lands on Rotations without one,
+  // which falls back to their last-viewed team.
+  const team = coachTeam(candidate.name);
+  window.location.href = team
+    ? `rotations.html?team=${encodeURIComponent(team)}`
+    : 'rotations.html';
+}
+
+// Coach's own team, by the same "Coach X" -> "Team X" suffix match
+// gameboard.js's coachDefaultTeam uses (no stored coach->team mapping exists).
+function coachTeam(coachName) {
+  const suffix = coachName.replace(/^(Coach|Director)\s+/, '');
+  return TEAMS.find(t => t.replace(/^Team\s+/, '') === suffix) || '';
 }
 
 // ── Change PIN ────────────────────────────────────────────────────────────────
