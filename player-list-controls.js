@@ -21,6 +21,7 @@ import { getCurrentCoach } from './coach-login.js';
 import { saveFavorites, getFavorites } from './firebase.js';
 import { missedTryout } from './tryout-attendance.js';
 import { hasVideoSet } from './video-availability.js';
+import { teamColorsFor } from './coaches-config.js';
 
 const MISSED_TRYOUT = missedTryout(SEASON_CODE);
 // PRE-DRAFT (Fall 2026): powers the Has Video filter/sort while videos are
@@ -280,6 +281,20 @@ function buildSeedChips(onChange) {
   });
 }
 
+// Coaches refer to teams by color first ("LIME SHOCK") once colors are
+// assigned — matches the same convention already used on the Schedules
+// page (teamColorDisplayName) and the Draft Results header. Prefers the
+// short display name (e.g. "Grey" for "Grey Concrete") so it doesn't
+// overflow the chip. Display-only: the chip's data-value stays the bare
+// team name below, since that's what activeFilters.teams actually matches
+// against — only the visible label changes.
+function teamChipLabel(team) {
+  const info = teamColorsFor(SEASON_CODE)[team];
+  if (!info) return team;
+  const displayColor = info.shortName || info.name;
+  return `${displayColor.toUpperCase()} — ${team}`;
+}
+
 /**
  * Team chips are built from the players' actual assignments, so they track
  * whatever the draft wrote — no coach list to keep in sync here. Exported
@@ -295,7 +310,7 @@ export function buildTeamChips(getPlayers, onChange) {
   )].sort();
   if (!teams.length) { container.innerHTML = '<span class="filter-empty">No teams assigned yet</span>'; return; }
   container.innerHTML = teams.map(t => `
-    <button class="filter-chip" data-type="team" data-value="${escAttr(t)}">${escAttr(t)}</button>
+    <button class="filter-chip" data-type="team" data-value="${escAttr(t)}">${escAttr(teamChipLabel(t))}</button>
   `).join('');
   container.querySelectorAll('.filter-chip').forEach(btn => {
     btn.addEventListener('click', () => {

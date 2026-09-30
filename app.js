@@ -11,7 +11,7 @@ import {
 import { priorSeasons } from './player-identity.js';
 import { getSeason } from './season-config.js';
 import { contactFor } from './player-contacts.js';
-import { personByName, teamNameFor, TEAM_ADMINS } from './coaches-config.js';
+import { personByName, teamNameFor, TEAM_ADMINS, teamColorsFor } from './coaches-config.js';
 import {
   activeFilters, favorites, currentSort, toggleFavorite as toggleFavoriteShared,
   loadFavorites, applySort, applyFilters, renderResultCount,
@@ -154,7 +154,7 @@ function renderGrid() {
     for (const p of visible) {
       const team = p._teamFB || p[COL.TEAM] || 'Unassigned';
       if (team !== lastTeam) {
-        parts.push(`<div class="team-group-header">${escHtml(team)}</div>`);
+        parts.push(`<div class="team-group-header">${escHtml(teamNameWithColor(team))}</div>`);
         lastTeam = team;
       }
       parts.push(playerCardHTML(p, !!coach));
@@ -231,6 +231,20 @@ function wirePlayerModal() {
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeVideoModal(); });
 }
 
+// Coaches refer to teams by color first ("LIME SHOCK") once colors are
+// assigned — used wherever a coach name is shown without already being
+// paired with a photo/swatch of their own color (team-group headers, the
+// Team filter chips). Prefers the short display name (e.g. "Grey" for
+// "Grey Concrete") so it doesn't overflow tight chip/header UI — display
+// only, never used for matching against sheet/roster data. Returns the
+// bare team name unchanged if no color is assigned yet for this season.
+function teamNameWithColor(team) {
+  const info = teamColorsFor(SEASON_CODE)[team];
+  if (!info) return team;
+  const displayColor = info.shortName || info.name;
+  return `${displayColor.toUpperCase()} — ${team}`;
+}
+
 function playerCardHTML(p, isLoggedIn) {
   const fullName  = p[COL.NAME] || 'Unknown';
   // Privacy scoping ahead of opening media uploads to parents: a logged-out
@@ -268,7 +282,7 @@ function playerCardHTML(p, isLoggedIn) {
   }
 
   const teamHtml = team
-    ? `<div class="player-card-team">${escHtml(team)}</div>` : '';
+    ? `<div class="player-card-team">${escHtml(teamNameWithColor(team))}</div>` : '';
 
   // Badge row.
   //
@@ -393,7 +407,7 @@ export function escHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-export { COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID, photoUrl, videoUrl };
+export { COL, SHEET_CSV_URL, PHOTOS_FOLDER_ID, VIDEOS_FOLDER_ID, photoUrl, videoUrl, teamNameWithColor };
 
 // player.js and draft-board.js import escHtml/COL/photoUrl from here, which
 // used to drag the directory's whole bootstrap along with them — fetching the

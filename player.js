@@ -8,7 +8,7 @@
 // markup as directory.html, shared via player-list-controls.js, so a coach
 // moving between "browse" and "rank" doesn't relearn a second set of
 // controls — see PRODUCT_SPEC / the 2026-09-19 mid-season ranking request.
-import { escHtml, COL, photoUrl, videoUrl } from './app.js';
+import { escHtml, COL, photoUrl, videoUrl, teamNameWithColor } from './app.js';
 import { fetchPlayers, buildDriveIndex, ageDisplay, SEASON_CODE } from './players-data.js';
 import { priorSeasons } from './player-identity.js';
 import { getSeason } from './season-config.js';
@@ -167,13 +167,14 @@ function renderList() {
   }
 
   if (currentSort === 'team') {
-    // Group by team — same "Team X" header row the directory grid shows.
+    // Group by team — same "Team X" header row the directory grid shows,
+    // color-prefixed the same way (see teamNameWithColor in app.js).
     let lastTeam = null;
     const parts = [];
     for (const p of visible) {
       const team = p._teamFB || p[COL.TEAM] || 'Unassigned';
       if (team !== lastTeam) {
-        parts.push(`<div class="team-group-header">${escHtml(team)}</div>`);
+        parts.push(`<div class="team-group-header">${escHtml(teamNameWithColor(team))}</div>`);
         lastTeam = team;
       }
       parts.push(rowHTML(p, !!coach));
@@ -478,7 +479,7 @@ function openBioModal(p) {
   const data = live[id];
   const teamName = (coach && data?.team) || p[COL.TEAM] || '';
   badges.push(teamName
-    ? `<span class="player-card-returning" title="Team assignment">${escHtml(teamName)}</span>`
+    ? `<span class="player-card-returning" title="Team assignment">${escHtml(teamNameWithColor(teamName))}</span>`
     : `<span class="player-card-missed" title="Not yet drafted to a team">Undrafted</span>`);
   const badgesHtml = badges.length
     ? `<div class="player-card-badges bio-modal-badges">${badges.join('')}</div>` : '';
