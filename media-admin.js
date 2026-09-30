@@ -18,7 +18,7 @@ import {
   subscribeMessages, markMessageHandled,
 } from './media-data.js';
 import { removalLabel } from './media-permissions.js';
-import { fetchPlayers, buildDriveIndex, videoUrl as tryoutVideoUrl, COL } from './players-data.js';
+import { fetchPlayers, buildDriveIndex, photoUrl, videoUrl as tryoutVideoUrl, COL } from './players-data.js';
 import { refreshPromotions } from './media-promotions.js';
 import {
   thumbUrl, fullUrl, videoUrl, videoPosterUrl,
@@ -35,6 +35,13 @@ let promotions  = {};
 // the cap check here would let an admin approve a 6th real clip on a player
 // who effectively already has 6 (5 approved + the tryout video).
 let tryoutById  = {};
+// Same reasoning as tryoutById above, for the headshot's own pinned photo
+// slot (MAX_APPROVED_PHOTOS is 11, not 10, for exactly this — see its own
+// comment in media-config.js). photoUrl() already resolves a promoted
+// submission's photo ahead of the raw Drive one, so this stays correct
+// either way — it's just "is there a pinned headshot tile," not a count of
+// submissions, so there's no double-counting against `mine` below.
+let headshotById = {};
 let filter      = 'pending';
 let unsubscribe = null;
 let msgUnsub    = null;
@@ -81,10 +88,11 @@ async function start() {
   try {
     const [players] = await Promise.all([fetchPlayers(), buildDriveIndex()]);
     tryoutById = Object.fromEntries(players.map(p => [String(p[COL.ID]), !!tryoutVideoUrl(p)]));
+    headshotById = Object.fromEntries(players.map(p => [String(p[COL.ID]), !!photoUrl(p)]));
   } catch (err) {
     // Never let this block the inbox from loading — worst case the cap check
-    // undercounts by the tryout video, same as before this fix existed.
-    console.warn('media: could not load tryout-video index', err);
+    // undercounts by the tryout video/headshot, same as before this fix existed.
+    console.warn('media: could not load tryout-video/headshot index', err);
   }
   unsubscribe = subscribeSubmissions(list => {
     submissions = list;
