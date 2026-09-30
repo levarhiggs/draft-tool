@@ -2441,15 +2441,25 @@ main {
 }
 
 :root {
-  /* Same total width as the old 5x112 + 2x56 layout (672px), just spread
-     evenly across all 7 days instead of narrowing Sat/Sun. */
-  --sched-cal-day-w: 96px;
+  /* Sun/Mon/Tue/Wed/Sat are where every Fall 2026 game actually falls —
+     Thu/Fri have zero scheduled games this season, so they're narrowed to
+     just fit a day label/number and that freed width goes to the other 5
+     columns instead. Same total table width as the old equal-7 layout
+     (~672px), just redistributed. Entering a score used to get truncated
+     by .sched-cal-score's max-width at the old equal 96px column (caught
+     2026-09-30) — revisit this split if game days ever change. */
+  --sched-cal-day-w: 115px;
+  --sched-cal-slim-day-w: 48px;
 }
 
 .sched-cal-weekdays,
 .sched-cal-week-row {
   display: grid;
-  grid-template-columns: repeat(7, var(--sched-cal-day-w));
+  grid-template-columns:
+    var(--sched-cal-day-w) var(--sched-cal-day-w) var(--sched-cal-day-w)
+    var(--sched-cal-day-w)
+    var(--sched-cal-slim-day-w) var(--sched-cal-slim-day-w)
+    var(--sched-cal-day-w);
   gap: 4px;
   width: fit-content;
   margin: 0 auto;
@@ -2552,6 +2562,14 @@ main {
 .sched-cal-entry {
   display: flex;
   align-items: center;
+  /* flex-wrap, not nowrap: the parent .sched-cal-cell clips overflow (see
+     its own rule above), so if time + swatches + a full two-digit score
+     don't fit on one line even at the wider weekday columns, the score
+     wraps to its own line instead of being silently clipped — the whole
+     score must stay visible without any extra tap/scroll to reveal it
+     (2026-09-30). .sched-cal-entries' own overflow-y:auto absorbs any
+     resulting height. */
+  flex-wrap: wrap;
   gap: 3px;
   background: var(--clr-card);
   border: 1px solid var(--clr-border);
@@ -2561,7 +2579,6 @@ main {
   color: var(--clr-muted);
   cursor: default;
   transition: border-color 0.12s;
-  white-space: nowrap;
 }
 .sched-cal-entry:hover { border-color: var(--clr-accent); }
 .sched-cal-entry-played { color: var(--clr-text); }
@@ -2576,9 +2593,13 @@ main {
   font-weight: 700;
   color: var(--clr-text);
   white-space: nowrap;
-  max-width: 5ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* No more max-width/ellipsis truncation — was capped at 5ch, too tight
+     for a real two-digit-vs-two-digit score plus its leading space/dash
+     (e.g. " 42-38" is 6 chars), so scores were silently getting cut off
+     (caught 2026-09-30). The wider weekday columns (--sched-cal-day-w)
+     plus .sched-cal-entry's flex-wrap (see its own comment) now guarantee
+     the full score is always visible — wrapping to its own line if needed
+     — rather than truncating it with an ellipsis. */
 }
 
 .sched-score-matchup {
