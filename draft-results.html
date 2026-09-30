@@ -199,6 +199,13 @@ button.lightbox-video-btn.hidden{display:none}
 }
 .side-menu-link:hover{background:var(--card)}
 .side-menu-link.active{color:#4f8ef7;font-weight:600}
+/* Media Inbox defaults to this class in the HTML and side-menu.js removes
+   it for an actual admin — this page has no generic bare .hidden rule
+   (only scoped ones like .lightbox-arrow.hidden, since it doesn't load
+   style.css, gotcha #11), so the class alone did nothing and the link
+   stayed visible to every logged-out visitor (caught live 2026-09-30,
+   after the class was added but this rule was missed). */
+.side-menu-link.hidden{display:none}
 
 /* "To be announced" state — shown between seasons, before a draft is held */
 .tba-panel{grid-column:1/-1;max-width:560px;margin:64px auto;padding:40px 32px;
@@ -435,7 +442,7 @@ button.lightbox-video-btn.hidden{display:none}
 
 <!-- Player photo lightbox. Clicking a face opens the rest of that player's
      TEAM one swipe/arrow-key away, wrapping at either end — see
-     openLightbox()/lightboxStep() below, and window.dtBridge for the
+     openLightboxFromEl()/lightboxStep() below, and window.dtBridge for the
      coach-session/video/phone data this non-module script can't import
      directly (gotcha #11). -->
 <div id="lightbox" role="dialog" aria-modal="true" aria-label="Player photo">
@@ -616,6 +623,12 @@ const TEAMS = [
   },
 ];
 
+function escHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // Map player ID -> Drive file IDs (populated after API call)
 const photoIndex = {};  // id -> { thumbUrl, fullUrl }
 
@@ -679,13 +692,23 @@ function renderTeam(t) {
   const tiles = roster.map((p, i) => {
     const displayName = coachView ? p.name : (p.name.split(/\s+/)[0] || p.name);
     const entry = photoIndex[p.id];
+    // data-lb-team/data-lb-index (not baked into an inline onclick string)
+    // so photoLoadError() below can read them straight off the element —
+    // hand-escaping a team/coach name through THREE levels of nested quotes
+    // (HTML attribute -> JS string -> the outerHTML string it builds) to
+    // recreate an onclick inline was fragile and silently broken on any
+    // coach name containing an apostrophe (verified: produced invalid JS
+    // that threw). data attributes sidestep the whole problem.
     const photoHtml = entry
       ? `<img class="player-photo"
               src="${entry.thumbUrl}"
               alt="${displayName}"
-              onclick="openLightbox('${t.coach.replace(/'/g, "\\'")}',${i},event)"
-              onerror="this.outerHTML='<div class=\\'player-photo-placeholder\\'>🏀</div>'" />`
-      : `<div class="player-photo-placeholder" onclick="openLightbox('${t.coach.replace(/'/g, "\\'")}',${i},event)">🏀</div>`;
+              data-lb-team="${escHtml(t.coach)}" data-lb-index="${i}"
+              onclick="openLightboxFromEl(this,event)"
+              onerror="photoLoadError(this)" />`
+      : `<div class="player-photo-placeholder"
+              data-lb-team="${escHtml(t.coach)}" data-lb-index="${i}"
+              onclick="openLightboxFromEl(this,event)">🏀</div>`;
     return `
       <div class="player-tile" data-player-id="${p.id}" data-player-name="${p.name.replace(/"/g, '&quot;')}">
         ${photoHtml}
@@ -735,11 +758,31 @@ async function init() {
 let lbTeamCoach = null; // which team's roster is currently open
 let lbIndex = -1;       // index into teamRosters[lbTeamCoach]
 
-function openLightbox(teamCoach, index, e) {
+// Reads which team/index to open off the clicked element's own data
+// attributes (set in renderTeam() above) rather than an inline onclick
+// string carrying the coach name through nested quote-escaping — see the
+// comment on photoHtml in renderTeam() for why that broke.
+function openLightboxFromEl(el, e) {
   e.stopPropagation();
-  lbTeamCoach = teamCoach;
-  lbIndex = index;
+  lbTeamCoach = el.dataset.lbTeam;
+  lbIndex = Number(el.dataset.lbIndex);
   showLightboxSlide();
+}
+
+// A photo that fails to load (Drive throttling, a bad file) swaps in the
+// SAME placeholder markup + data attributes renderTeam() uses for a player
+// with no Drive entry at all — carrying data-lb-team/data-lb-index across
+// via textContent-safe DOM creation, not a hand-built HTML string, so this
+// can't reintroduce the escaping bug even if a coach name ever contains a
+// quote or other special character.
+function photoLoadError(img) {
+  const div = document.createElement('div');
+  div.className = 'player-photo-placeholder';
+  div.dataset.lbTeam = img.dataset.lbTeam;
+  div.dataset.lbIndex = img.dataset.lbIndex;
+  div.textContent = '🏀';
+  div.addEventListener('click', e => openLightboxFromEl(div, e));
+  img.replaceWith(div);
 }
 
 function showLightboxSlide() {
