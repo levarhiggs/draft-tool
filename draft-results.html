@@ -64,25 +64,79 @@ h1{
   width:76px;height:76px;border-radius:22%;
   background:var(--border);display:flex;align-items:center;
   justify-content:center;font-size:1.6rem;margin-bottom:6px;flex-shrink:0;
+  cursor:pointer;
 }
 .player-name{font-size:.68rem;font-weight:600;text-align:center;line-height:1.25;color:var(--text);word-break:break-word}
-/* lightbox */
+/* Lightbox: click a face to open it full-size, then swipe/arrow-key through
+   the REST OF THAT PLAYER'S TEAM, wrapping at either end — same interaction
+   as the Draft Board's own photo lightbox (draft-board.js/.html), rebuilt
+   here inline since this page doesn't load style.css (gotcha #11). */
 #lightbox{
   display:none;position:fixed;inset:0;z-index:1000;
-  background:rgba(0,0,0,0.88);
-  align-items:center;justify-content:center;cursor:pointer;
+  background:rgba(0,0,0,0.9);
+  align-items:center;justify-content:center;
+  padding:24px;overflow:hidden;touch-action:pan-y;
 }
 #lightbox.open{display:flex}
-#lightbox img{
-  max-width:88vw;max-height:88vh;
+.lightbox-frame{
+  position:relative;display:flex;flex-direction:column;align-items:center;
+  max-width:88vw;will-change:transform;
+}
+.lightbox-frame.sliding{transition:transform .22s ease-out}
+#lightbox-img{
+  max-width:88vw;max-height:76vh;min-height:120px;
   border-radius:12px;object-fit:contain;
   box-shadow:0 8px 48px rgba(0,0,0,0.7);
+  background:#1a1d2b;
 }
+#lightbox-img.no-photo{
+  width:min(60vw,320px);aspect-ratio:.75;
+  display:flex;align-items:center;justify-content:center;
+}
+#lightbox-img.no-photo::before{content:"🏀";font-size:3rem}
+#lightbox-media{position:relative;display:flex}
+button.lightbox-video-btn{
+  position:absolute;bottom:14px;right:14px;left:auto;z-index:1;
+  width:44px;height:30px;font-size:1rem;border:0;cursor:pointer;
+  pointer-events:auto;background:#c0392b;color:#fff;border-radius:5px;
+}
+button.lightbox-video-btn:hover{filter:brightness(1.18)}
+button.lightbox-video-btn.hidden{display:none}
+.lightbox-video{
+  width:min(88vw,640px);aspect-ratio:16/9;max-height:76vh;
+  border-radius:12px;border:0;background:#000;
+  box-shadow:0 8px 48px rgba(0,0,0,0.7);
+}
+#lightbox-caption{margin-top:14px;color:#fff;text-align:center;max-width:90vw}
 #lightbox-name{
-  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
-  background:rgba(0,0,0,0.7);color:#fff;
-  padding:8px 20px;border-radius:20px;
-  font-size:.9rem;font-weight:600;pointer-events:none;white-space:nowrap;
+  font-size:1.1rem;font-weight:700;pointer-events:none;
+}
+#lightbox-sub{margin-top:3px;font-size:.85rem;color:rgba(255,255,255,.75)}
+/* Parent phone under the caption — only rendered when the logged-in coach
+   owns this player's team, or is a TEAM_ADMIN (see window.dtBridge in the
+   module script at the bottom of this file). */
+#lightbox-phone{margin-top:4px;font-size:.9rem}
+#lightbox-phone a{color:#8fc4ff;text-decoration:none;font-variant-numeric:tabular-nums;white-space:nowrap}
+#lightbox-phone a:hover{text-decoration:underline}
+#lightbox-close{
+  position:fixed;top:18px;right:20px;z-index:2;
+  background:rgba(0,0,0,.55);color:#fff;
+  border:1px solid rgba(255,255,255,.25);border-radius:50%;
+  width:38px;height:38px;font-size:1rem;cursor:pointer;line-height:1;
+}
+#lightbox-close:hover{background:rgba(0,0,0,.8)}
+.lightbox-arrow{
+  position:fixed;top:50%;transform:translateY(-50%);z-index:2;
+  background:rgba(0,0,0,.45);color:#fff;
+  border:1px solid rgba(255,255,255,.25);border-radius:50%;
+  width:46px;height:46px;font-size:1.6rem;line-height:1;cursor:pointer;
+}
+.lightbox-arrow:hover{background:rgba(0,0,0,.75)}
+.lightbox-arrow.hidden{display:none}
+#lightbox-prev{left:14px}
+#lightbox-next{right:14px}
+@media (max-width:640px){
+  .lightbox-arrow{width:38px;height:38px;font-size:1.3rem;opacity:.6}
 }
 .loading-msg{
   text-align:center;color:var(--muted);padding:60px 20px;font-size:.95rem;
@@ -366,22 +420,39 @@ h1{
   <a href="player.html" class="side-menu-link" id="nav-player-ranking">📝 Coach Rankings</a>
   <a href="draft-board.html" class="side-menu-link" id="nav-draft-board">📋 Draft Board</a>
   <a href="draft-results.html" class="side-menu-link active">🏆 Draft Results</a>
-  <a href="practice-schedule.html" class="side-menu-link">🏟️ Practice Schedule</a>
   <a href="schedules.html" class="side-menu-link">📅 Game Schedules</a>
   <a href="gameboard.html" class="side-menu-link">🎯 Gameboard</a>
   <a href="rotations.html" class="side-menu-link">🔄 Rotations</a>
   <a href="standings.html" class="side-menu-link">📊 Standings</a>
   <a href="playoffs.html" class="side-menu-link">🥇 Playoffs</a>
-  <a href="media-admin.html" class="side-menu-link" id="nav-media-admin">📸 Media Inbox</a>
+  <a href="practice-schedule.html" class="side-menu-link">🏟️ Practice Schedule</a>
+  <a href="media-admin.html" class="side-menu-link hidden" id="nav-media-admin">📸 Media Inbox</a>
 </nav>
 
 <div id="teams-grid" class="teams-grid">
   <!-- populated by the inline script below -->
 </div>
 
-<div id="lightbox">
-  <img id="lightbox-img" src="" alt=""/>
-  <div id="lightbox-name"></div>
+<!-- Player photo lightbox. Clicking a face opens the rest of that player's
+     TEAM one swipe/arrow-key away, wrapping at either end — see
+     openLightbox()/lightboxStep() below, and window.dtBridge for the
+     coach-session/video/phone data this non-module script can't import
+     directly (gotcha #11). -->
+<div id="lightbox" role="dialog" aria-modal="true" aria-label="Player photo">
+  <button id="lightbox-close" aria-label="Close">✕</button>
+  <button id="lightbox-prev" class="lightbox-arrow" aria-label="Previous player">‹</button>
+  <div id="lightbox-frame" class="lightbox-frame">
+    <div id="lightbox-media">
+      <img id="lightbox-img" src="" alt=""/>
+      <button id="lightbox-video-btn" class="lightbox-video-btn hidden" title="Watch tryout video">▶</button>
+    </div>
+    <div id="lightbox-caption">
+      <div id="lightbox-name"></div>
+      <div id="lightbox-sub"></div>
+      <div id="lightbox-phone"></div>
+    </div>
+  </div>
+  <button id="lightbox-next" class="lightbox-arrow" aria-label="Next player">›</button>
 </div>
 
 <script>
@@ -592,21 +663,29 @@ function isCoachLoggedIn() {
  * field written to Firestore, and neither should be corrupted by a
  * display-only truncation.
  */
+// Team rosters, sorted the same way they're displayed (alphabetical) — the
+// lightbox steps through THIS array, by index, so "swipe" and "the grid
+// you're looking at" always agree on order. Built once per team in
+// renderTeam() and kept around (not recomputed from TEAMS on open) so the
+// lightbox's roster always matches what was actually rendered.
+const teamRosters = {}; // team coach name -> sorted roster array
+
 function renderTeam(t) {
   const roster = t.players.slice().sort((a, b) =>
     a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  teamRosters[t.coach] = roster;
   const coachView = isCoachLoggedIn();
 
-  const tiles = roster.map(p => {
+  const tiles = roster.map((p, i) => {
     const displayName = coachView ? p.name : (p.name.split(/\s+/)[0] || p.name);
     const entry = photoIndex[p.id];
     const photoHtml = entry
       ? `<img class="player-photo"
               src="${entry.thumbUrl}"
               alt="${displayName}"
-              onclick="openLightbox('${entry.fullUrl}','${displayName.replace(/'/g, "\\'")}',event)"
+              onclick="openLightbox('${t.coach.replace(/'/g, "\\'")}',${i},event)"
               onerror="this.outerHTML='<div class=\\'player-photo-placeholder\\'>🏀</div>'" />`
-      : `<div class="player-photo-placeholder">🏀</div>`;
+      : `<div class="player-photo-placeholder" onclick="openLightbox('${t.coach.replace(/'/g, "\\'")}',${i},event)">🏀</div>`;
     return `
       <div class="player-tile" data-player-id="${p.id}" data-player-name="${p.name.replace(/"/g, '&quot;')}">
         ${photoHtml}
@@ -647,16 +726,179 @@ async function init() {
   document.dispatchEvent(new CustomEvent('rosterRendered'));
 }
 
-function openLightbox(src, name, e) {
+// ── Player photo lightbox ────────────────────────────────────────────────
+// Clicking a face opens the rest of THAT PLAYER'S TEAM one swipe/arrow-key
+// away, wrapping at either end — same interaction as the Draft Board's own
+// lightbox (draft-board.js's openPlayerPhoto/lightboxStep), reimplemented
+// here since this page can't import that module directly (gotcha #11).
+
+let lbTeamCoach = null; // which team's roster is currently open
+let lbIndex = -1;       // index into teamRosters[lbTeamCoach]
+
+function openLightbox(teamCoach, index, e) {
   e.stopPropagation();
-  document.getElementById('lightbox-img').src = src;
-  document.getElementById('lightbox-name').textContent = name;
+  lbTeamCoach = teamCoach;
+  lbIndex = index;
+  showLightboxSlide();
+}
+
+function showLightboxSlide() {
+  const roster = teamRosters[lbTeamCoach];
+  if (!roster || !roster.length) return;
+  const p = roster[lbIndex];
+  const team = TEAMS.find(t => t.coach === lbTeamCoach);
+  const coachView = isCoachLoggedIn();
+  const displayName = coachView ? p.name : (p.name.split(/\s+/)[0] || p.name);
+
+  stopLightboxVideo();
+
+  const entry = photoIndex[p.id];
+  const img = document.getElementById('lightbox-img');
+  if (entry) {
+    img.src = entry.fullUrl;
+    img.alt = displayName;
+    img.classList.remove('no-photo');
+  } else {
+    img.src = '';
+    img.alt = '';
+    img.classList.add('no-photo');
+  }
+
+  const bridge = window.dtBridge;
+  const videoUrl = bridge ? bridge.videoUrlFor(p.id) : '';
+  const videoBtn = document.getElementById('lightbox-video-btn');
+  videoBtn.classList.toggle('hidden', !videoUrl);
+  videoBtn.dataset.videoUrl = videoUrl;
+
+  document.getElementById('lightbox-name').textContent = displayName;
+  document.getElementById('lightbox-sub').textContent = team ? `${team.coach} — Team ${team.colorName}` : '';
+
+  const phoneEl = document.getElementById('lightbox-phone');
+  const canSeePhone = bridge && bridge.canSeePhone(lbTeamCoach);
+  const phone = canSeePhone ? bridge.contactFor(p.id) : '';
+  if (phone) {
+    phoneEl.innerHTML = `<a href="tel:${phone.replace(/[^0-9]/g, '')}" title="Call ${phone}">${phone}</a>`;
+    phoneEl.classList.remove('hidden');
+  } else {
+    phoneEl.textContent = '';
+  }
+
+  const canStep = roster.length > 1;
+  document.getElementById('lightbox-prev').classList.toggle('hidden', !canStep);
+  document.getElementById('lightbox-next').classList.toggle('hidden', !canStep);
+
   document.getElementById('lightbox').classList.add('open');
 }
-document.getElementById('lightbox').addEventListener('click', () => {
+
+function playLightboxVideo() {
+  const url = document.getElementById('lightbox-video-btn').dataset.videoUrl;
+  if (!url) return;
+  const media = document.getElementById('lightbox-media');
+  media.innerHTML = `<iframe class="lightbox-video" src="${url}" allowfullscreen allow="autoplay"></iframe>`;
+}
+
+function stopLightboxVideo() {
+  const media = document.getElementById('lightbox-media');
+  if (!media || !media.querySelector('iframe')) return;
+  media.innerHTML =
+    `<img id="lightbox-img" src="" alt="" />` +
+    `<button id="lightbox-video-btn" class="lightbox-video-btn hidden" title="Watch tryout video">▶</button>`;
+  wireLightboxVideoBtn();
+}
+
+function wireLightboxVideoBtn() {
+  const btn = document.getElementById('lightbox-video-btn');
+  btn.addEventListener('pointerdown', e => e.stopPropagation());
+  btn.addEventListener('click', e => { e.stopPropagation(); playLightboxVideo(); });
+}
+
+function lightboxStep(dir) {
+  const roster = teamRosters[lbTeamCoach];
+  if (!roster || roster.length < 2) return;
+  lbIndex = (lbIndex + dir + roster.length) % roster.length;
+  showLightboxSlide();
+}
+
+function closeLightbox() {
   document.getElementById('lightbox').classList.remove('open');
+  stopLightboxVideo();
   document.getElementById('lightbox-img').src = '';
+  lbTeamCoach = null;
+  lbIndex = -1;
+}
+
+// A video index that finishes loading AFTER a player is already open should
+// still surface that player's video button without the visitor having to
+// close and reopen — see the videoIndexReady dispatch in the module bridge
+// script at the bottom of this file.
+document.addEventListener('videoIndexReady', () => {
+  if (lbTeamCoach !== null) showLightboxSlide();
 });
+
+document.getElementById('lightbox').addEventListener('click', e => {
+  if (e.target === document.getElementById('lightbox')) closeLightbox();
+});
+document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+document.getElementById('lightbox-prev').addEventListener('click', () => lightboxStep(-1));
+document.getElementById('lightbox-next').addEventListener('click', () => lightboxStep(1));
+wireLightboxVideoBtn();
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('lightbox').classList.contains('open')) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') lightboxStep(-1);
+  if (e.key === 'ArrowRight') lightboxStep(1);
+});
+
+/**
+ * Swipe left/right on the lightbox to step through the team roster, same as
+ * the arrow keys. The frame follows the finger while dragging, then either
+ * completes the step (past a distance threshold or a fast flick) or springs
+ * back — mirrors draft-board.js's wireLightboxSwipe() exactly (Pointer
+ * Events, not native HTML5 DnD, which doesn't track touch reliably).
+ */
+function wireLightboxSwipe() {
+  const frame = document.getElementById('lightbox-frame');
+  let startX = 0, startT = 0, dx = 0, dragging = false;
+
+  frame.addEventListener('pointerdown', e => {
+    const roster = teamRosters[lbTeamCoach];
+    if (!roster || roster.length < 2) return;
+    if (document.getElementById('lightbox-media').querySelector('iframe')) return;
+    dragging = true;
+    startX = e.clientX;
+    startT = Date.now();
+    frame.classList.remove('sliding');
+    frame.setPointerCapture(e.pointerId);
+  });
+  frame.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    dx = e.clientX - startX;
+    frame.style.transform = `translateX(${dx}px)`;
+  });
+  function release() {
+    if (!dragging) return;
+    dragging = false;
+    const elapsed = Date.now() - startT;
+    const fast = elapsed < 300 && Math.abs(dx) > 40;
+    const far = Math.abs(dx) > frame.getBoundingClientRect().width * 0.22;
+    frame.classList.add('sliding');
+    if (dx < 0 && (fast || far)) {
+      frame.style.transform = 'translateX(-40px)';
+      frame.style.opacity = '0';
+      setTimeout(() => { lightboxStep(1); frame.style.transform = ''; frame.style.opacity = '1'; }, 140);
+    } else if (dx > 0 && (fast || far)) {
+      frame.style.transform = 'translateX(40px)';
+      frame.style.opacity = '0';
+      setTimeout(() => { lightboxStep(-1); frame.style.transform = ''; frame.style.opacity = '1'; }, 140);
+    } else {
+      frame.style.transform = '';
+    }
+    dx = 0;
+  }
+  frame.addEventListener('pointerup', release);
+  frame.addEventListener('pointercancel', release);
+}
+wireLightboxSwipe();
 
 init();
 
@@ -926,6 +1168,64 @@ init();
   }
   document.addEventListener('rosterRendered', wireAll);
   wireAll();
+</script>
+<!-- Lightbox data bridge. The main script above is a plain (non-module)
+     script (gotcha #11) and can't import getCurrentCoach/contactFor/team
+     helpers itself, so this module fetches what the swipeable lightbox
+     needs (tryout video index, coach session, phone numbers) and hands it
+     across via window.dtBridge — same cross-boundary pattern as the media-
+     submit wiring above, just data instead of a function call. -->
+<script type="module">
+  import { getCurrentCoach } from './coach-login.js';
+  import { TEAM_ADMINS } from './coaches-config.js';
+  import { contactFor } from './player-contacts.js';
+
+  const VIDEOS_FOLDER_ID = '1oTuWp5fC5lVM7csgPt0lPr2_wEPuF2UM'; // Fall 2026 (26.3), see season-config.js
+  const videoIndex = {}; // player id -> Drive file id
+
+  async function buildVideoIndex() {
+    const cached = sessionStorage.getItem('driveVideos_26.3');
+    if (cached) { Object.assign(videoIndex, JSON.parse(cached)); return; }
+    try {
+      const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${VIDEOS_FOLDER_ID}' in parents`)}&fields=files(id,name)&key=AIzaSyAoIlK4ncTUeJjPeOYJLXuj2GoWnMge3X8`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+      (data.files || []).forEach(({ id, name }) => {
+        videoIndex[name.replace(/\.[^/.]+$/, '').trim()] = id;
+      });
+      sessionStorage.setItem('driveVideos_26.3', JSON.stringify(videoIndex));
+    } catch { /* no video badge is a fine fallback, never block the page on this */ }
+    // Tells the non-module lightbox a video index now exists, so it can
+    // re-render the CURRENTLY OPEN slide's video button if one just became
+    // available mid-view (same race buildPhotoIndex's own comment above
+    // describes — a cold vs. warm sessionStorage cache finishes at very
+    // different times relative to when a user might already have a player
+    // open).
+    document.dispatchEvent(new CustomEvent('videoIndexReady'));
+  }
+  buildVideoIndex();
+
+  window.dtBridge = {
+    videoIndex,
+    videoUrlFor(id) {
+      const fileId = videoIndex[id];
+      return fileId ? `https://drive.google.com/file/d/${fileId}/preview` : '';
+    },
+    getCurrentCoach,
+    // Whether the CURRENTLY logged-in coach owns the given team's roster —
+    // matches by coach display name (both "TEAMS[].coach" and a session's
+    // own name are already "Coach X" strings, no round-trip through
+    // teamNameFor's "Team X" shape needed) or is a TEAM_ADMIN, who can see
+    // every team's contact info per the rest of the app's convention.
+    canSeePhone(teamCoachName) {
+      const coach = getCurrentCoach();
+      if (!coach) return false;
+      if (TEAM_ADMINS.includes(coach.name)) return true;
+      return coach.name === teamCoachName;
+    },
+    contactFor: id => contactFor('26.3', id),
+  };
 </script>
 </body>
 </html>
