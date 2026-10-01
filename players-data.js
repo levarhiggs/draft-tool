@@ -183,8 +183,18 @@ export async function buildIconIndex() {
   sessionStorage.setItem(CK_ICONS, JSON.stringify(iconIndex));
 }
 
+// A team color new to a season with no icon file of its own yet (the icons
+// folder is still 26.2's — see ICONS_FOLDER_ID's season-config.js comment)
+// can borrow a close-enough existing icon by name. Fall 2026's "Burnt
+// Orange" has no Drive file; Summer 2026's "Deep Orange" is close enough
+// visually (both orange) and the user asked for it directly — 2026-10-01.
+// Add more pairs here if another new color shows up with no icon of its own.
+const ICON_NAME_ALIASES = {
+  'Burnt Orange': 'Deep Orange',
+};
+
 export function iconUrl(colorName) {
-  const fileId = iconIndex[colorName];
+  const fileId = iconIndex[colorName] || iconIndex[ICON_NAME_ALIASES[colorName]];
   return fileId ? driveFileUrl(fileId, 'img') : null;
 }
 
