@@ -191,6 +191,50 @@ export function teamNameFor(personId) {
   return `Team ${suffix}`;
 }
 
+/**
+ * Resolve ONE jersey number out of a player's jerseyNumbers map (keyed by
+ * coach display name — see the file-header comment on how Firestore keys
+ * this), per the hierarchy the user asked for (2026-10-04): the coach who
+ * currently owns the player's team outranks everyone, since they're the one
+ * actually outfitting that kid; a league admin's entry is next most
+ * trustworthy; any other coach's entry is better than nothing; and null
+ * means "don't change how this player is displayed" (ID still shows), not
+ * "show no jersey" as if 0 were a real number.
+ *
+ * `team` is the player's own `team` field (e.g. "Team Craig"), matched
+ * against a jerseyNumbers key by the same suffix-strip convention used
+ * everywhere else in this app (schedule.js's suffixOf, app.js's
+ * myPlayerPhone) — there is no stored team->coach-name mapping to look up
+ * directly.
+ */
+export function resolvedJerseyNumber(team, jerseyNumbers) {
+  if (!jerseyNumbers) return null;
+  const entries = Object.entries(jerseyNumbers).filter(([, n]) => n != null);
+  if (!entries.length) return null;
+
+  const teamSuffix = (team || '').replace(/^Team\s+/, '');
+  const coachSuffix = name => name.replace(/^(Coach|Director)\s+/, '');
+
+  const own = entries.find(([name]) => coachSuffix(name) === teamSuffix);
+  if (own) return own[1];
+
+  const admin = entries.find(([name]) => TEAM_ADMINS.includes(name));
+  if (admin) return admin[1];
+
+  return entries[0][1];
+}
+
+/**
+ * "Name #N" (or just "Name" with no trailing space if no jersey is
+ * resolved) — the single shared formatter so every page that shows a
+ * player's name renders the jersey suffix identically. Never touches the
+ * player ID; callers decide whether/where to still show that.
+ */
+export function nameWithJersey(name, team, jerseyNumbers) {
+  const num = resolvedJerseyNumber(team, jerseyNumbers);
+  return num == null ? name : `${name} #${num}`;
+}
+
 // ── Team color, as it appears in the season schedule sheet (V/H columns
 // identify teams by color name, not coach/team name — this is the link
 // between the two). Also used for color chips/badges in the UI.

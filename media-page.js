@@ -13,6 +13,7 @@ import { loadPromotions } from './media-promotions.js';
 import { renderGallery } from './media-gallery.js';
 import { attachMediaSubmit, openMediaSheet } from './media-submit.js';
 import { createMessage } from './media-data.js';
+import { getCurrentCoach } from './coach-login.js';
 
 function playerIdFromUrl() {
   return new URLSearchParams(location.search).get('id') || '';
@@ -65,9 +66,20 @@ async function init() {
     return;
   }
 
-  const name  = p[COL.NAME] || 'Unknown';
+  const fullName = p[COL.NAME] || 'Unknown';
+  // Same privacy scoping as directory.html/draft-results.html ahead of
+  // opening media uploads to parents: a logged-out visitor sees only the
+  // first name and no Grade/Age, and the ID is never shown (2026-10-04 —
+  // jersey # was considered here too but the user asked to skip it in every
+  // media file, not just the admin inbox).
+  const isLoggedIn = !!getCurrentCoach();
+  const name = isLoggedIn ? fullName : (fullName.split(/\s+/)[0] || fullName);
   const photo = photoUrl(p);
   document.title = `${name} — Player Media`;
+
+  const subHtml = isLoggedIn
+    ? `<div class="media-page-sub">Grade ${escHtml(p[COL.GRADE] || '—')} · Age ${escHtml(ageDisplay(p[COL.AGE]))}</div>`
+    : '';
 
   headEl.innerHTML = `
     <a class="media-page-back" href="directory.html">← Back to Player Directory</a>
@@ -76,8 +88,8 @@ async function init() {
         ? `<img class="media-page-ava" id="media-page-ava" src="${photo}" alt="${escHtml(name)}" />`
         : `<div class="media-page-ava" id="media-page-ava">🏀</div>`}
       <div class="media-page-meta">
-        <h2 class="media-page-name"><span class="pid">${escHtml(String(p[COL.ID]))}</span> ${escHtml(name)}</h2>
-        <div class="media-page-sub">Grade ${escHtml(p[COL.GRADE] || '—')} · Age ${escHtml(ageDisplay(p[COL.AGE]))}</div>
+        <h2 class="media-page-name">${escHtml(name)}</h2>
+        ${subHtml}
         <div class="media-page-actions">
           <button class="btn btn-primary" id="media-page-add">＋ Add a photo or clip</button>
           <button class="btn" id="media-page-share">🔗 Share</button>
@@ -93,17 +105,21 @@ async function init() {
   // page someone may have reached from a shared link with no idea the
   // gesture exists.
   const ava = document.getElementById('media-page-ava');
-  const player = { id: p[COL.ID], name };
+  // The REAL full name, not the display-scoped one — this feeds Firestore
+  // submission records and the admin-facing contact message, neither of
+  // which should ever be corrupted by a logged-out visitor's truncated
+  // display name (same class of bug fixed in draft-results.html, 2026-10-01).
+  const player = { id: p[COL.ID], name: fullName };
   // Long-press on the header photo, same as everywhere else on touch.
   if (ava) attachMediaSubmit(ava, player);
   document.getElementById('media-page-add')
     ?.addEventListener('click', () => openMediaSheet(player));
 
   wireShare(name);
-  wireContact(p, name);
+  wireContact(p, fullName);
 
   await renderGallery(galEl, id, {
-    playerName: name,
+    playerName: fullName,
     // The player's own headshot leads the gallery as photo 1 of N — same
     // full-size (w1200) treatment as draft-board.js's own lightbox.
     headshotPhoto: biggerPhotoUrl(p, 1200),
@@ -112,7 +128,7 @@ async function init() {
     tryoutVideo: videoUrl(p),
     // Roster record, so the gallery can decide whether this viewer may remove
     // anything: admins always, a coach only for their own players.
-    player: { ...p, name, _teamFB: p._teamFB || p[COL.TEAM] || '' },
+    player: { ...p, name: fullName, _teamFB: p._teamFB || p[COL.TEAM] || '' },
   });
 }
 

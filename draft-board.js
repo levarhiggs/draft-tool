@@ -17,6 +17,7 @@ import { getCurrentCoach } from './coach-login.js';
 import { contactFor } from './player-contacts.js';
 import {
   getActiveCoaches, personByName, teamNameFor, TEAM_ADMINS, teamColorsFor,
+  resolvedJerseyNumber,
 } from './coaches-config.js';
 import {
   subscribePlayer, saveRanking, deleteRanking, saveFavorites, getFavorites,
@@ -141,6 +142,17 @@ function pinCard(id, tier) {
 function compositeOf(id) {
   const d = live[id];
   return d && d.composite != null ? d.composite : null;
+}
+/**
+ * Resolved jersey # for a drafted player (or null), hierarchy-resolved
+ * against the TEAM this slot belongs to (not the player's own pre-draft
+ * roster team, which the sheet doesn't even carry anymore post-draft) — see
+ * resolvedJerseyNumber in coaches-config.js. `coachPersonId` is the coach
+ * column this slot sits in.
+ */
+function jerseyOf(id, coachPersonId) {
+  const team = coachPersonId ? teamNameFor(coachPersonId) : '';
+  return resolvedJerseyNumber(team, live[id]?.jerseyNumbers);
 }
 /** The commissioner's own seed, used as a display override while live. */
 function adminSeedOf(id) {
@@ -510,12 +522,19 @@ function renderBoard(np) {
         // first name to fit.
         const fullName = p ? p[COL.NAME] : '?';
         const firstName = p ? p[COL.NAME].split(' ')[0] : '?';
+        // Jersey # replaces the id badge once resolved (team owner > admin >
+        // any other coach — see jerseyOf above); unresolved leaves the id
+        // showing exactly as before (2026-10-04).
+        const jersey = jerseyOf(pid, c.personId);
+        const idBadge = jersey == null
+          ? `<span class="pid">${escHtml(pid)}</span>`
+          : `<span class="pid pid-jersey">#${escHtml(String(jersey))}</span>`;
         slot.innerHTML = photoMode
           ? avatarHTML(p, 'slot-ava-tall') +
-            `<span class="tall-meta"><span class="pid">${escHtml(pid)}</span>` +
+            `<span class="tall-meta">${idBadge}` +
             `<span class="pname">${escHtml(fullName)}</span></span>` +
             `<span class="picknum">${pickNumber(ci, s)}</span>`
-          : `<span class="pid">${escHtml(pid)}</span>` +
+          : `${idBadge}` +
             `<span class="pname">${escHtml(firstName)}</span>` +
             `<span class="picknum">${pickNumber(ci, s)}</span>`;
         slot.title = canEdit()
@@ -721,11 +740,20 @@ function poolCard(p, placed) {
           `<span class="comp-val">${comp != null ? comp.toFixed(1) : '—'}</span>` +
         `</div>`;
 
+  // Pool cards have no drafted team yet, so the hierarchy's top tier (team
+  // owner) can never apply here — falls straight to admin > any other coach,
+  // same resolvedJerseyNumber() call as everywhere else, just with an empty
+  // team (2026-10-04).
+  const poolJersey = resolvedJerseyNumber('', live[id]?.jerseyNumbers);
+  const idBadge = poolJersey == null
+    ? `<span class="pid">${escHtml(id)}</span>`
+    : `<span class="pid pid-jersey">#${escHtml(String(poolJersey))}</span>`;
+
   card.innerHTML =
     (poolPhotos ? avatarHTML(p, 'card-ava-tall') : '') +
     `<button class="fav-btn" data-fav aria-pressed="${fav}"
              aria-label="${fav ? 'Unfavorite' : 'Favorite'} ${escHtml(p[COL.NAME])}">♥</button>` +
-    `<div class="prow"><span class="pid">${escHtml(id)}</span>` +
+    `<div class="prow">${idBadge}` +
     `<span class="pname">${escHtml(p[COL.NAME])}</span></div>` +
     metaHtml;
 
@@ -822,8 +850,6 @@ function showLightboxSlide(personId) {
 
   const rowCoach = coachRows.find(c => c.personId === personId);
   const coachName = rowCoach?.name || '';
-
-  el('db-lightbox-name').textContent = p ? p[COL.NAME] : `#${playerId}`;
   // Team color, from THIS season's own map (teamColorsFor(SEASON_CODE)) —
   // never the flat TEAM_COLORS export, which resolves to SCHEDULE_SEASON
   // (26.2) and would show Sedat/Humberto their now-wrong Summer colors on
@@ -832,6 +858,9 @@ function showLightboxSlide(personId) {
   // suppressed rather than show nothing useful; "Team {Name}" alone would
   // just repeat the caption's own name, so that part stays as coachName.
   const teamName = rowCoach ? teamNameFor(rowCoach.personId) || coachName : coachName;
+  const jerseyNum = resolvedJerseyNumber(teamName, live[playerId]?.jerseyNumbers);
+  const baseName = p ? p[COL.NAME] : `#${playerId}`;
+  el('db-lightbox-name').textContent = jerseyNum == null ? baseName : `${baseName} #${jerseyNum}`;
   const colorInfo = teamColorsFor(SEASON_CODE)[teamName];
   el('db-lightbox-sub').textContent = colorInfo ? `${coachName} — ${colorInfo.name}` : coachName;
 

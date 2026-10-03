@@ -712,7 +712,7 @@ function renderTeam(t) {
     return `
       <div class="player-tile" data-player-id="${p.id}" data-player-name="${p.name.replace(/"/g, '&quot;')}">
         ${photoHtml}
-        <div class="player-name">${displayName}</div>
+        <div class="player-name" data-jersey-base="${escHtml(displayName)}" data-jersey-team="${escHtml(t.coach)}">${displayName}</div>
       </div>`;
   }).join('');
 
@@ -813,7 +813,8 @@ function showLightboxSlide() {
   videoBtn.classList.toggle('hidden', !videoUrl);
   videoBtn.dataset.videoUrl = videoUrl;
 
-  document.getElementById('lightbox-name').textContent = displayName;
+  const jerseyNum = bridge && bridge.jerseyReady() ? bridge.jerseyFor(p.id, lbTeamCoach) : null;
+  document.getElementById('lightbox-name').textContent = jerseyNum == null ? displayName : `${displayName} #${jerseyNum}`;
   document.getElementById('lightbox-sub').textContent = team ? `${team.coach} — Team ${team.colorName}` : '';
 
   const phoneEl = document.getElementById('lightbox-phone');
@@ -877,6 +878,29 @@ function closeLightbox() {
 document.addEventListener('videoIndexReady', () => {
   if (lbTeamCoach !== null) showLightboxSlide();
 });
+
+// Jersey # arrives asynchronously (the module bridge's bulk Firestore fetch
+// at the bottom of this file) well after the grid's first paint, so every
+// tile's name patches in its "#N" suffix once that index is ready — a
+// targeted text-content patch, not a full re-render, so scroll position and
+// any open lightbox state survive. "Name #N" replaces the plain name; the
+// page never showed a player ID to begin with (gotcha: this is the one page
+// in the app where there was nothing to hide in the first place).
+function applyJerseyNumbers() {
+  const bridge = window.dtBridge;
+  if (!bridge || !bridge.jerseyReady()) return;
+  document.querySelectorAll('.player-name[data-jersey-base]').forEach(el => {
+    const base = el.dataset.jerseyBase;
+    const team = el.dataset.jerseyTeam;
+    const tile = el.closest('.player-tile');
+    const num = bridge.jerseyFor(tile?.dataset.playerId, team);
+    el.textContent = num == null ? base : `${base} #${num}`;
+  });
+  // Also refresh the lightbox caption if one is already open when this
+  // index finishes loading — same pattern as videoIndexReady above.
+  if (lbTeamCoach !== null) showLightboxSlide();
+}
+document.addEventListener('jerseyIndexReady', applyJerseyNumbers);
 
 document.getElementById('lightbox').addEventListener('click', e => {
   if (e.target === document.getElementById('lightbox')) closeLightbox();
@@ -1220,8 +1244,9 @@ init();
      submit wiring above, just data instead of a function call. -->
 <script type="module">
   import { getCurrentCoach } from './coach-login.js';
-  import { TEAM_ADMINS } from './coaches-config.js';
+  import { TEAM_ADMINS, resolvedJerseyNumber } from './coaches-config.js';
   import { contactFor } from './player-contacts.js';
+  import { getCompositeRank } from './firebase.js';
 
   const VIDEOS_FOLDER_ID = '1oTuWp5fC5lVM7csgPt0lPr2_wEPuF2UM'; // Fall 2026 (26.3), see season-config.js
   const videoIndex = {}; // player id -> Drive file id
@@ -1249,6 +1274,38 @@ init();
   }
   buildVideoIndex();
 
+  // Jersey # bulk fetch — one-time pass over every rendered player's
+  // Firestore doc, same "might go slightly stale until reload" tradeoff
+  // this page's own buildPhotoIndex()/buildVideoIndex() already accept, and
+  // the same one Media Inbox's tryoutById/headshotById use (per the user,
+  // 2026-10-04: a live per-item subscription wasn't worth it here either).
+  // Runs off the already-rendered tiles' data-player-id, same source
+  // wireAll() above reads, so it only ever fetches real players.
+  const jerseyIndex = {}; // player id -> jerseyNumbers map
+  let jerseyReady = false;
+
+  async function buildJerseyIndex() {
+    const ids = [...document.querySelectorAll('.player-tile[data-player-id]')]
+      .map(t => t.dataset.playerId);
+    if (!ids.length) return;
+    await Promise.all(ids.map(async id => {
+      try {
+        const data = await getCompositeRank(id);
+        jerseyIndex[id] = data.jerseyNumbers || {};
+      } catch { jerseyIndex[id] = {}; }
+    }));
+    jerseyReady = true;
+    // Same re-render-the-open-slide signal as videoIndexReady above, so a
+    // lightbox already open when this finishes picks up the jersey # too.
+    document.dispatchEvent(new CustomEvent('jerseyIndexReady'));
+  }
+  // Must wait for the roster tiles to exist before reading their ids — same
+  // cold-vs-warm-cache race the media-submit wiring above documents, so this
+  // runs once immediately (covers a warm photo-index cache finishing
+  // instantly) and again on rosterRendered (covers a cold one).
+  document.addEventListener('rosterRendered', buildJerseyIndex);
+  buildJerseyIndex();
+
   window.dtBridge = {
     videoIndex,
     videoUrlFor(id) {
@@ -1268,6 +1325,10 @@ init();
       return coach.name === teamCoachName;
     },
     contactFor: id => contactFor('26.3', id),
+    jerseyReady: () => jerseyReady,
+    // team owner > admin > any other coach — same hierarchy/helper every
+    // other page uses (coaches-config.js).
+    jerseyFor: (id, teamCoachName) => resolvedJerseyNumber(teamCoachName, jerseyIndex[id]),
   };
 </script>
 </body>

@@ -11,7 +11,7 @@ import {
 import { priorSeasons } from './player-identity.js';
 import { getSeason } from './season-config.js';
 import { contactFor } from './player-contacts.js';
-import { personByName, teamNameFor, TEAM_ADMINS, teamColorsFor } from './coaches-config.js';
+import { personByName, teamNameFor, TEAM_ADMINS, teamColorsFor, nameWithJersey } from './coaches-config.js';
 import {
   activeFilters, favorites, currentSort, toggleFavorite as toggleFavoriteShared,
   loadFavorites, applySort, applyFilters, renderResultCount,
@@ -118,6 +118,7 @@ async function enrichWithFirebase(players) {
     p._rankings  = data.rankings;
     p._teamFB    = data.team   || '';
     p._noShow    = data.noShow || false;
+    p._jerseyNumbers = data.jerseyNumbers || {};
 
     // Prior-season composite for returning players. Ids are season-scoped, so
     // this has to go through the identity link to find last season's id.
@@ -259,6 +260,12 @@ function playerCardHTML(p, isLoggedIn) {
   const photo     = photoUrl(p);
   const team      = p._teamFB || p[COL.TEAM] || '';
   const composite = p._composite ?? null;
+  // Jersey # suffix replaces the ID prefix wherever a number is resolved
+  // (see nameWithJersey/resolvedJerseyNumber in coaches-config.js for the
+  // team-owner > admin > any-other-coach hierarchy) — "Levar Higgs #1", or
+  // "Levar #1" when logged out, per the user's spec (2026-10-04). No jersey
+  // resolved means no change: the ID still shows, same as before.
+  const displayName = nameWithJersey(name, team, p._jerseyNumbers);
   const isFav     = favorites.has(String(id));
 
   // Composite seed is ADMIN-ONLY for now.
@@ -346,10 +353,16 @@ function playerCardHTML(p, isLoggedIn) {
     ? `<div class="player-card-meta">Grade ${escHtml(grade)} · Age ${escHtml(age)}</div>`
     : '';
 
+  // Hide the ID only once a jersey # actually replaces it — a player with
+  // no resolved jersey keeps showing "ID - Name" exactly as before.
+  const nameHtml = displayName === name
+    ? `<span class="pc-id">${escHtml(id)}</span><span class="pc-sep"> · </span>${escHtml(name)}`
+    : escHtml(displayName);
+
   const cardInner = `
     <span class="player-card-thumb">${imgHtml}${videoBadge}</span>
     <div class="player-card-info">
-      <div class="player-card-name"><span class="pc-id">${escHtml(id)}</span><span class="pc-sep"> · </span>${escHtml(name)}</div>
+      <div class="player-card-name">${nameHtml}</div>
       ${metaHtml}
       ${phoneHtml}
       ${priorHtml}

@@ -14,7 +14,7 @@ import { priorSeasons } from './player-identity.js';
 import { getSeason } from './season-config.js';
 import { subscribePlayer, getPriorPlayerData, saveRanking, deleteRanking, saveNote, deleteNote, decodeRanking } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
-import { personByName, teamNameFor } from './coaches-config.js';
+import { personByName, teamNameFor, nameWithJersey } from './coaches-config.js';
 import { contactFor } from './player-contacts.js';
 import { attachMediaSubmit, openMediaSheet } from './media-submit.js';
 import { loadPromotions } from './media-promotions.js';
@@ -141,6 +141,7 @@ function subscribeAll() {
       const teamChanged = p._teamFB !== (data.team || '');
       p._composite = data.composite;
       p._teamFB    = data.team || '';
+      p._jerseyNumbers = data.jerseyNumbers || {};
       if (teamChanged) scheduleTeamChipsRebuild();
       renderRowLive(id);
     });
@@ -190,6 +191,14 @@ function renderList() {
 function rowHTML(p, isLoggedIn) {
   const id    = String(p[COL.ID]);
   const name  = p[COL.NAME] || 'Unknown';
+  const team  = p._teamFB || p[COL.TEAM] || '';
+  // "Name #N" once a jersey resolves (team owner > admin > any other coach —
+  // see nameWithJersey in coaches-config.js), ID hidden only then; otherwise
+  // unchanged "ID Name" (2026-10-04).
+  const displayName = nameWithJersey(name, team, p._jerseyNumbers);
+  const nameHtml = displayName === name
+    ? `${escHtml(id)} ${escHtml(name)}`
+    : escHtml(displayName);
   const photo = photoUrl(p);
   const video = videoUrl(p);
   const isFav = favorites.has(id);
@@ -217,7 +226,7 @@ function rowHTML(p, isLoggedIn) {
 
       <div class="rank-row-main">
         <div class="rank-row-headline">
-          <div class="rank-row-name">${escHtml(id)} ${escHtml(name)}</div>
+          <div class="rank-row-name">${nameHtml}</div>
         </div>
 
         <div class="rank-row-mechanism" data-role="mechanism">${rankingHtml}</div>
@@ -403,6 +412,19 @@ function renderRowLive(id) {
 
   const compositeVal = row.querySelector('[data-role="composite-value"]');
   if (compositeVal) compositeVal.textContent = data.composite !== null ? data.composite.toFixed(1) : '—';
+
+  // Jersey # can arrive/change on this same live subscription — keep the
+  // row header in sync without a full re-render.
+  const nameEl = row.querySelector('.rank-row-name');
+  if (nameEl) {
+    const p = allPlayers.find(pl => String(pl[COL.ID]) === id);
+    if (p) {
+      const name = p[COL.NAME] || 'Unknown';
+      const team = p._teamFB || p[COL.TEAM] || '';
+      const displayName = nameWithJersey(name, team, p._jerseyNumbers);
+      nameEl.textContent = displayName === name ? `${id} ${name}` : displayName;
+    }
+  }
 
   // Re-render just this row's ranking mechanism so a coach's own saved
   // selection stays reflected, without touching the note textarea
