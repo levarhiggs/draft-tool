@@ -791,6 +791,51 @@ export async function deleteRotationConfig(coachName, configId) {
   await deleteDoc(ref);
 }
 
+// ── Build Defense: per-game saved defenses (admin-only, added 2026-10-04) ────
+// Same rotationConfigs/{coachName}/configs collection, so no new Firestore
+// rule is needed (gotcha #3). These docs carry `defenseTeam` + `defenseTag`
+// and deliberately NO `team` / `gameTag` field: every existing reader above
+// (getRotationConfigs, getGameConfig, getGameConfigsForTeam) filters on
+// `team`, so defense docs never show up in the Saved Rotations gallery, the
+// Apply to Gameboard picker, or Gameboard's per-game config load — and
+// Apply to Gameboard's full-overwrite setDoc can never clobber a defense.
+//
+// Shape: {
+//   kind: 'defense',
+//   defenseTeam: string,
+//   defenseTag: { team, opponentTeam, gameNum },   // gameNum = sheet Game #
+//   title: string,
+//   quarters: [{ scheme: '2-3' | '1-3-1' | '3-2', spots: { spotId: playerId } } × 4],
+//   rotation: { order, pattern, presentIds },      // the grid it was built from
+//   createdAt: timestamp,
+// }
+// One doc per coach+team+gameNum: saving again overwrites, same as
+// saveGameConfig.
+
+export async function getDefenseConfigsForTeam(coachName, team) {
+  try {
+    const q = query(rotationConfigsRef(coachName), where('defenseTeam', '==', team));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error('getDefenseConfigsForTeam error:', err);
+    return [];
+  }
+}
+
+export async function saveDefenseConfig(coachName, team, gameNum, config) {
+  const existing = (await getDefenseConfigsForTeam(coachName, team))
+    .find(c => String(c.defenseTag?.gameNum) === String(gameNum));
+  const payload = { ...config, createdAt: serverTimestamp() };
+  if (existing) {
+    const ref = doc(db, 'rotationConfigs', sid(coachName), 'configs', existing.id);
+    await setDoc(ref, payload); // full overwrite — old placements shouldn't linger
+    return existing.id;
+  }
+  const ref = await addDoc(rotationConfigsRef(coachName), payload);
+  return ref.id;
+}
+
 // ── Practice Schedule (weekly coaching court-slot grid) ─────────────────────
 // Deliberately NOT season-scoped (no sid()) — this is the recurring weekly
 // practice-slot assignment, not season-specific roster/ranking data. It

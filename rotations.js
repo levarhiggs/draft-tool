@@ -12,6 +12,7 @@ import {
   computePlayerStatus, computeQuarterStatus, computeGameStatus,
   countPresent, expectedOnCourt, generateSuggestions, totalQuartersPlayed,
 } from './rotations-engine.js';
+import { openBuildDefense, canBuildDefense } from './defense.js';
 
 // ── State ──────────────────────────────────────────────────────────────────────
 // state shape:
@@ -54,6 +55,7 @@ async function init() {
   wireExport();
   wireSavedConfigMenu();
   wireApplyGameboardModal();
+  wireBuildDefense();
   wirePopoverDismiss();
 
   // Deep link support: rotations.html?team=Team+Name (used by Gameboard's
@@ -74,7 +76,10 @@ async function init() {
   }
 
   // Logging in/out changes whose saved configs (if any) should be visible.
-  document.addEventListener('coachChanged', () => { refreshSavedConfigsGallery(); });
+  document.addEventListener('coachChanged', () => {
+    refreshSavedConfigsGallery();
+    syncBuildDefenseButton();
+  });
 }
 
 function populateTeamSelect() {
@@ -146,6 +151,7 @@ async function loadTeam(team) {
       const data = await getCompositeRank(p[COL.ID]);
       p._composite = data.composite;
       p._teamFB    = data.team || '';
+      p._jerseyByCoach = data.jerseyNumbers || {}; // Build Defense's Auto Insert order
     }
   }));
 
@@ -867,6 +873,52 @@ async function applyToGames(games) {
     const params = new URLSearchParams({ team: currentTeam, game: String(firstGame.sheetGameNum) });
     window.location.href = `gameboard.html?${params.toString()}`;
   }
+}
+
+// ── Build Defense (admin-only hidden feature — see defense.js) ────────────────
+// The button exists for everyone in the markup but stays hidden unless the
+// logged-in coach is in TEAM_ADMINS; openBuildDefense() re-checks too.
+
+function syncBuildDefenseButton() {
+  document.getElementById('btn-build-defense').classList.toggle('hidden', !canBuildDefense());
+}
+
+function wireBuildDefense() {
+  syncBuildDefenseButton();
+  document.getElementById('btn-build-defense').addEventListener('click', () => {
+    if (!currentTeam) return;
+    openBuildDefense({
+      team: currentTeam,
+      teamLabel: teamHeaderLabel(currentTeam),
+      order: [...order],
+      pattern: new Map([...pattern.entries()].map(([id, p]) => [id, [...p]])),
+      absent: new Set(absent),
+      playersById,
+      loadGames: listTeamGamesForPicker,
+    });
+  });
+}
+
+// This team's games for a game picker, in schedule order. Same matching and
+// labels as openApplyGameboardModal: sheetGameNum (the sheet's absolute
+// Game #) is the storage key, displayNum is only the human-facing "Game N".
+async function listTeamGamesForPicker() {
+  const games = await ensureScheduleLoaded();
+  const ownColorName = teamColorName(currentTeam);
+  if (!ownColorName) return [];
+  return games
+    .filter(g => g[SCHED_COL.V] === ownColorName || g[SCHED_COL.H] === ownColorName)
+    .map((game, i) => {
+      const oppColorName = opponentColorForGame(game, ownColorName);
+      const oppTeam = teamNameForColorName(oppColorName);
+      const oppLabel = oppTeam ? teamColorDisplayName(oppTeam) : oppColorName;
+      return {
+        sheetGameNum: game[SCHED_COL.GAME],
+        displayNum: i + 1,
+        opponentTeam: oppTeam || null,
+        label: `Game ${i + 1} — vs. ${(oppLabel || '?').toUpperCase()}`,
+      };
+    });
 }
 
 function applySavedConfigToGrid(configId) {

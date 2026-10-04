@@ -1,4 +1,4 @@
-const CACHE = 'csbc-draft-v84';
+const CACHE = 'csbc-draft-v85';
 const SHELL = [
   '/draft-tool/',
   '/draft-tool/index.html',
@@ -20,6 +20,7 @@ const SHELL = [
   '/draft-tool/player-list-controls.js',
   '/draft-tool/rotations.js',
   '/draft-tool/rotations-engine.js',
+  '/draft-tool/defense.js',
   '/draft-tool/primer.html',
   '/draft-tool/primer.js',
   '/draft-tool/assets/primer-top.png',
