@@ -1,4 +1,4 @@
-const CACHE = 'csbc-draft-v83';
+const CACHE = 'csbc-draft-v84';
 const SHELL = [
   '/draft-tool/',
   '/draft-tool/index.html',
@@ -50,6 +50,7 @@ const SHELL = [
   '/draft-tool/coaches-config.js',
   '/draft-tool/firebase.js',
   '/draft-tool/firebase-config.js',
+  '/draft-tool/jersey-picker.js',
   '/draft-tool/style.css',
   '/draft-tool/manifest.json',
   '/draft-tool/icon-192.png',
