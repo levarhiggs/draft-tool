@@ -1,6 +1,7 @@
 // firebase.js — read/write rankings, notes, team assignments, favorites
 import { db } from './firebase-config.js';
 import { resolveSeason, isReadOnly, scheduleSeason } from './season-config.js';
+import { canEditJerseyNumber } from './coaches-config.js';
 import {
   doc, getDoc, setDoc, updateDoc, onSnapshot, deleteField, serverTimestamp, arrayUnion,
   collection, getDocs, query, where, addDoc, deleteDoc, increment,
@@ -218,22 +219,64 @@ export async function deleteRanking(playerId, coachName) {
   });
 }
 
-// Jersey # is set once per player, per coach, and rarely changes mid-season
-// (players are required to have one to play; different coaches don't
-// necessarily know each other's numbering until they meet). 1-8 per the
-// user's spec.
-export async function saveJerseyNumber(playerId, coachName, number) {
+// Jersey # write-lock hierarchy (user's spec, 2026-10-05): the coach who
+// currently owns a player's team outranks everyone and, once set, locks the
+// number against every other coach, admins included; an admin's entry locks
+// it against every OTHER coach but not against the team owner or another
+// admin; a plain "other coach" entry is crowd-sourced and freely
+// overwritable by any other other-coach. Enforced HERE, inside the actual
+// write, rather than only at the UI layer, so no future caller can
+// accidentally bypass it. canEditJerseyNumber/jerseyTierOf in
+// coaches-config.js are the single source of truth for the rule; this
+// function is also responsible for the "at most one entry survives" part —
+// a successful higher-or-equal-tier write deletes every OTHER existing
+// entry in the same update, not just adds its own.
+export async function saveJerseyNumber(playerId, coachName, team, number) {
   const ref  = playerRef(playerId);
   const snap = await getDoc(ref);
+  const existing = snap.exists() ? (snap.data().jerseyNumbers || {}) : {};
+
+  const { allowed, blockedBy } = canEditJerseyNumber(coachName, team, existing);
+  if (!allowed) {
+    const err = new Error(`Jersey # already set by ${blockedBy}. Confirm with them before changing it.`);
+    err.code = 'jersey-locked';
+    err.blockedBy = blockedBy;
+    throw err;
+  }
+
+  const patch = { [`jerseyNumbers.${coachName}`]: number };
+  Object.keys(existing).forEach(name => {
+    if (name !== coachName) patch[`jerseyNumbers.${name}`] = deleteField();
+  });
+
   if (snap.exists()) {
-    await updateDoc(ref, { [`jerseyNumbers.${coachName}`]: number });
+    await updateDoc(ref, patch);
   } else {
     await setDoc(ref, { rankings: {}, modifiers: {}, notes: {}, team: '', jerseyNumbers: { [coachName]: number } });
   }
 }
 
-export async function clearJerseyNumber(playerId, coachName) {
-  await updateDoc(playerRef(playerId), { [`jerseyNumbers.${coachName}`]: deleteField() });
+export async function clearJerseyNumber(playerId, coachName, team) {
+  const ref  = playerRef(playerId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const existing = snap.data().jerseyNumbers || {};
+
+  // Clearing follows the identical permission check as setting (user
+  // confirmed no separate, more permissive rule) — but it must be able to
+  // clear EVERY existing entry blocking the acting coach, not just one
+  // named key, since canEditJerseyNumber already checks all of them.
+  const { allowed, blockedBy } = canEditJerseyNumber(coachName, team, existing);
+  if (!allowed) {
+    const err = new Error(`Jersey # was set by ${blockedBy}. Confirm with them before clearing it.`);
+    err.code = 'jersey-locked';
+    err.blockedBy = blockedBy;
+    throw err;
+  }
+
+  const patch = {};
+  Object.keys(existing).forEach(name => { patch[`jerseyNumbers.${name}`] = deleteField(); });
+  await updateDoc(ref, patch);
 }
 
 // Coach favorites stored in coaches/{coachName}

@@ -191,37 +191,95 @@ export function teamNameFor(personId) {
   return `Team ${suffix}`;
 }
 
+// Strip the "Team "/"Coach "/"Director " prefix a name carries, so a coach
+// name and a team name can be compared by their shared suffix — same
+// convention used everywhere else in this app (schedule.js's suffixOf,
+// app.js's myPlayerPhone). There is no stored team->coach-name mapping to
+// look up directly.
+function nameSuffix(str) {
+  return (str || '').replace(/^(Team|Coach|Director)\s+/, '');
+}
+
+/**
+ * Where a coach's jerseyNumbers entry for THIS player ranks in the write/
+ * display hierarchy the user specified (2026-10-04, refined 2026-10-05 into
+ * a write-lock): the coach who currently owns the player's team outranks
+ * everyone, since they're the one actually outfitting that kid; a league
+ * admin is next; everyone else is 'other' — crowd-sourced, no internal
+ * ranking among themselves. `team` is the player's own `team` field (e.g.
+ * "Team Craig").
+ */
+export function jerseyTierOf(coachName, team) {
+  if (nameSuffix(coachName) === nameSuffix(team)) return 'owner';
+  if (TEAM_ADMINS.includes(coachName)) return 'admin';
+  return 'other';
+}
+
+const TIER_RANK = { owner: 3, admin: 2, other: 1 };
+
 /**
  * Resolve ONE jersey number out of a player's jerseyNumbers map (keyed by
  * coach display name — see the file-header comment on how Firestore keys
- * this), per the hierarchy the user asked for (2026-10-04): the coach who
- * currently owns the player's team outranks everyone, since they're the one
- * actually outfitting that kid; a league admin's entry is next most
- * trustworthy; any other coach's entry is better than nothing; and null
- * means "don't change how this player is displayed" (ID still shows), not
- * "show no jersey" as if 0 were a real number.
+ * this) — whichever entry sits at the highest tier per jerseyTierOf above.
+ * null means "don't change how this player is displayed" (ID still shows),
+ * not "show no jersey" as if 0 were a real number.
  *
- * `team` is the player's own `team` field (e.g. "Team Craig"), matched
- * against a jerseyNumbers key by the same suffix-strip convention used
- * everywhere else in this app (schedule.js's suffixOf, app.js's
- * myPlayerPhone) — there is no stored team->coach-name mapping to look up
- * directly.
+ * As of 2026-10-05 this is ALSO structurally guaranteed to be unambiguous:
+ * the write path (canSetJerseyNumber/applyJerseyWrite in firebase.js)
+ * deletes any lower-tier entry the instant a higher tier sets one, so at
+ * most one entry should ever exist. This still picks the single highest-
+ * ranked entry defensively (rather than assuming that invariant holds) in
+ * case older data predates the lock.
  */
 export function resolvedJerseyNumber(team, jerseyNumbers) {
   if (!jerseyNumbers) return null;
   const entries = Object.entries(jerseyNumbers).filter(([, n]) => n != null);
   if (!entries.length) return null;
 
-  const teamSuffix = (team || '').replace(/^Team\s+/, '');
-  const coachSuffix = name => name.replace(/^(Coach|Director)\s+/, '');
+  let best = null;
+  for (const [name, num] of entries) {
+    const tier = jerseyTierOf(name, team);
+    if (!best || TIER_RANK[tier] > TIER_RANK[best.tier]) best = { name, num, tier };
+  }
+  return best.num;
+}
 
-  const own = entries.find(([name]) => coachSuffix(name) === teamSuffix);
-  if (own) return own[1];
+/**
+ * Whether `actingCoachName` may set/clear this player's jersey #, and who
+ * to blame if not. The rule (user's spec, 2026-10-05):
+ *   - No entry at all -> anyone may set it.
+ *   - An entry at a tier BELOW the acting coach's own tier (or equal, at
+ *     the 'other' tier only — any other-coach may overwrite any other
+ *     other-coach's guess) -> allowed; the caller deletes the old entry and
+ *     writes the new one under the acting coach's own name, so at most one
+ *     entry survives.
+ *   - An entry at a tier AT OR ABOVE the acting coach's own tier, except
+ *     'other' vs 'other' above -> blocked.
+ * Clearing uses this exact same check (the user confirmed no separate,
+ * more permissive rule for clearing).
+ */
+export function canEditJerseyNumber(actingCoachName, team, jerseyNumbers) {
+  if (!jerseyNumbers) return { allowed: true, blockedBy: null };
+  const entries = Object.entries(jerseyNumbers).filter(([, n]) => n != null);
+  if (!entries.length) return { allowed: true, blockedBy: null };
 
-  const admin = entries.find(([name]) => TEAM_ADMINS.includes(name));
-  if (admin) return admin[1];
-
-  return entries[0][1];
+  // At most one entry should exist (see resolvedJerseyNumber's comment),
+  // but defend against stale/pre-lock data carrying more than one anyway —
+  // the acting coach must be allowed to clear EVERY existing entry, not
+  // just the highest-ranked one, or a leftover lower-tier entry could
+  // resurface after the blocking entry is removed.
+  const actingTier = jerseyTierOf(actingCoachName, team);
+  for (const [name] of entries) {
+    if (name === actingCoachName) continue; // always free to touch your own entry
+    const tier = jerseyTierOf(name, team);
+    const blocked = tier === 'owner'
+      ? actingTier !== 'owner'
+      : tier === 'admin'
+        ? actingTier === 'other'
+        : false; // 'other' never blocks anyone
+    if (blocked) return { allowed: false, blockedBy: name };
+  }
+  return { allowed: true, blockedBy: null };
 }
 
 /**

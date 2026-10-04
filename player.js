@@ -14,7 +14,8 @@ import { priorSeasons } from './player-identity.js';
 import { getSeason } from './season-config.js';
 import { subscribePlayer, getPriorPlayerData, saveRanking, deleteRanking, saveNote, deleteNote, decodeRanking } from './firebase.js';
 import { getCurrentCoach } from './coach-login.js';
-import { personByName, teamNameFor, nameWithJersey } from './coaches-config.js';
+import { personByName, teamNameFor, nameWithJersey, resolvedJerseyNumber } from './coaches-config.js';
+import { openJerseyPicker } from './jersey-picker.js';
 import { contactFor } from './player-contacts.js';
 import { attachMediaSubmit, openMediaSheet } from './media-submit.js';
 import { loadPromotions } from './media-promotions.js';
@@ -188,17 +189,38 @@ function renderList() {
   visible.forEach(p => wireRow(p));
 }
 
-function rowHTML(p, isLoggedIn) {
-  const id    = String(p[COL.ID]);
-  const name  = p[COL.NAME] || 'Unknown';
-  const team  = p._teamFB || p[COL.TEAM] || '';
+/**
+ * The row header's "ID Name" / "Name #N" markup, shared by rowHTML() (first
+ * render) and renderRowLive() (live-subscription patch) so the two can't
+ * drift — renderRowLive used to just set plain textContent, which would
+ * have silently destroyed the jersey-trigger span's click handler on every
+ * live update (caught while wiring the picker, 2026-10-05).
+ */
+function rowNameHTML(p, isLoggedIn) {
+  const id   = String(p[COL.ID]);
+  const name = p[COL.NAME] || 'Unknown';
+  const team = p._teamFB || p[COL.TEAM] || '';
   // "Name #N" once a jersey resolves (team owner > admin > any other coach —
   // see nameWithJersey in coaches-config.js), ID hidden only then; otherwise
   // unchanged "ID Name" (2026-10-04).
   const displayName = nameWithJersey(name, team, p._jerseyNumbers);
-  const nameHtml = displayName === name
-    ? `${escHtml(id)} ${escHtml(name)}`
-    : escHtml(displayName);
+  // The ID (or, once resolved, the "#N" jersey suffix) is its own clickable
+  // span when logged in — tap/click opens the shared jersey picker
+  // (jersey-picker.js), same prompt as Gameboard's Jersey # mode, reachable
+  // here per the user's request (2026-10-05). Logged out there's no coach
+  // session to attribute an edit to, so it's plain text, not a button.
+  const jerseyNum = displayName === name ? null : resolvedJerseyNumber(team, p._jerseyNumbers);
+  const idPart = jerseyNum != null ? `#${jerseyNum}` : id;
+  const restOfName = jerseyNum != null ? displayName.replace(/ #\d+$/, '') : name;
+  return isLoggedIn
+    ? `<span class="rank-row-jersey-trigger" data-jersey-trigger data-id="${escHtml(id)}" title="Set jersey #">${escHtml(idPart)}</span> ${escHtml(restOfName)}`
+    : (displayName === name ? `${escHtml(id)} ${escHtml(name)}` : escHtml(displayName));
+}
+
+function rowHTML(p, isLoggedIn) {
+  const id    = String(p[COL.ID]);
+  const name  = p[COL.NAME] || 'Unknown';
+  const nameHtml = rowNameHTML(p, isLoggedIn);
   const photo = photoUrl(p);
   const video = videoUrl(p);
   const isFav = favorites.has(id);
@@ -309,7 +331,39 @@ function wireRow(p) {
   row.querySelector('[data-action="video"]')
     ?.addEventListener('click', () => openMediaSheet({ id: p[COL.ID], name: p[COL.NAME] }));
 
+  // Jersey # picker — see jersey-picker.js and rowHTML's own comment above.
+  // Only rendered (and so only present to wire) when logged in.
+  row.querySelector('[data-jersey-trigger]')?.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    openJerseyPickerFor(p, e.currentTarget);
+  });
+
   wireMechanism(p);
+}
+
+/** Every player on the SAME team as `p`, shaped for jersey-picker.js — the
+ * "taken" check is scoped to that 8-player roster, per the user's confirmed
+ * scope (2026-10-04), not the whole league. */
+function openJerseyPickerFor(p, anchorEl) {
+  const team = p._teamFB || p[COL.TEAM] || '';
+  const teammates = allPlayers
+    .filter(pl => (pl._teamFB || pl[COL.TEAM] || '') === team)
+    .map(pl => ({ id: String(pl[COL.ID]), name: pl[COL.NAME], jerseyNumbers: pl._jerseyNumbers }));
+  const player = { id: String(p[COL.ID]), name: p[COL.NAME], jerseyNumbers: p._jerseyNumbers };
+
+  openJerseyPicker(anchorEl, {
+    player, team, teammates,
+    onChange: () => {
+      // Mirror the just-saved value onto the SHARED allPlayers record (the
+      // picker only mutated its own local copy) so the row header reflects
+      // it immediately, same pattern renderRowLive already uses for
+      // composite/team changes arriving over the live subscription.
+      const sharedRecord = allPlayers.find(pl => String(pl[COL.ID]) === player.id);
+      if (sharedRecord) sharedRecord._jerseyNumbers = player.jerseyNumbers;
+      renderRowLive(player.id);
+    },
+  });
 }
 
 function wireMechanism(p) {
@@ -414,15 +468,21 @@ function renderRowLive(id) {
   if (compositeVal) compositeVal.textContent = data.composite !== null ? data.composite.toFixed(1) : '—';
 
   // Jersey # can arrive/change on this same live subscription — keep the
-  // row header in sync without a full re-render.
+  // row header in sync without a full re-render. Rebuilt via rowNameHTML
+  // (same markup rowHTML uses on first render) and re-wired below —
+  // innerHTML replaces the jersey-trigger span, which drops its listener,
+  // so a plain textContent assignment here previously destroyed the
+  // click-to-edit feature on its very next live update (caught 2026-10-05).
   const nameEl = row.querySelector('.rank-row-name');
   if (nameEl) {
     const p = allPlayers.find(pl => String(pl[COL.ID]) === id);
     if (p) {
-      const name = p[COL.NAME] || 'Unknown';
-      const team = p._teamFB || p[COL.TEAM] || '';
-      const displayName = nameWithJersey(name, team, p._jerseyNumbers);
-      nameEl.textContent = displayName === name ? `${id} ${name}` : displayName;
+      nameEl.innerHTML = rowNameHTML(p, !!getCurrentCoach());
+      nameEl.querySelector('[data-jersey-trigger]')?.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        openJerseyPickerFor(p, e.currentTarget);
+      });
     }
   }
 

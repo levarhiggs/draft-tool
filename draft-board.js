@@ -15,6 +15,7 @@ import { attachMediaSubmit } from './media-submit.js';
 import { loadPromotions } from './media-promotions.js';
 import { getCurrentCoach } from './coach-login.js';
 import { contactFor } from './player-contacts.js';
+import { openJerseyPicker } from './jersey-picker.js';
 import {
   getActiveCoaches, personByName, teamNameFor, TEAM_ADMINS, teamColorsFor,
   resolvedJerseyNumber,
@@ -860,7 +861,23 @@ function showLightboxSlide(personId) {
   const teamName = rowCoach ? teamNameFor(rowCoach.personId) || coachName : coachName;
   const jerseyNum = resolvedJerseyNumber(teamName, live[playerId]?.jerseyNumbers);
   const baseName = p ? p[COL.NAME] : `#${playerId}`;
-  el('db-lightbox-name').textContent = jerseyNum == null ? baseName : `${baseName} #${jerseyNum}`;
+  const nameEl = el('db-lightbox-name');
+  // Same click-to-edit jersey picker as player.html (jersey-picker.js) —
+  // reachable here too per the user's "3 different places" request
+  // (2026-10-05). Only wired when logged in and the player record resolved
+  // (an unfilled board spot has no `p` to attach teammates/jerseyNumbers to).
+  if (p && getCurrentCoach()) {
+    nameEl.innerHTML = jerseyNum == null
+      ? `${escHtml(baseName)} <span class="rank-row-jersey-trigger db-lightbox-jersey-trigger" data-jersey-trigger title="Set jersey #">＋#</span>`
+      : `${escHtml(baseName)} <span class="rank-row-jersey-trigger db-lightbox-jersey-trigger" data-jersey-trigger title="Set jersey #">#${jerseyNum}</span>`;
+    nameEl.querySelector('[data-jersey-trigger]').addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      openLightboxJerseyPicker(p, teamName, personId, e.currentTarget);
+    });
+  } else {
+    nameEl.textContent = jerseyNum == null ? baseName : `${baseName} #${jerseyNum}`;
+  }
   const colorInfo = teamColorsFor(SEASON_CODE)[teamName];
   el('db-lightbox-sub').textContent = colorInfo ? `${coachName} — ${colorInfo.name}` : coachName;
 
@@ -892,6 +909,25 @@ function showLightboxSlide(personId) {
 
   el('db-lightbox').classList.remove('hidden');
   el('db-lightbox').dataset.personId = personId;
+}
+
+/**
+ * "Taken" in the picker is scoped to lbRoster — the same 8 (or fewer)
+ * teammates the lightbox is currently stepping through for this coach's
+ * column, matching the scope rule already used in player.js (2026-10-04:
+ * taken/free is per-team, not league-wide).
+ */
+function openLightboxJerseyPicker(p, team, personId, anchorEl) {
+  const teammates = lbRoster
+    .map(r => byId(r.playerId))
+    .filter(Boolean)
+    .map(pl => ({ id: String(pl[COL.ID]), name: pl[COL.NAME], jerseyNumbers: live[pl[COL.ID]]?.jerseyNumbers }));
+  const player = { id: String(p[COL.ID]), name: p[COL.NAME], jerseyNumbers: live[p[COL.ID]]?.jerseyNumbers };
+
+  openJerseyPicker(anchorEl, {
+    player, team, teammates,
+    onChange: () => showLightboxSlide(personId),
+  });
 }
 
 /** Swap the photo for an inline video player, in the same frame. */

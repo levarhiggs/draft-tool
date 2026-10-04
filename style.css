@@ -3055,6 +3055,14 @@ main {
   max-width: 220px;
 }
 
+/* jersey-picker.js's popover is appended to document.body, so it can be
+   opened from inside the draft-board lightbox (#db-lightbox, z-index 1000)
+   via its "#N" trigger — needs to clear that modal's own stacking context
+   or its backdrop intercepts the picker's clicks (caught 2026-10-05). */
+#jersey-picker-popover {
+  z-index: 1100;
+}
+
 .gb-jersey-pick-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -3194,6 +3202,39 @@ main {
   border-color: var(--clr-danger);
   opacity: 0.85;
   filter: none;
+}
+
+/* This player's OWN current number (jersey-picker.js, the shared picker
+   reachable from player.html/draft-board.html's lightbox) — highlighted,
+   not dimmed, and not clickable as a plain select target (removal goes
+   through the explicit Remove row below instead, see openJerseyPicker). */
+.gb-jersey-pick-selected {
+  background: var(--clr-accent);
+  border-color: var(--clr-accent);
+  color: #fff;
+  cursor: default;
+}
+.gb-jersey-pick-selected:hover {
+  background: var(--clr-accent);
+  border-color: var(--clr-accent);
+}
+
+.gb-jersey-pick-remove {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 10px;
+  background: transparent;
+  border: 1px solid var(--clr-danger);
+  border-radius: 8px;
+  color: var(--clr-danger);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.gb-jersey-pick-remove:hover {
+  background: var(--clr-danger);
+  color: #fff;
 }
 
 /* Always side-by-side, never stacked, at any screen width — the whole
@@ -4627,6 +4668,18 @@ body.coach-gate-active .btn-drawer-toggle {
 }
 
 .rank-row-name { font-size: 1.3rem; font-weight: 800; line-height: 1.15; }
+
+/* Clickable ID/#N opener for the shared jersey picker (jersey-picker.js) —
+   player.html rows and the draft-board lightbox caption both use this class
+   so the affordance (dotted underline, pointer cursor) matches everywhere
+   it appears (2026-10-05). */
+.rank-row-jersey-trigger {
+  cursor: pointer;
+  border-bottom: 1px dotted var(--clr-accent);
+}
+.rank-row-jersey-trigger:hover { color: var(--clr-accent); }
+
+.db-lightbox-jersey-trigger { font-size: 0.9em; }
 
 .rank-row-notes-link { display: block; margin-top: 10px; font-size: 0.82rem; }
 

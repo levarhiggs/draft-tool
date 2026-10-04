@@ -1,7 +1,7 @@
 // gameboard.js — Gameboard page: Game/Board view toggle + Board team grid.
 // Default view on load: "Game" if a coach is logged in, "Board" otherwise.
 import { getCurrentCoach } from './coach-login.js';
-import { TEAMS, TEAM_COLORS } from './coaches-config.js';
+import { TEAMS, TEAM_COLORS, resolvedJerseyNumber, canEditJerseyNumber } from './coaches-config.js';
 import { buildIconIndex, iconUrl, fetchPlayers, buildDriveIndex, photoUrl, COL } from './players-data.js';
 import { fetchSchedule, parseGameDate, COL as SCHED_COL } from './schedule-data.js';
 import { getCompositeRank, getGameConfig, saveGameConfig, getAllScheduleGames, saveJerseyNumber, clearJerseyNumber, saveLiveStatLog, getLiveStatLog, saveGameLogNotes, getGameLogNotes, saveGameboardGhosts, getGameboardGhosts } from './firebase.js';
@@ -633,7 +633,11 @@ async function resolveUnassignedToRealPlayer(side, jerseyNum, realPlayerId) {
   delete side.ghostsByJersey[jerseyNum];
 
   const player = side.players[realPlayerId];
-  await setJerseyNumberFor(player, jerseyNum);
+  const result = await setJerseyNumberFor(player, jerseyNum);
+  if (!result.ok) {
+    alert(`Jersey #${jerseyNum} is already set by ${result.blockedBy}. Confirm with them before changing it.`);
+    return;
+  }
   if (oldPattern) side.pattern.set(realPlayerId, oldPattern);
   side.absent.delete(realPlayerId);
   if (wasAbsent) { /* the placeholder's absence doesn't carry over to a newly-identified real player — they're being actively placed IN */ }
@@ -650,14 +654,21 @@ function sessionJerseyKey(playerId) {
   return `gameboard_jersey_${playerId}`;
 }
 
+// As of 2026-10-05, the displayed number is the HIERARCHY-RESOLVED one
+// (team owner > admin > any other coach — same resolvedJerseyNumber() every
+// other page uses), not just "whatever the viewing coach personally
+// entered" — now that writes are locked by that same hierarchy, there is
+// only ever meant to be one real answer, and a coach whose own guess just
+// got overridden by the team owner should see the team owner's number, not
+// their own stale one.
 function jerseyNumberFor(player) {
   // Ghosts/unresolved placeholders carry their number inline — they have no
   // real Firestore player doc to store a per-coach jersey number against.
   if (player._ghostJerseyNum != null) return player._ghostJerseyNum;
   const coach = getCurrentCoach();
   if (coach) {
-    const n = player._jerseyByCoach?.[coach.name];
-    return n == null ? null : n;
+    const team = player._teamFB || player[COL.TEAM] || '';
+    return resolvedJerseyNumber(team, player._jerseyByCoach);
   }
   try {
     const raw = sessionStorage.getItem(sessionJerseyKey(player[COL.ID]));
@@ -665,26 +676,53 @@ function jerseyNumberFor(player) {
   } catch { return null; }
 }
 
+/**
+ * Attempts the write-locked save; returns { ok, blockedBy }. Callers
+ * (showJerseyPicker etc.) are responsible for surfacing a notice on
+ * !ok — this function only does the write and local-state bookkeeping, same
+ * split firebase.js's saveJerseyNumber/canEditJerseyNumber already keep.
+ */
 async function setJerseyNumberFor(player, number) {
   const coach = getCurrentCoach();
   if (coach) {
-    player._jerseyByCoach = { ...(player._jerseyByCoach || {}), [coach.name]: number };
-    await saveJerseyNumber(player[COL.ID], coach.name, number);
-  } else {
-    try { sessionStorage.setItem(sessionJerseyKey(player[COL.ID]), String(number)); }
-    catch { /* sessionStorage unavailable/full — silently skip, not critical */ }
+    const team = player._teamFB || player[COL.TEAM] || '';
+    const check = canEditJerseyNumber(coach.name, team, player._jerseyByCoach);
+    if (!check.allowed) return { ok: false, blockedBy: check.blockedBy };
+    try {
+      await saveJerseyNumber(player[COL.ID], coach.name, team, number);
+    } catch (err) {
+      if (err.code === 'jersey-locked') return { ok: false, blockedBy: err.blockedBy };
+      throw err;
+    }
+    // Mirror the server-side "delete every other entry" onto local state so
+    // the next jerseyNumberFor() call in this same session reflects it
+    // immediately, without waiting on a live subscription round-trip.
+    player._jerseyByCoach = { [coach.name]: number };
+    return { ok: true, blockedBy: null };
   }
+  try { sessionStorage.setItem(sessionJerseyKey(player[COL.ID]), String(number)); }
+  catch { /* sessionStorage unavailable/full — silently skip, not critical */ }
+  return { ok: true, blockedBy: null };
 }
 
 async function clearJerseyNumberFor(player) {
   const coach = getCurrentCoach();
   if (coach) {
-    if (player._jerseyByCoach) delete player._jerseyByCoach[coach.name];
-    await clearJerseyNumber(player[COL.ID], coach.name);
-  } else {
-    try { sessionStorage.removeItem(sessionJerseyKey(player[COL.ID])); }
-    catch { /* sessionStorage unavailable/full — silently skip, not critical */ }
+    const team = player._teamFB || player[COL.TEAM] || '';
+    const check = canEditJerseyNumber(coach.name, team, player._jerseyByCoach);
+    if (!check.allowed) return { ok: false, blockedBy: check.blockedBy };
+    try {
+      await clearJerseyNumber(player[COL.ID], coach.name, team);
+    } catch (err) {
+      if (err.code === 'jersey-locked') return { ok: false, blockedBy: err.blockedBy };
+      throw err;
+    }
+    player._jerseyByCoach = {};
+    return { ok: true, blockedBy: null };
   }
+  try { sessionStorage.removeItem(sessionJerseyKey(player[COL.ID])); }
+  catch { /* sessionStorage unavailable/full — silently skip, not critical */ }
+  return { ok: true, blockedBy: null };
 }
 
 // Numbers already taken on a team (each coach's own numbering — two coaches
@@ -1835,10 +1873,18 @@ function showJerseyPicker(anchorEl, player, side) {
         const num = parseInt(btn.dataset.num, 10);
         const owner = taken[num];
         if (owner) {
-          await clearJerseyNumberFor(owner);
+          const result = await clearJerseyNumberFor(owner);
+          if (!result.ok) {
+            alert(`#${num} is already set by ${result.blockedBy}. Confirm with them before changing it.`);
+            return;
+          }
           renderButtons();
         } else {
-          await setJerseyNumberFor(player, num);
+          const result = await setJerseyNumberFor(player, num);
+          if (!result.ok) {
+            alert(`#${num} is already set by ${result.blockedBy}. Confirm with them before changing it.`);
+            return;
+          }
           popover.classList.add('hidden');
           renderGameView();
         }
@@ -2009,7 +2055,12 @@ function showLineupManager(anchorEl, side) {
         const player = side.players[input.dataset.id];
 
         if (raw === '') {
-          await clearJerseyNumberFor(player);
+          const result = await clearJerseyNumberFor(player);
+          if (!result.ok) {
+            alert(`Jersey # is already set by ${result.blockedBy}. Confirm with them before clearing it.`);
+            renderRows();
+            return;
+          }
           renderRows();
           return;
         }
@@ -2018,9 +2069,19 @@ function showLineupManager(anchorEl, side) {
         const taken = takenJerseyNumbers(side);
         const owner = taken[num];
         if (owner && owner[COL.ID] !== player[COL.ID]) {
-          await clearJerseyNumberFor(owner);
+          const clearResult = await clearJerseyNumberFor(owner);
+          if (!clearResult.ok) {
+            alert(`#${num} is already set by ${clearResult.blockedBy}. Confirm with them before changing it.`);
+            renderRows();
+            return;
+          }
         }
-        await setJerseyNumberFor(player, num);
+        const setResult = await setJerseyNumberFor(player, num);
+        if (!setResult.ok) {
+          alert(`#${num} is already set by ${setResult.blockedBy}. Confirm with them before changing it.`);
+          renderRows();
+          return;
+        }
         renderRows();
         // Auto-advance to the next player's field (wrapping to the first
         // after the last) once a valid single digit is entered — lets a
