@@ -105,7 +105,7 @@ export function openBuildDefense(source) {
   };
 
   firstNameCounts = {};
-  presentIds.forEach(id => {
+  ctx.order.forEach(id => {
     const f = firstName(id);
     firstNameCounts[f] = (firstNameCounts[f] || 0) + 1;
   });
@@ -130,6 +130,7 @@ export function openBuildDefense(source) {
 function closeBuildDefense() {
   document.getElementById('bd-view').classList.add('hidden');
   document.body.classList.remove('bd-open');
+  endPrint(); // never leave the Rotations page's own Print export showing this sheet
   selected = null;
 }
 
@@ -220,6 +221,7 @@ function buildDomOnce() {
       <div class="bd-actionbar">
         <button class="btn-secondary" id="bd-back" type="button">← Back to Rotation</button>
         <button class="btn-secondary" id="bd-auto" type="button">🔢 Auto Insert</button>
+        <button class="btn-secondary" id="bd-print" type="button">🖨️ Print Game Sheet</button>
         <button class="btn-primary" id="bd-save" type="button">🛡️ Save Defense to Games</button>
       </div>
     </div>
@@ -261,6 +263,8 @@ function buildDomOnce() {
     </div>
 
     <div id="bd-toast" class="bd-toast hidden" role="status"></div>
+
+    <div id="bd-print-sheet" aria-hidden="true"></div>
   `);
   wireDom();
 }
@@ -270,14 +274,14 @@ function syncControls() {
   document.querySelectorAll('.bd-toggle-btn').forEach(b => b.classList.toggle('active', b.dataset.style === avatarStyle));
 }
 
-function courtSVG() {
+function courtSVG(flip = flipped) {
   // Basket 5.25ft from baseline; 3pt arc 23.75ft; corners 3ft in from the
   // sidelines. Flip Grid rotates the line work 180°; the ball and its
   // caption are drawn outside the rotated group so they stay upright.
   const L = 'stroke="var(--bd-court-line)" stroke-width="2.5" fill="none"';
-  const ball = flipped ? { y: 350, ty: 384, text: 'BALL' } : { y: 120, ty: 96, text: 'BALL AT TOP' };
+  const ball = flip ? { y: 350, ty: 384, text: 'BALL' } : { y: 120, ty: 96, text: 'BALL AT TOP' };
   return `<svg viewBox="0 0 500 470" aria-hidden="true">
-    <g${flipped ? ' transform="rotate(180 250 235)"' : ''}>
+    <g${flip ? ' transform="rotate(180 250 235)"' : ''}>
       <rect x="1.5" y="1.5" width="497" height="467" rx="4" fill="var(--bd-court)" stroke="var(--bd-court-line)" stroke-width="3"/>
       <path d="M190 1.5 A60 60 0 0 0 310 1.5" ${L}/>
       <rect x="170" y="280" width="160" height="188.5" fill="var(--bd-paint)" stroke="var(--bd-court-line)" stroke-width="2.5"/>
@@ -291,6 +295,13 @@ function courtSVG() {
     <circle cx="250" cy="${ball.y}" r="10" fill="var(--bd-ball)"/>
     <text x="250" y="${ball.ty}" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="1.5" fill="var(--clr-muted)" font-family="Segoe UI, system-ui, sans-serif">${ball.text}</text>
   </svg>`;
+}
+
+// Percent position of a spot on the court; Flip Grid rotates it 180°.
+function spotPosition(s, flip) {
+  const x = flip ? 500 - s.x : s.x;
+  const y = flip ? 470 - s.y : s.y;
+  return `left:${(x / 500 * 100).toFixed(2)}%;top:${(y / 470 * 100).toFixed(2)}%`;
 }
 
 function render() {
@@ -318,9 +329,7 @@ function quarterHTML(q) {
 
   const spots = layout.spots.map(s => {
     const pid = quarters[q].spots[s.id];
-    const x = flipped ? 500 - s.x : s.x;
-    const y = flipped ? 470 - s.y : s.y;
-    const pos = `left:${(x / 500 * 100).toFixed(2)}%;top:${(y / 470 * 100).toFixed(2)}%`;
+    const pos = spotPosition(s, flipped);
     const sel = pid && selected && selected.q === q && selected.pid === pid ? ' bd-selected' : '';
     const inner = pid
       ? `<div class="bd-token${sel}" data-q="${q}" data-pid="${escHtml(pid)}">${avatarHTML(pid)}<span class="bd-badge">${s.no}</span></div>`
@@ -544,6 +553,7 @@ function wireDom() {
   }));
 
   document.getElementById('bd-back').addEventListener('click', closeBuildDefense);
+  document.getElementById('bd-print').addEventListener('click', printGameSheet);
 
   const autoModal = document.getElementById('bd-modal-auto');
   document.getElementById('bd-auto').addEventListener('click', () => {
@@ -660,6 +670,93 @@ async function commitSave() {
     console.error('saveDefenseConfig error:', err);
     toast('Saving failed. Check your connection and try again.');
   }
+}
+
+// ── Print Game Sheet ─────────────────────────────────────────────────────────
+// One landscape letter page, black and white: the rotation grid on the left,
+// the four quarter courts on the right. Initials only (no photos), so it
+// prints cleanly and cheaply. Q1–Q2 print in the current Flip Grid
+// orientation and Q3–Q4 in the opposite one, showing the halftime switch
+// of baskets on paper.
+//
+// The sheet is a body-level element that's display:none on screen; the
+// body.bd-printing class (see style.css's Build Defense print block) hides
+// everything else at print time. @page landscape is injected only for this
+// print so the Rotations page's own Print export keeps its default page.
+
+function printGameSheet() {
+  const sheet = document.getElementById('bd-print-sheet');
+  sheet.innerHTML = printSheetHTML();
+  let pageStyle = document.getElementById('bd-print-page');
+  if (!pageStyle) {
+    pageStyle = document.createElement('style');
+    pageStyle.id = 'bd-print-page';
+    pageStyle.textContent = '@page { size: letter landscape; margin: 0.3in; }';
+    document.head.appendChild(pageStyle);
+  }
+  document.body.classList.add('bd-printing');
+  window.addEventListener('afterprint', endPrint, { once: true });
+  window.print();
+}
+
+function endPrint() {
+  document.body.classList.remove('bd-printing');
+  document.getElementById('bd-print-page')?.remove();
+}
+
+function printSheetHTML() {
+  const present = new Set(ctx.presentIds);
+  const rows = ctx.order.map(id => {
+    const isAbsent = !present.has(id);
+    const pat = ctx.pattern[id] || [false, false, false, false];
+    const cells = [0, 1, 2, 3].map(q => {
+      const on = !isAbsent && pat[q];
+      return `<div class="bdp-cell${isAbsent ? ' bdp-cell-absent' : ''}">${on ? `<span class="bdp-init">${escHtml(initials(id))}</span>` : ''}</div>`;
+    }).join('');
+    return `<div class="bdp-row${isAbsent ? ' bdp-row-absent' : ''}">
+      <div class="bdp-name"><span class="bdp-dot"></span><span>${escHtml(displayName(id).toUpperCase())}</span>${isAbsent ? '<span class="bdp-absent-tag">ABSENT</span>' : ''}</div>
+      ${cells}
+    </div>`;
+  }).join('');
+
+  const courts = [0, 1, 2, 3].map(q => {
+    const flip = q < 2 ? flipped : !flipped;
+    const layout = DEFENSE_LAYOUTS[quarters[q].scheme];
+    const lineup = ctx.lineups[q].map(pid => {
+      const s = spotOf(q, pid);
+      return `<div class="bdp-lu">
+        <span class="bdp-init">${escHtml(initials(pid))}${s ? `<span class="bdp-no">${spotDef(q, s).no}</span>` : ''}</span>
+        <span class="bdp-lu-name">${escHtml(displayName(pid))}</span>
+      </div>`;
+    }).join('') || '<div class="bdp-lu-empty">No one on court</div>';
+    const spots = layout.spots.map(s => {
+      const pid = quarters[q].spots[s.id];
+      return `<div class="bdp-spot" style="${spotPosition(s, flip)}">
+        <span class="bdp-init${pid ? '' : ' bdp-init-empty'}">${pid ? escHtml(initials(pid)) : s.no}${pid ? `<span class="bdp-no">${s.no}</span>` : ''}</span>
+        <span class="bdp-spot-label">${pid ? escHtml(displayName(pid).toUpperCase()) : s.label.toUpperCase()}</span>
+      </div>`;
+    }).join('');
+    return `<section class="bdp-qcard">
+      <div class="bdp-qhead"><span class="bdp-qname">Q${q + 1}</span><span class="bdp-scheme">${escHtml(layout.name.toUpperCase())}</span></div>
+      <div class="bdp-qbody">
+        <div class="bdp-lineup"><div class="bdp-lu-title">LINEUP</div>${lineup}</div>
+        <div class="bdp-court">${courtSVG(flip)}${spots}</div>
+      </div>
+    </section>`;
+  }).join('');
+
+  const now = new Date();
+  const stamp = `Generated ${now.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })} @ ${now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+
+  return `<div class="bdp-page">
+    <section class="bdp-rot">
+      <h1 class="bdp-team">${escHtml(ctx.teamLabel)}</h1>
+      <div class="bdp-row bdp-head"><div></div><div>Q1</div><div>Q2</div><div>Q3</div><div>Q4</div></div>
+      <div class="bdp-rows">${rows}</div>
+      <div class="bdp-foot">${escHtml(stamp)}<br />CSBC Coach App by L. Higgs</div>
+    </section>
+    <div class="bdp-courts">${courts}</div>
+  </div>`;
 }
 
 // ── Misc ─────────────────────────────────────────────────────────────────────

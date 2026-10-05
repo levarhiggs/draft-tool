@@ -6286,3 +6286,59 @@ body.bd-open { overflow: hidden; }
 .bd-actionbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 310; background: var(--clr-surface); border-top: 1px solid var(--clr-border); padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
 .bd-toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); background: var(--clr-card); border: 1px solid var(--clr-success); color: var(--clr-text); padding: 9px 16px; border-radius: 10px; z-index: 650; font-size: 13px; max-width: calc(100% - 32px); }
 @media (prefers-reduced-motion: reduce) { .bd-ring, .bd-switch-track, .bd-switch-knob { transition: none; } }
+
+/* ── Build Defense: Print Game Sheet (defense.js printGameSheet) ──
+   One landscape letter page in black and white: rotation grid left, four
+   quarter courts right. Sized in inches to the printable area (11×8.5 less
+   0.3in margins) so it always fits on a single page. */
+#bd-print-sheet { display: none; }
+@media print {
+  body.bd-printing { background: #fff !important; }
+  body.bd-printing > *:not(#bd-print-sheet) { display: none !important; }
+  body.bd-printing #bd-print-sheet {
+    display: block;
+    visibility: visible;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    --bd-court: #fff;
+    --bd-court-line: #000;
+    --bd-paint: #f1f1f1;
+    --bd-ball: #000;
+    --clr-muted: #000;
+  }
+  body.bd-printing #bd-print-sheet * { visibility: visible; }
+}
+.bdp-page { width: 10.35in; height: 7.85in; display: grid; grid-template-columns: 3.55in minmax(0, 1fr); gap: 0.14in; color: #000; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+.bdp-rot { border: 1.5pt solid #000; border-radius: 10px; padding: 0.14in 0.16in 0.1in; display: flex; flex-direction: column; min-height: 0; }
+.bdp-team { margin: 0 0 0.06in; font-size: 18pt; font-weight: 800; text-align: center; color: #000; }
+.bdp-row { display: grid; grid-template-columns: 1.05in repeat(4, minmax(0, 1fr)); gap: 0.05in; align-items: center; }
+.bdp-head { font-size: 14pt; font-weight: 800; text-align: center; padding-bottom: 0.05in; }
+.bdp-rows { flex: 1; display: flex; flex-direction: column; gap: 0.06in; min-height: 0; }
+.bdp-rows .bdp-row { flex: 1; max-height: 0.82in; border: 1pt solid #000; border-radius: 7px; padding: 0.04in; }
+.bdp-name { display: flex; align-items: center; gap: 0.06in; font-size: 10.5pt; font-weight: 800; min-width: 0; overflow: hidden; flex-wrap: wrap; }
+.bdp-dot { width: 0.1in; height: 0.1in; border-radius: 50%; background: #000; flex: none; }
+.bdp-absent-tag { font-size: 6.5pt; font-weight: 700; letter-spacing: .06em; border: 0.75pt solid #000; border-radius: 3px; padding: 0 3px; }
+.bdp-row-absent .bdp-name > span:nth-child(2) { text-decoration: line-through; }
+.bdp-cell { height: 100%; min-height: 0.42in; border: 0.75pt solid #000; border-radius: 6px; display: grid; place-items: center; }
+.bdp-cell-absent { background: repeating-linear-gradient(45deg, #fff 0 4px, #d6d6d6 4px 5px); }
+.bdp-init { position: relative; width: 0.36in; height: 0.36in; border-radius: 50%; border: 1pt solid #000; background: #e4e4e4; display: grid; place-items: center; font-size: 9pt; font-weight: 800; color: #000; flex: none; }
+.bdp-init-empty { background: #fff; border-style: dashed; color: #555; }
+.bdp-no { position: absolute; right: -0.07in; bottom: -0.05in; width: 0.16in; height: 0.16in; border-radius: 50%; background: #000; color: #fff; font-size: 6.5pt; font-weight: 800; display: grid; place-items: center; }
+.bdp-foot { margin-top: 0.06in; text-align: center; font-size: 8.5pt; line-height: 1.35; }
+
+.bdp-courts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 0.12in; min-width: 0; min-height: 0; }
+.bdp-qcard { border: 1.5pt solid #000; border-radius: 10px; padding: 0.08in 0.1in; display: flex; flex-direction: column; gap: 0.05in; min-height: 0; }
+.bdp-qhead { display: flex; align-items: baseline; gap: 0.1in; }
+.bdp-qname { font-size: 15pt; font-weight: 800; }
+.bdp-scheme { font-size: 9pt; font-weight: 700; letter-spacing: .06em; }
+.bdp-qbody { flex: 1; display: grid; grid-template-columns: 0.66in minmax(0, 1fr); gap: 0.07in; align-items: center; min-height: 0; }
+.bdp-lineup { border: 0.75pt solid #000; border-radius: 6px; padding: 0.04in 0.02in; display: flex; flex-direction: column; align-items: center; gap: 0.04in; align-self: stretch; justify-content: center; }
+.bdp-lu-title { font-size: 6.5pt; font-weight: 700; letter-spacing: .08em; }
+.bdp-lu { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.bdp-lu-name { font-size: 7pt; font-weight: 600; max-width: 0.62in; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bdp-lu-empty { font-size: 7pt; text-align: center; }
+.bdp-court { position: relative; width: 100%; aspect-ratio: 500 / 470; }
+.bdp-court svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.bdp-spot { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.bdp-spot .bdp-init { width: 0.32in; height: 0.32in; font-size: 8pt; }
+.bdp-spot-label { font-size: 6.5pt; font-weight: 800; letter-spacing: .04em; background: #fff; padding: 0 2px; border-radius: 2px; white-space: nowrap; }
