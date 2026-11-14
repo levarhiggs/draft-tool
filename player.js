@@ -84,8 +84,11 @@ async function init() {
       }
     }));
 
-    renderList();
+    // Controls first: initListControls() is what reads ?team= / ?sort= into
+    // the shared filter state, so rendering before it showed every player
+    // even on a login redirect to player.html?team=... (caught 2026-11-14).
     initListControls(() => allPlayers, renderList);
+    renderList();
     wireModals();
     wireInstructionsModal();
     subscribeAll();
@@ -125,7 +128,15 @@ function cssId(id) { return String(id).replace(/[^a-zA-Z0-9_-]/g, '_'); }
 let teamChipsTimer = null;
 function scheduleTeamChipsRebuild() {
   clearTimeout(teamChipsTimer);
-  teamChipsTimer = setTimeout(() => buildTeamChips(() => allPlayers, renderList), 150);
+  teamChipsTimer = setTimeout(() => {
+    buildTeamChips(() => allPlayers, renderList);
+    // Team membership comes from these live snapshots, not the first render,
+    // so a team filter (e.g. a coach's login redirect to ?team=) has to be
+    // re-applied once they land. Skipped mid-note so a full re-render can't
+    // wipe a textarea someone is typing in.
+    const typing = document.activeElement?.matches?.('[data-role="note-input"]');
+    if (activeFilters.teams.size && !typing) renderList();
+  }, 150);
 }
 
 function subscribeAll() {
@@ -708,16 +719,39 @@ function openNotesModal(p) {
 
 // ── Rankings breakdown modal ───────────────────────────────────────────────────
 
+/**
+ * True when a stored ranking key belongs to the coach of `team` — the
+ * player's CURRENT-season team. Resolved through the person (so a ranking
+ * saved under a historical display name still matches), falling back to the
+ * same "Coach X" <-> "Team X" suffix rule used app-wide for a name with no
+ * PERSONS entry.
+ */
+function isTeamCoach(storedName, team) {
+  if (!team || team === 'Undrafted') return false;
+  const person = personByName(storedName);
+  if (person) return teamNameFor(person.id) === team;
+  const suffix = s => (s || '').replace(/^(Team|Coach|Director)\s+/, '');
+  return suffix(storedName) === suffix(team);
+}
+
 function openRankingsModal(id) {
   const data = live[id] || { rankings: {} };
   const display = document.getElementById('rank-composite-display');
   const tbody    = document.getElementById('rank-table-body');
   const footer   = document.getElementById('rank-footer');
+  const p = allPlayers.find(pl => String(pl[COL.ID]) === id);
+  const team = data.team || p?.[COL.TEAM] || '';
 
+  // The player's own coach this season works closest with the player, so
+  // that coach's seed is listed first and emphasized (user's request, 2026-11-14). Display
+  // only — the composite is still a plain average; weighting his seed more
+  // heavily is a possible future change, not done here.
   const entries = Object.entries(data.rankings || {})
-    .map(([coach, val]) => ({ coach: displayCoachName(coach), val: parseFloat(val) }))
+    .map(([coach, val]) => ({
+      coach: displayCoachName(coach), val: parseFloat(val), own: isTeamCoach(coach, team),
+    }))
     .filter(e => !isNaN(e.val))
-    .sort((a, b) => b.val - a.val);
+    .sort((a, b) => (b.own - a.own) || (b.val - a.val));
 
   const count = entries.length;
   const composite = count ? entries.reduce((s, e) => s + e.val, 0) / count : null;
@@ -727,7 +761,9 @@ function openRankingsModal(id) {
     : 'No seeds submitted yet';
 
   tbody.innerHTML = entries.length
-    ? entries.map(e => `<tr><td>${escHtml(e.coach)}</td><td>${e.val.toFixed(1)}</td></tr>`).join('')
+    ? entries.map(e => e.own
+        ? `<tr class="rank-row-own-coach" title="Player's coach this season"><td><strong>${escHtml(e.coach)}*</strong></td><td><strong>${e.val.toFixed(1)}</strong></td></tr>`
+        : `<tr><td>${escHtml(e.coach)}</td><td>${e.val.toFixed(1)}</td></tr>`).join('')
     : `<tr><td colspan="2" class="no-rankings-msg">No seeds submitted yet.</td></tr>`;
 
   const footerLines = [`Average of ${count} seed${count !== 1 ? '' : ''}`];
@@ -736,6 +772,7 @@ function openRankingsModal(id) {
     const max = Math.max(...entries.map(e => e.val));
     footerLines.push(`Range: ${min.toFixed(1)} – ${max.toFixed(1)}`);
   }
+  if (entries.some(e => e.own)) footerLines.push('* Player’s coach this season');
   footer.innerHTML = footerLines.map(l => `<div>${l}</div>`).join('');
 
   document.getElementById('modal-rankings').classList.remove('hidden');

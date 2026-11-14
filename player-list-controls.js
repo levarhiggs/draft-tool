@@ -310,7 +310,7 @@ export function buildTeamChips(getPlayers, onChange) {
   )].sort();
   if (!teams.length) { container.innerHTML = '<span class="filter-empty">No teams assigned yet</span>'; return; }
   container.innerHTML = teams.map(t => `
-    <button class="filter-chip" data-type="team" data-value="${escAttr(t)}">${escAttr(teamChipLabel(t))}</button>
+    <button class="filter-chip${activeFilters.teams.has(t) ? ' active' : ''}" data-type="team" data-value="${escAttr(t)}">${escAttr(teamChipLabel(t))}</button>
   `).join('');
   container.querySelectorAll('.filter-chip').forEach(btn => {
     btn.addEventListener('click', () => {

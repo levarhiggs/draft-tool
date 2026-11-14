@@ -92,20 +92,20 @@ async function attemptLogin() {
   closeLoginModal();
   updateBadge();
 
-  // Straight to Rotations with the coach's own team pre-selected — building
-  // game lineups is the coach's real job during the regular season, not
-  // wherever they clicked "Coach Login" from. Used to be draft-board.html
-  // during the draft, and player.html (rankings) before that. A coach with
-  // no team this season (the commissioner) lands on Rotations without one,
-  // which falls back to their last-viewed team.
+  // Straight to Coach Rankings filtered to the coach's own team — the
+  // end-of-season ranking pass (2026-11-14) is the coach's job right now, so
+  // future seasons' coaches have a reference. Was rotations.html?team= during
+  // the regular season, draft-board.html during the draft, and player.html
+  // (unfiltered) before that. A coach with no team this season (the
+  // commissioner) lands on the full, unfiltered list.
   // Exception: the primer page. A coach logging in there is doing so to be
   // counted as having read it (primer.js records the view on coachChanged),
   // so they stay put.
   if (window.location.pathname.endsWith('/primer.html')) return;
   const team = coachTeam(candidate.name);
   window.location.href = team
-    ? `rotations.html?team=${encodeURIComponent(team)}`
-    : 'rotations.html';
+    ? `player.html?team=${encodeURIComponent(team)}`
+    : 'player.html';
 }
 
 // Coach's own team, by the same "Coach X" -> "Team X" suffix match
