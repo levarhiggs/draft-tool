@@ -49,10 +49,15 @@ const ROUND_1_GAMES = ['r1_10v7', 'r1_11v6', 'r1_9v8'];
 
 // ── Team lookups ─────────────────────────────────────────────────────────────
 
+// Bracket-card-only short names, on top of coaches-config's shortName. The
+// winner row (big logo + green tick) doesn't fit "Carolina Blue (9)" in a
+// 163px card; setting shortName globally would rename it app-wide.
+const BRACKET_SHORT = { 'Carolina Blue': 'Carolina' };
+
 function teamInfo(seed) {
   const name = SEEDS[seed];
   const entry = Object.values(TEAM_COLORS).find(v => v.name === name);
-  return { name, short: entry?.shortName || name, hex: entry?.hex || '#888' };
+  return { name, short: BRACKET_SHORT[name] || entry?.shortName || name, hex: entry?.hex || '#888' };
 }
 
 // White/Neon Yellow etc. need dark letters on their chips; everything else light.

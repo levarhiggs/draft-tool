@@ -6422,10 +6422,11 @@ body.bd-open { overflow: hidden; }
 .pg-v2 .pg-chip-icon { width: 112%; height: 112%; }
 .pg-v2 .pg-chip-edge { box-shadow: 0 0 0 1px rgba(255,255,255,0.45); }
 
-/* Decided games: winner's logo grows, loser struck through and greyed.
-   No tick here (the Summer page's ::after tick is turned off). */
+/* Decided games: winner's logo grows and gets the Summer page's green tick
+   (sized up to match the bigger logo); loser struck through and greyed. */
 .pg-v2 .pg-team-row.pg-win { padding-block: 6px; gap: 7px; }
-.pg-v2 .pg-team-row.pg-win::after { content: none; }
+.pg-v2 .pg-team-row.pg-win::after { width: 18px; height: 18px; font-size: 0.7rem; }
+.pg-v2 .pg-ladder-card .pg-team-row.pg-win::after { width: 22px; height: 22px; font-size: 0.82rem; }
 .pg-v2 .pg-team-row.pg-win .pg-chip { width: 38px; height: 38px; border-radius: 9px; }
 .pg-v2 .pg-team-row.pg-win .pg-chip > span { font-size: 1rem; }
 .pg-v2 .pg-team-row.pg-lose { opacity: 0.5; font-weight: 600; text-decoration: none; }
