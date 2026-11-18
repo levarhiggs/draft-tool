@@ -6342,3 +6342,130 @@ body.bd-open { overflow: hidden; }
 .bdp-spot { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 1px; }
 .bdp-spot .bdp-init { width: 0.32in; height: 0.32in; font-size: 8pt; }
 .bdp-spot-label { font-size: 6.5pt; font-weight: 800; letter-spacing: .04em; background: #fff; padding: 0 2px; border-radius: 2px; white-space: nowrap; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   Playoffs — season dropdown (all playoffs pages) + Fall 2026 bracket.
+   The bracket rules are scoped to .pg-v2 (playoffs.html) so the archived
+   Summer page (playoffs-26.2.html), which shares the pg-* classes, keeps
+   rendering exactly as it did.
+   ══════════════════════════════════════════════════════════════════════ */
+.pg-season-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: -8px 0 20px;
+}
+.pg-season-label { font-size: 0.8rem; font-weight: 700; color: var(--clr-muted); }
+.pg-season-select {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  min-width: 190px;
+  cursor: pointer;
+}
+.pg-season-select:focus-visible { outline: 2px solid var(--clr-accent); outline-offset: 2px; }
+
+.pg-v2-note {
+  max-width: 560px;
+  margin: 0 auto 26px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--clr-muted);
+  line-height: 1.5;
+}
+.pg-v2-note b { color: var(--clr-text); font-weight: 700; }
+
+/* Stage: 40px wider than Summer's so the enlarged winner logos fit beside
+   "Carolina Blue (9)". Wires are measured in JS, not hand-tuned. */
+.pg-v2 .pg-stage { position: relative; width: 860px; }
+.pg-v2 .pg-prelim-tier { gap: 140px; }
+.pg-wires { position: absolute; inset: 0; pointer-events: none; z-index: 1; overflow: visible; width: 100%; height: 100%; }
+
+/* Bracket title sits over the Round 2 (inner) column */
+.pg-v2 .pg-bracket-label { display: grid; grid-template-columns: 1fr 30px 1fr; }
+.pg-v2 .pg-bracket-label span { grid-column: 3; text-align: center; white-space: nowrap; }
+.pg-v2 .pg-block-b .pg-bracket-label { direction: rtl; text-align: initial; }
+.pg-v2 .pg-block-b .pg-bracket-label span { direction: ltr; }
+.pg-col-heads { display: grid; grid-template-columns: 1fr 30px 1fr; margin-bottom: -6px; }
+.pg-col-heads span { font-size: 0.6rem; font-weight: 700; color: var(--clr-muted); text-transform: uppercase; letter-spacing: 0.06em; text-align: center; }
+.pg-block-b .pg-col-heads { direction: rtl; }
+.pg-block-b .pg-col-heads > * { direction: ltr; }
+
+.pg-v2 .pg-card-when { flex-direction: column; gap: 1px; white-space: nowrap; }
+.pg-card-when .pg-gym { font-size: 0.58rem; font-weight: 600; letter-spacing: 0.02em; }
+.pg-card-ghost {
+  border: 1px dashed var(--clr-border);
+  border-radius: var(--radius);
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 10px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--clr-muted);
+  line-height: 1.4;
+}
+
+/* Team rows: names in full white; undecided slots muted + italic */
+.pg-v2 .pg-team-row { color: var(--clr-text); font-weight: 700; }
+.pg-v2 .pg-team-row.pg-tbd { color: var(--clr-muted); font-style: italic; font-weight: 600; font-size: 0.72rem; }
+.pg-v2 .pg-team-row.pg-tbd b { font-style: normal; font-weight: 800; }
+.pg-seed { font-size: 0.6rem; font-weight: 700; color: var(--clr-muted); margin-left: -3px; font-variant-numeric: tabular-nums; }
+.pg-v2 .pg-chip-icon { width: 112%; height: 112%; }
+.pg-v2 .pg-chip-edge { box-shadow: 0 0 0 1px rgba(255,255,255,0.45); }
+
+/* Decided games: winner's logo grows, loser struck through and greyed.
+   No tick here (the Summer page's ::after tick is turned off). */
+.pg-v2 .pg-team-row.pg-win { padding-block: 6px; gap: 7px; }
+.pg-v2 .pg-team-row.pg-win::after { content: none; }
+.pg-v2 .pg-team-row.pg-win .pg-chip { width: 38px; height: 38px; border-radius: 9px; }
+.pg-v2 .pg-team-row.pg-win .pg-chip > span { font-size: 1rem; }
+.pg-v2 .pg-team-row.pg-lose { opacity: 0.5; font-weight: 600; text-decoration: none; }
+.pg-v2 .pg-team-row.pg-lose .pg-name { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.pg-v2 .pg-team-row.pg-lose .pg-chip { filter: grayscale(1); }
+
+/* Overlapping logos for an undecided slot */
+.pg-stack { display: inline-flex; flex-shrink: 0; }
+.pg-stack .pg-chip { width: 16px; height: 16px; border-radius: 4px; box-shadow: 0 0 0 1.5px var(--clr-card); }
+.pg-stack .pg-chip + .pg-chip { margin-left: -6px; }
+.pg-stack .pg-chip > span { font-size: 0.5rem; }
+
+/* Semifinal slots: leading team's logo large, possible opponents beside it */
+.pg-semi-row { display: flex; align-items: center; gap: 14px; padding: 12px 18px; }
+.pg-semi-row + .pg-semi-row { border-top: 1px solid var(--clr-border); }
+.pg-semi-logos { display: flex; align-items: center; gap: 7px; width: 86px; flex-shrink: 0; }
+.pg-semi-logos .pg-chip-lead { width: 54px; height: 54px; border-radius: 13px; }
+.pg-semi-logos .pg-chip-lead > span { font-size: 1.4rem; }
+.pg-semi-alts { display: flex; flex-direction: column; gap: 5px; }
+.pg-semi-alts .pg-chip { width: 24px; height: 24px; border-radius: 6px; }
+.pg-semi-text { min-width: 0; }
+.pg-semi-who { font-size: 0.9rem; font-weight: 700; color: var(--clr-text); }
+.pg-semi-who span { color: var(--clr-muted); font-weight: 600; }
+.pg-semi-opts { font-size: 0.68rem; color: var(--clr-muted); font-weight: 600; margin-top: 2px; }
+
+/* Championship: TBD tiles with the pool of teams still alive */
+.pg-champ-vs { align-self: center; font-size: 0.75rem; font-weight: 800; color: var(--clr-muted); letter-spacing: 0.1em; }
+.pg-champ-pool { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: 170px; }
+.pg-champ-pool .pg-chip { width: 22px; height: 22px; border-radius: 6px; }
+.pg-v2 .pg-champ-team-color { color: var(--clr-muted); }
+
+/* Phone ladder */
+.pg-v2 .pg-ladder-tag.pg-tag-b { color: var(--pg-bracket-b); }
+.pg-v2 .pg-ladder-tag.pg-tag-gold { color: var(--clr-warning); }
+.pg-v2 .pg-ladder-champ { border-color: var(--clr-warning); }
+.pg-v2 .pg-ladder-top { gap: 10px; align-items: baseline; }
+.pg-v2 .pg-ladder-when { text-align: right; }
+.pg-v2 .pg-ladder-card .pg-team-row { padding: 6px 0; font-size: 0.92rem; }
+.pg-v2 .pg-ladder-card .pg-team-row .pg-chip { width: 26px; height: 26px; border-radius: 7px; }
+.pg-v2 .pg-ladder-card .pg-team-row.pg-win .pg-chip { width: 48px; height: 48px; border-radius: 12px; }
+.pg-v2 .pg-ladder-card .pg-team-row.pg-tbd { font-size: 0.82rem; white-space: normal; }
+.pg-v2 .pg-ladder-card .pg-stack .pg-chip { width: 22px; height: 22px; border-radius: 6px; }
+.pg-v2 .pg-ladder-card .pg-stack .pg-chip + .pg-chip { margin-left: -8px; }

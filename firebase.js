@@ -517,18 +517,22 @@ export async function getScheduleGame(gameNum) {
 // number (string, matching the doc ID) — used by Gameboard's Board view to
 // compute season stats for all 12 teams without issuing 60 individual
 // getDoc calls.
-export async function getAllScheduleGames() {
+//
+// `code` defaults to the schedule season. Pass an explicit code to read a
+// different season's results — the archived playoffs-26.2 page does this so
+// it keeps showing Summer's records after the app rolled over to Fall.
+export async function getAllScheduleGames(code = SCHEDULE_CODE) {
   try {
     const snap = await getDocs(collection(db, 'scheduleGames'));
     const games = {};
     // Docs from every season live in this one collection (see SEASON SCOPING
-    // above), so filter to the schedule season and strip the prefix — callers
+    // above), so filter to the requested season and strip the prefix — callers
     // expect plain game numbers as keys and would otherwise double-count
     // across seasons in every win/loss computation.
-    const prefix = `${SCHEDULE_CODE}__`;
+    const prefix = `${code}__`;
     snap.forEach(d => {
       const isLegacy = !d.id.includes('__');
-      if (SCHEDULE_CODE === LEGACY_SEASON) {
+      if (code === LEGACY_SEASON) {
         if (isLegacy) games[d.id] = d.data();
       } else if (d.id.startsWith(prefix)) {
         games[d.id.slice(prefix.length)] = d.data();
