@@ -36,7 +36,7 @@ const GAMES = {
   // Round 2 — Thu Nov 19
   r2_1:    { bracket: 'A', a: { seed: 1 }, b: { from: [8, 9] },  win: 'b', day: 'Thu Nov 19', time: '6:50 PM', gym: 'Gym Middle' },
   r2_2:    { bracket: 'B', a: { seed: 2 }, b: { from: [7, 10] }, win: 'a', day: 'Thu Nov 19', time: '7:40 PM', gym: 'Gym East' },
-  r2_3:    { bracket: 'B', a: { seed: 3 }, b: { from: [6, 11] }, day: 'Thu Nov 19', time: '7:40 PM', gym: 'Gym Middle' },
+  r2_3:    { bracket: 'B', a: { seed: 3 }, b: { from: [6, 11] }, win: 'a', day: 'Thu Nov 19', time: '7:40 PM', gym: 'Gym Middle' },
   r2_4:    { bracket: 'A', a: { seed: 4 }, b: { seed: 5 },       win: 'a', day: 'Thu Nov 19', time: '8:30 PM', gym: 'Gym Middle' },
   // Semifinals — Mon Nov 30
   semiA:   { bracket: 'A', a: { from: [1, 8, 9] },  b: { from: [4, 5] },     day: 'Mon Nov 30', time: '6:50 PM', gym: 'Gym Middle' },
