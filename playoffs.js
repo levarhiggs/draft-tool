@@ -34,10 +34,10 @@ const GAMES = {
   r1_11v6: { bracket: 'B', a: { seed: 11 }, b: { seed: 6 }, win: 'b', day: 'Tue Nov 17', time: '6:00 PM', gym: 'Gym Middle' },
   r1_9v8:  { bracket: 'A', a: { seed: 9 },  b: { seed: 8 }, win: 'a', day: 'Tue Nov 17', time: '6:50 PM', gym: 'Gym Middle' },
   // Round 2 — Thu Nov 19
-  r2_1:    { bracket: 'A', a: { seed: 1 }, b: { from: [8, 9] },  day: 'Thu Nov 19', time: '6:50 PM', gym: 'Gym Middle' },
-  r2_2:    { bracket: 'B', a: { seed: 2 }, b: { from: [7, 10] }, day: 'Thu Nov 19', time: '7:40 PM', gym: 'Gym East' },
+  r2_1:    { bracket: 'A', a: { seed: 1 }, b: { from: [8, 9] },  win: 'b', day: 'Thu Nov 19', time: '6:50 PM', gym: 'Gym Middle' },
+  r2_2:    { bracket: 'B', a: { seed: 2 }, b: { from: [7, 10] }, win: 'a', day: 'Thu Nov 19', time: '7:40 PM', gym: 'Gym East' },
   r2_3:    { bracket: 'B', a: { seed: 3 }, b: { from: [6, 11] }, day: 'Thu Nov 19', time: '7:40 PM', gym: 'Gym Middle' },
-  r2_4:    { bracket: 'A', a: { seed: 4 }, b: { seed: 5 },       day: 'Thu Nov 19', time: '8:30 PM', gym: 'Gym Middle' },
+  r2_4:    { bracket: 'A', a: { seed: 4 }, b: { seed: 5 },       win: 'a', day: 'Thu Nov 19', time: '8:30 PM', gym: 'Gym Middle' },
   // Semifinals — Mon Nov 30
   semiA:   { bracket: 'A', a: { from: [1, 8, 9] },  b: { from: [4, 5] },     day: 'Mon Nov 30', time: '6:50 PM', gym: 'Gym Middle' },
   semiB:   { bracket: 'B', a: { from: [3, 6, 11] }, b: { from: [2, 7, 10] }, day: 'Mon Nov 30', time: '6:50 PM', gym: 'Gym West' },
@@ -46,13 +46,14 @@ const GAMES = {
 };
 
 const ROUND_1_GAMES = ['r1_10v7', 'r1_11v6', 'r1_9v8'];
+const ROUND_2_GAMES = ['r2_1', 'r2_4', 'r2_2', 'r2_3'];
 
 // ── Team lookups ─────────────────────────────────────────────────────────────
 
 // Bracket-card-only short names, on top of coaches-config's shortName. The
-// winner row (big logo + green tick) doesn't fit "Carolina Blue (9)" in a
-// 163px card; setting shortName globally would rename it app-wide.
-const BRACKET_SHORT = { 'Carolina Blue': 'Carolina' };
+// winner row (big logo + green tick) doesn't fit "Carolina Blue (9)" or
+// "Neon Yellow (4)" in a 163px card; setting shortName globally would rename it app-wide.
+const BRACKET_SHORT = { 'Carolina Blue': 'Carolina', 'Neon Yellow': 'Neon' };
 
 function teamInfo(seed) {
   const name = SEEDS[seed];
@@ -94,9 +95,6 @@ function orList(seeds) {
 // still alive; once one is left it shows as that team.
 
 const ELIM = new Set();
-Object.values(GAMES).forEach(g => {
-  if (g.win) ELIM.add((g.win === 'a' ? g.b : g.a).seed);
-});
 const live = from => from.filter(s => !ELIM.has(s));
 
 function resolve(side) {
@@ -106,12 +104,24 @@ function resolve(side) {
   return { ...side, from: f };
 }
 
+// Each game's two sides are resolved ONCE, in round order (GAMES is listed
+// that way), against the losers of the rounds before it, and kept on the game
+// as g.sides. Resolving later against the full ELIM set would drop a team from
+// the very game it lost (True Red would vanish from its own Round 2 card).
+const seedOf = (g, key) => g.sides[key].seed;
+const winnerOf = g => g.win ? seedOf(g, g.win) : null;
+const loserOf  = g => g.win ? seedOf(g, g.win === 'a' ? 'b' : 'a') : null;
+Object.values(GAMES).forEach(g => {
+  g.sides = { a: resolve(g.a), b: resolve(g.b) };
+  if (g.win) ELIM.add(loserOf(g));
+});
+
 const stateOf = (g, key) => !g.win ? '' : g.win === key ? 'pg-win' : 'pg-lose';
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
-function rowHtml(rawSide, long = false, state = '') {
-  const side = resolve(rawSide);
+// side = a game's resolved side (g.sides.a / g.sides.b).
+function rowHtml(side, long = false, state = '') {
   if (side.semi) {
     return `<div class="pg-team-row pg-tbd">${stack(side.from)}<span>Winner of <b>Semi ${side.semi}</b></span></div>`;
   }
@@ -128,8 +138,8 @@ function cardHtml(id, r2 = false) {
   return `
     <div class="pg-card ${r2 ? 'pg-card-r2' : ''}" id="card-${id}">
       <div class="pg-card-when"><span><span class="pg-day">${g.day}</span> · ${g.time}</span><span class="pg-gym">${g.gym}</span></div>
-      ${rowHtml(g.a, false, stateOf(g, 'a'))}
-      ${rowHtml(g.b, false, stateOf(g, 'b'))}
+      ${rowHtml(g.sides.a, false, stateOf(g, 'a'))}
+      ${rowHtml(g.sides.b, false, stateOf(g, 'b'))}
     </div>`;
 }
 
@@ -138,9 +148,22 @@ function arrowHtml(bracket, dir) {
 }
 
 // Semi slot: the Round 2 host team's logo leads, larger; the teams that could
-// still take the slot sit beside it.
-function semiRowHtml(allFrom) {
-  const [host, ...rest] = live(allFrom);
+// still take the slot sit beside it. Once Round 2 is played the slot shows the
+// team that advanced and who it beat.
+function semiRowHtml(side) {
+  if (side.seed != null) {
+    const seed = side.seed;
+    const beat = ROUND_2_GAMES.map(id => GAMES[id]).find(g => winnerOf(g) === seed);
+    return `
+    <div class="pg-semi-row pg-semi-set">
+      <div class="pg-semi-logos">${chip(seed, 'pg-chip-lead')}</div>
+      <div class="pg-semi-text">
+        <div class="pg-semi-who">${teamInfo(seed).name} <span>(${seed})</span></div>
+        <div class="pg-semi-opts">${beat ? `Beat ${teamInfo(loserOf(beat)).name}, ${beat.day}` : 'Advanced'}</div>
+      </div>
+    </div>`;
+  }
+  const [host, ...rest] = side.from;
   const hostName = teamInfo(host).name;
   const feeder = Object.values(GAMES).find(x => x.a.seed === host);
   const other = rest.length === 1
@@ -166,8 +189,8 @@ function semiCardHtml(id, title, cls) {
         <div class="pg-semi-when">${g.day} · ${g.time} · ${g.gym}</div>
       </div>
       <div class="pg-semi-matchup">
-        ${semiRowHtml(g.a.from)}
-        ${semiRowHtml(g.b.from)}
+        ${semiRowHtml(g.sides.a)}
+        ${semiRowHtml(g.sides.b)}
       </div>
     </div>`;
 }
@@ -178,20 +201,31 @@ function champTeamHtml(side) {
       <div class="pg-champ-team-color">TBD</div>
       <div class="pg-champ-team-tile pg-champ-team-tile-empty">?</div>
       <div class="pg-champ-team-coach">Winner of Semi ${side.semi}</div>
-      <div class="pg-champ-pool">${live(side.from).map(s => chip(s)).join('')}</div>
+      <div class="pg-champ-pool">${side.from.map(s => chip(s)).join('')}</div>
     </div>`;
 }
 
+// "Gold, True Red and Carolina Blue" — winners' seeds, lowest number first.
+function andList(ids) {
+  const seeds = ids.map(id => winnerOf(GAMES[id])).filter(s => s != null).sort((x, y) => x - y);
+  return orList(seeds).replace(/ or ([^,]*)$/, ' and $1');
+}
+
+function roundNote(label, ids) {
+  const done = ids.filter(id => GAMES[id].win);
+  if (!done.length) return '';
+  if (done.length === ids.length) return ` <b>${label} is final</b>: ${andList(ids)} advance.`;
+  const open = ids.filter(id => !GAMES[id].win).map(id => {
+    const g = GAMES[id];
+    return `${teamInfo(seedOf(g, 'a')).name} vs ${teamInfo(seedOf(g, 'b')).name}`;
+  });
+  return ` <b>${label}</b>: ${andList(done)} advance; ${open.join(', ')} result to come.`;
+}
+
 function renderNote() {
-  const r1Done = ROUND_1_GAMES.every(id => GAMES[id].win);
-  // Winners' seeds, lowest seed number first: "Gold, True Red and Carolina Blue".
-  const winners = ROUND_1_GAMES
-    .map(id => { const g = GAMES[id]; return g.win ? (g.win === 'a' ? g.a : g.b).seed : null; })
-    .filter(s => s != null)
-    .sort((x, y) => x - y);
   document.getElementById('pg-v2-note').innerHTML =
     `Playoff schedule, <b>Nov 17 to Dec 2</b>. Seeds follow the <b>official final standings</b>.` +
-    (r1Done ? ` <b>Round 1 is final</b>: ${orList(winners).replace(/ or ([^,]*)$/, ' and $1')} advance.` : '');
+    roundNote('Round 1', ROUND_1_GAMES) + roundNote('Round 2', ROUND_2_GAMES);
 }
 
 function renderDesktop() {
@@ -232,9 +266,9 @@ function renderDesktop() {
           <div class="pg-champ-label">Championship</div>
           <div class="pg-champ-when">${c.day} · ${c.time} · ${c.gym}</div>
           <div class="pg-champ-matchup">
-            ${champTeamHtml(c.a)}
+            ${champTeamHtml(c.sides.a)}
             <div class="pg-champ-vs">VS</div>
-            ${champTeamHtml(c.b)}
+            ${champTeamHtml(c.sides.b)}
           </div>
         </div>
       </div>
@@ -282,8 +316,8 @@ function ladderCardHtml(id, tag, tagCls = '') {
         <span class="pg-ladder-tag ${tagCls}">${tag}</span>
         <span class="pg-ladder-when">${g.day} · ${g.time} · ${g.gym}${g.win ? ' · Final' : ''}</span>
       </div>
-      ${rowHtml(g.a, true, stateOf(g, 'a'))}
-      ${rowHtml(g.b, true, stateOf(g, 'b'))}
+      ${rowHtml(g.sides.a, true, stateOf(g, 'a'))}
+      ${rowHtml(g.sides.b, true, stateOf(g, 'b'))}
     </div>`;
 }
 
